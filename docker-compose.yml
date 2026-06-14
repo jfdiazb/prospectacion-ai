@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # MongoDB
+  mongodb:
+    image: mongo:6
+    container_name: prospectacion_mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - prospectacion_network
+
+  # Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: prospectacion_backend
+    ports:
+      - "5001:5001"
+    environment:
+      NODE_ENV: development
+      MONGO_URI: mongodb://admin:password@mongodb:27017/prospectacion-ai
+      JWT_SECRET: your-super-secret-key
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      FRONTEND_URL: http://localhost:3000
+    depends_on:
+      - mongodb
+    networks:
+      - prospectacion_network
+    volumes:
+      - ./backend/src:/app/src
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: prospectacion_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: http://localhost:5001/api/v1
+    depends_on:
+      - backend
+    networks:
+      - prospectacion_network
+    volumes:
+      - ./frontend/src:/app/src
+
+volumes:
+  mongodb_data:
+
+networks:
+  prospectacion_network:
+    driver: bridge

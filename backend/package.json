@@ -1,0 +1,69 @@
+{
+  "name": "prospectacion-ai-backend",
+  "version": "1.0.0",
+  "description": "Backend para sistema de prospectación automatizada",
+  "main": "dist/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src",
+    "test": "jest",
+    "migrate": "node scripts/migrate.js"
+  },
+  "keywords": [
+    "prospectacion",
+    "crm",
+    "leads",
+    "marketing",
+    "network-marketing"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "bcryptjs": "^2.4.3",
+    "bull": "^4.11.4",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.2",
+    "express-rate-limit": "^7.1.0",
+    "helmet": "^7.0.0",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.3",
+    "lodash": "^4.17.21",
+    "module-alias": "^2.3.4",
+    "moment": "^2.29.4",
+    "mongodb-memory-server": "^11.1.0",
+    "mongoose": "^7.8.9",
+    "nodemailer": "^6.9.7",
+    "openai": "^4.19.0",
+    "redis": "^4.6.10",
+    "tsconfig-paths": "^4.2.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.25",
+    "@types/jest": "^29.5.7",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.8.0",
+    "@typescript-eslint/eslint-plugin": "^6.8.0",
+    "@typescript-eslint/parser": "^6.8.0",
+    "eslint": "^8.51.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.1",
+    "prettier": "^3.0.3",
+    "ts-jest": "^29.1.1",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
