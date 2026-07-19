@@ -4,6 +4,7 @@ import { LeadService } from '../services/LeadService';
 import { HTTP_STATUS, MESSAGES } from '../config/constants';
 import type { IApiResponse, IPaginatedResponse, ILead } from '../types/index';
 
+
 /**
  * Controlador de Leads
  */

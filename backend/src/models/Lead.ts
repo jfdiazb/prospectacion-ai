@@ -17,7 +17,7 @@ const leadSchema = new Schema(
     },
     platform: {
       type: String,
-      enum: ['instagram', 'facebook', 'tiktok', 'whatsapp', 'telegram', 'manual'],
+      enum: ['instagram', 'facebook', 'tiktok', 'youtube','whatsapp', 'telegram', 'manual'],
       required: true,
     },
     fullName: String,
@@ -59,7 +59,10 @@ const leadSchema = new Schema(
     email: String,
     phone: String,
     source: String,
-    aiAnalysis: String,
+    aiAnalysis: {
+  type: Object,
+  default: {}
+},
     messageHistory: [
       {
         platform: String,
@@ -73,14 +76,14 @@ const leadSchema = new Schema(
 );
 
 /**
- * Indices para bÃºsquedas rÃ¡pidas
+ * Indices para búsquedas rápidas
  */
 leadSchema.index({ userId: 1, createdAt: -1 });
 leadSchema.index({ username: 1 });
 leadSchema.index({ email: 1 });
 leadSchema.index({ score: -1 });
 leadSchema.index({ interestLevel: 1 });
-leadSchema.index({ platform: 1 });
+leadSchema.index({ platform: 1, score: -1 });
 
 export default mongoose.model<ILead & mongoose.Document>('Lead', leadSchema);
 

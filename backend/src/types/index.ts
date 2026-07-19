@@ -36,6 +36,19 @@ export interface ILead {
   notes?: string;
   email?: string;
   phone?: string;
+  source?: string;
+
+aiAnalysis?: {
+  [key: string]: any;
+};
+
+messageHistory?: {
+  platform: string;
+  timestamp: Date;
+  content: string;
+  type: string;
+}[];
+
   createdAt?: Date;
   updatedAt?: Date;
 }

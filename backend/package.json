@@ -20,9 +20,11 @@
     "marketing",
     "network-marketing"
   ],
-  "author": "Your Name",
+  "author": "Jose Fernando Diaz Bonilla",
   "license": "MIT",
   "dependencies": {
+    "@google/genai": "^2.11.0",
+    "@google/generative-ai": "^0.24.1",
     "axios": "^1.6.0",
     "bcryptjs": "^2.4.3",
     "bull": "^4.11.4",
@@ -38,8 +40,8 @@
     "moment": "^2.29.4",
     "mongodb-memory-server": "^11.1.0",
     "mongoose": "^7.8.9",
-    "nodemailer": "^6.9.7",
-    "openai": "^4.19.0",
+    "nodemailer": "^9.0.1",
+    "openai": "^4.104.0",
     "redis": "^4.6.10",
     "tsconfig-paths": "^4.2.0",
     "uuid": "^9.0.1"
@@ -50,7 +52,7 @@
     "@types/express": "^4.17.25",
     "@types/jest": "^29.5.7",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^20.8.0",
+    "@types/node": "^20.19.43",
     "@typescript-eslint/eslint-plugin": "^6.8.0",
     "@typescript-eslint/parser": "^6.8.0",
     "eslint": "^8.51.0",

@@ -1,10 +1,15 @@
 ﻿import User from '../models/User';
 import type { IUser, IAuthResponse } from '../types/index';
-import { hashPassword, comparePassword, generateToken, validateEmail } from '../utils/helpers';
+import {
+  hashPassword,
+  comparePassword,
+  generateToken,
+  validateEmail,
+} from '../utils/helpers';
 import { MESSAGES } from '../config/constants';
 
 /**
- * Servicio de AutenticaciÃ³n
+ * Servicio de Autenticación
  */
 export class AuthService {
   /**
@@ -18,16 +23,17 @@ export class AuthService {
 
     // Verificar si el email ya existe
     const existingUser = await User.findOne({ email: userData.email });
+
     if (existingUser) {
       throw new Error(MESSAGES.ERROR.EMAIL_ALREADY_EXISTS);
     }
 
-    // Validar contraseÃ±a
+    // Validar contraseña
     if (!userData.password || userData.password.length < 6) {
       throw new Error(MESSAGES.ERROR.WEAK_PASSWORD);
     }
 
-    // Hash de la contraseÃ±a
+    // Hash de la contraseña
     const hashedPassword = await hashPassword(userData.password);
 
     // Crear usuario
@@ -39,7 +45,10 @@ export class AuthService {
     });
 
     // Generar token
-    const token = generateToken({ id: user._id, email: user.email });
+    const token = generateToken({
+      id: user._id,
+      email: user.email,
+    });
 
     return {
       token,
@@ -53,29 +62,56 @@ export class AuthService {
   }
 
   /**
-   * Iniciar sesiÃ³n
+   * Iniciar sesión
    */
   static async login(email: string, password: string): Promise<IAuthResponse> {
+    console.log('\n================ LOGIN =================');
+    console.log('📧 Email recibido:', email);
+
     // Buscar usuario
-    const user = (await User.findOne({ email }).select('+password')) as any;
+    const user = await User.findOne({ email }).select('+password');
+
+    console.log('👤 Usuario encontrado:', user ? 'SI' : 'NO');
 
     if (!user) {
+      console.log('❌ No existe un usuario con ese email');
       throw new Error(MESSAGES.ERROR.INVALID_CREDENTIALS);
     }
 
-    // Verificar contraseÃ±a
+    console.log('🔐 Password almacenada:', user.password);
+
+    // Verificar contraseña
     const isPasswordValid = await comparePassword(password, user.password);
 
+    console.log('🔍 Password válida:', isPasswordValid);
+
     if (!isPasswordValid) {
+      console.log('❌ Contraseña incorrecta');
       throw new Error(MESSAGES.ERROR.INVALID_CREDENTIALS);
     }
 
-    // Actualizar Ãºltimo login
+    console.log('✅ Credenciales correctas');
+
+    // Actualizar último login
     user.lastLogin = new Date();
+
+    console.log('💾 Guardando último login...');
     await user.save();
 
+    console.log('✅ Último login actualizado');
+
     // Generar token
-    const token = generateToken({ id: user._id, email: user.email, role: user.role });
+    console.log('🎫 Generando JWT...');
+
+    const token = generateToken({
+      id: user._id,
+      email: user.email,
+      role: user.role,
+    });
+
+    console.log('✅ JWT generado correctamente');
+    console.log('🚀 LOGIN EXITOSO');
+    console.log('========================================\n');
 
     return {
       token,
@@ -97,31 +133,49 @@ export class AuthService {
   }
 
   /**
-   * Actualizar perfil de usuario
+   * Actualizar perfil
    */
-  static async updateProfile(userId: string, updateData: Partial<IUser>): Promise<IUser | null> {
-    const allowedFields = ['fullName', 'avatar', 'phone', 'company'];
+  static async updateProfile(
+    userId: string,
+    updateData: Partial<IUser>
+  ): Promise<IUser | null> {
+    const allowedFields = [
+      'fullName',
+      'avatar',
+      'phone',
+      'company',
+    ];
+
     const filteredData = Object.keys(updateData)
-      .filter(key => allowedFields.includes(key))
+      .filter((key) => allowedFields.includes(key))
       .reduce((obj, key) => {
         obj[key] = updateData[key as keyof IUser];
         return obj;
       }, {} as any);
 
-    return await User.findByIdAndUpdate(userId, filteredData, { new: true });
+    return await User.findByIdAndUpdate(userId, filteredData, {
+      new: true,
+    });
   }
 
   /**
-   * Cambiar contraseÃ±a
+   * Cambiar contraseña
    */
-  static async changePassword(userId: string, oldPassword: string, newPassword: string): Promise<void> {
+  static async changePassword(
+    userId: string,
+    oldPassword: string,
+    newPassword: string
+  ): Promise<void> {
     const user = await User.findById(userId).select('+password');
 
     if (!user) {
       throw new Error(MESSAGES.ERROR.NOT_FOUND);
     }
 
-    const isPasswordValid = await comparePassword(oldPassword, user.password);
+    const isPasswordValid = await comparePassword(
+      oldPassword,
+      user.password
+    );
 
     if (!isPasswordValid) {
       throw new Error(MESSAGES.ERROR.INVALID_CREDENTIALS);
@@ -132,6 +186,7 @@ export class AuthService {
     }
 
     user.password = await hashPassword(newPassword);
+
     await user.save();
   }
 
@@ -143,4 +198,3 @@ export class AuthService {
     return !!user;
   }
 }
-

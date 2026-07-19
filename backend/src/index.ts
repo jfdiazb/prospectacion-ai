@@ -8,8 +8,10 @@ import hunterRoutes from './routes/hunterRoutes';
 import scraperRoutes from './routes/scraperRoutes';
 import aiRoutes from './routes/aiRoutes';
 import { errorMiddleware, notFoundMiddleware } from './middlewares/auth';
+import whatsappRoutes from './routes/whatsappRoutes';
 
 dotenv.config();
+console.log("MONGO_URI =>", process.env.MONGO_URI);
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 5001;
@@ -27,18 +29,21 @@ app.use(`${API_PREFIX}/leads`, leadRoutes);
 app.use(`${API_PREFIX}/lead-hunter`, hunterRoutes);
 app.use(`${API_PREFIX}/social-scraper`, scraperRoutes);
 app.use(`${API_PREFIX}/ai`, aiRoutes);
+app.use('/api/v1/whatsapp', whatsappRoutes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 
-const startServer = async () => {
+export const startServer = async () => {
   await connectDB();
-  app.listen(PORT, () => {
+  return app.listen(PORT, () => {
     console.log(`✅ Backend running on http://localhost:${PORT}`);
   });
 };
 
-startServer().catch(error => {
-  console.error('❌ Error iniciando servidor:', error);
-  process.exit(1);
-});
+if (process.env.NODE_ENV !== 'test') {
+  startServer().catch(error => {
+    console.error('❌ Error iniciando servidor:', error);
+    process.exit(1);
+  });
+}

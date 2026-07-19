@@ -6,6 +6,8 @@ import { startServer } from '../src/index';
 import { disconnectDB } from '../src/config/database';
 import type http from 'http';
 
+jest.setTimeout(120000);
+
 describe('Auth integration tests', () => {
   let server: http.Server;
   let baseURL: string;

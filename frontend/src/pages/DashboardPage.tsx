@@ -151,7 +151,7 @@ export const DashboardPage = () => {
                 <p className="text-sm uppercase tracking-[0.24em] text-primary-300">Actividad semanal</p>
                 <h2 className="mt-2 text-2xl font-semibold text-white">Tendencia de leads</h2>
               </div>
-              <div className="rounded-3xl bg-white/5 px-4 py-2 text-sm text-white shadow-inner shadow-black/10">Más de {stats.weeklyLeads?.reduce((sum:any, item:any) => sum + item.leads, 0) ?? stats.totalLeads ?? 0} leads esta semana</div>
+              <div className="rounded-3xl bg-white/5 px-4 py-2 text-sm text-white shadow-inner shadow-black/10">Más de {stats?.weeklyLeads?.reduce((sum:any, item:any) => sum + item.leads, 0) ?? stats?.totalLeads ?? 0} leads esta semana</div>
             </div>
 
             <div className="h-[320px] px-4 py-6 sm:px-6">

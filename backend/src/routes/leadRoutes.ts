@@ -1,32 +1,68 @@
-﻿import express from 'express';
-import { LeadController } from '../controllers/LeadController';
-import { authMiddleware } from '../middlewares/auth';
-import { apiLimiter } from '../middlewares/rateLimiter';
+﻿import { Router } from "express";
+import { analyzeLead } from "../ai/leadAnalyzer";
+import { LeadController } from "../controllers/LeadController";
 
-const router = express.Router();
+const router = Router();
 
-/**
- * Todas las rutas requieren autenticaciÃ³n
- */
-router.use(authMiddleware, apiLimiter);
+console.log("👉 leadRoutes cargado");
 
-/**
- * CRUD bÃ¡sico
- */
-router.post('/', LeadController.createLead);
-router.get('/', LeadController.getLeads);
-router.get('/stats', LeadController.getStats);
-router.get('/hot', LeadController.getHotLeads);
-router.get('/:id', LeadController.getLeadById);
-router.put('/:id', LeadController.updateLead);
-router.delete('/:id', LeadController.deleteLead);
+// GET
+router.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "Leads funcionando 🚀",
+  });
+});
 
-/**
- * Rutas especializadas
- */
-router.put('/:id/status', LeadController.updateLeadStatus);
-router.get('/status/:status', LeadController.getLeadsByStatus);
-router.post('/search', LeadController.advancedSearch);
+// POST
+import Lead from "../models/Lead";
+
+router.post("/", async (req, res) => {
+  try {
+    const data = req.body;
+
+    const lead = new Lead({
+      ...data,
+      userId: data.userId || "000000000000000000000000"
+    });
+
+    await lead.save();
+
+    return res.json({
+      success: true,
+      message: "Lead guardado en MongoDB",
+      lead
+    });
+
+  } catch (error) {
+    console.error("ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error guardando lead",
+      error: error.message
+    });
+  }
+});
+
+router.post("/analyze", async (req, res) => {
+  try {
+    const result = await analyzeLead(req.body);
+
+    return res.json({
+      success: true,
+      analysis: JSON.parse(result || "{}")
+    });
+
+  } catch (error: any) {
+    console.error("❌ Error analizando lead:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error analizando lead",
+      error: error.message
+    });
+  }
+});
 
 export default router;
-

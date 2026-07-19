@@ -20,31 +20,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   // Cargar usuario al montar
-  useEffect(() => {
-    const loadUser = async () => {
-      const token = authService.getToken();
-      const storedUser = authService.getStoredUser();
+useEffect(() => {
+  const loadUser = async () => {
+    const token = authService.getToken();
 
-      if (token && storedUser) {
-        setUser(storedUser);
-      }
-
-      if (token) {
-        try {
-          const userData = await authService.getProfile();
-          setUser(userData);
-          authService.setStoredUser(userData);
-        } catch (error) {
-          authService.logout();
-          setUser(null);
-        }
-      }
-
+    if (!token) {
+      authService.logout();
+      setUser(null);
       setIsLoading(false);
-    };
+      return;
+    }
 
-    loadUser();
-  }, []);
+    try {
+      const userData = await authService.getProfile();
+      setUser(userData);
+      authService.setStoredUser(userData);
+    } catch (error) {
+      authService.logout();
+      setUser(null);
+    }
+
+    setIsLoading(false);
+  };
+
+  loadUser();
+}, []);
 
   const login = async (email: string, password: string) => {
     const { token, user: userData } = await authService.login(email, password);
