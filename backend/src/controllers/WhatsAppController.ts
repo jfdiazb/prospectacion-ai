@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import axios from "axios";
+import crypto from 'crypto';
 import { GeminiService } from "../services/GeminiService";
 
 import { LeadService } from "../services/LeadService";
@@ -7,6 +8,17 @@ import { ConversationService } from "../services/ConversationService";
 import Lead from "../models/Lead";
 
 export class WhatsAppController {
+
+  private static isValidSignature(rawBody: Buffer, signature?: string): boolean {
+    const appSecret = process.env.WHATSAPP_APP_SECRET;
+    if (!appSecret || !signature) return false;
+
+    const expected = `sha256=${crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex')}`;
+    const expectedBuffer = Buffer.from(expected);
+    const signatureBuffer = Buffer.from(signature);
+    return expectedBuffer.length === signatureBuffer.length
+      && crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
+  }
 
   static verifyWebhook(req: Request, res: Response) {
     const mode = req.query["hub.mode"];
@@ -22,12 +34,19 @@ export class WhatsAppController {
 
   static async receiveMessage(req: Request, res: Response) {
     try {
-      const message = req.body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+      const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body));
+      if (!this.isValidSignature(rawBody, req.header('x-hub-signature-256'))) {
+        return res.sendStatus(401);
+      }
+
+      const payload = JSON.parse(rawBody.toString('utf8'));
+      const message = payload?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
 
       if (!message) return res.sendStatus(200);
 
       const from = message.from;
       const text = message.text?.body;
+      if (!from || !text) return res.sendStatus(200);
 
       const userId = process.env.CRM_OWNER_ID;
 
@@ -37,7 +56,8 @@ if (!userId) {
 
 // 🔎 Buscar lead por WhatsApp
 let lead = await Lead.findOne({
-  phone: from
+  phone: from,
+  userId,
 });
 
 
@@ -72,6 +92,10 @@ await ConversationService.addMessage(
     platform: "whatsapp"
   }
 );
+
+      if (process.env.WHATSAPP_AUTO_REPLY_ENABLED !== 'true') {
+        return res.sendStatus(200);
+      }
 
       // 🤖 GEMINI
       const aiResponse = await GeminiService.generateResponse(

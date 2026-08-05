@@ -1,27 +1,18 @@
-# Dockerfile - Frontend
-
-FROM node:18-alpine as builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
-
 COPY package*.json ./
-
 RUN npm ci
-
 COPY . .
-
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
-# Production stage
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
-
-# Instalar serve para servir la aplicación
-RUN npm install -g serve
-
+RUN npm install -g serve@14.2.4
 COPY --from=builder /app/dist ./dist
 
 EXPOSE 3000
-
 CMD ["serve", "-s", "dist", "-l", "3000"]

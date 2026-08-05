@@ -59,6 +59,13 @@ const leadSchema = new Schema(
     email: String,
     phone: String,
     source: String,
+    qualification: {
+      intent: String,
+      needs: [String],
+      objections: [String],
+      meetingRequested: { type: Boolean, default: false },
+      lastEvaluatedAt: Date,
+    },
     aiAnalysis: {
   type: Object,
   default: {}

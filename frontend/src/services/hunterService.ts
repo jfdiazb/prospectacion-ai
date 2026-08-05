@@ -7,12 +7,12 @@ export const hunterService = {
     platform: string;
     minFollowers?: number;
   }): Promise<IApiResponse<IHunterProfile[]>> {
-    const response = await apiClient.post<IApiResponse<IHunterProfile[]>>('/hunter/search', params);
+    const response = await apiClient.post<IApiResponse<IHunterProfile[]>>('/lead-hunter/search', params);
     return response.data;
   },
 
   async enrichProfile(profile: IHunterProfile): Promise<IApiResponse<IHunterProfile>> {
-    const response = await apiClient.post<IApiResponse<IHunterProfile>>('/hunter/enrich', profile);
+    const response = await apiClient.post<IApiResponse<IHunterProfile>>('/lead-hunter/enrich', profile);
     return response.data;
   },
 };

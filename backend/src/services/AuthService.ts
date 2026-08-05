@@ -22,7 +22,8 @@ export class AuthService {
     }
 
     // Verificar si el email ya existe
-    const existingUser = await User.findOne({ email: userData.email });
+    const normalizedEmail = userData.email.trim().toLowerCase();
+    const existingUser = await User.findOne({ email: normalizedEmail });
 
     if (existingUser) {
       throw new Error(MESSAGES.ERROR.EMAIL_ALREADY_EXISTS);
@@ -38,7 +39,7 @@ export class AuthService {
 
     // Crear usuario
     const user = await User.create({
-      email: userData.email,
+      email: normalizedEmail,
       password: hashedPassword,
       fullName: userData.fullName,
       role: userData.role || 'user',
@@ -48,6 +49,7 @@ export class AuthService {
     const token = generateToken({
       id: user._id,
       email: user.email,
+      role: user.role,
     });
 
     return {
@@ -65,53 +67,30 @@ export class AuthService {
    * Iniciar sesión
    */
   static async login(email: string, password: string): Promise<IAuthResponse> {
-    console.log('\n================ LOGIN =================');
-    console.log('📧 Email recibido:', email);
-
     // Buscar usuario
-    const user = await User.findOne({ email }).select('+password');
-
-    console.log('👤 Usuario encontrado:', user ? 'SI' : 'NO');
+    const user = await User.findOne({ email: email.trim().toLowerCase() }).select('+password');
 
     if (!user) {
-      console.log('❌ No existe un usuario con ese email');
       throw new Error(MESSAGES.ERROR.INVALID_CREDENTIALS);
     }
-
-    console.log('🔐 Password almacenada:', user.password);
 
     // Verificar contraseña
     const isPasswordValid = await comparePassword(password, user.password);
 
-    console.log('🔍 Password válida:', isPasswordValid);
-
     if (!isPasswordValid) {
-      console.log('❌ Contraseña incorrecta');
       throw new Error(MESSAGES.ERROR.INVALID_CREDENTIALS);
     }
-
-    console.log('✅ Credenciales correctas');
 
     // Actualizar último login
     user.lastLogin = new Date();
 
-    console.log('💾 Guardando último login...');
     await user.save();
-
-    console.log('✅ Último login actualizado');
-
-    // Generar token
-    console.log('🎫 Generando JWT...');
 
     const token = generateToken({
       id: user._id,
       email: user.email,
       role: user.role,
     });
-
-    console.log('✅ JWT generado correctamente');
-    console.log('🚀 LOGIN EXITOSO');
-    console.log('========================================\n');
 
     return {
       token,

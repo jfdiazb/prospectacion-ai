@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { AppLayout } from '@components/AppLayout';
 import { Button, Card } from '@components/shared';
@@ -57,6 +57,11 @@ export const ProfilePage = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    setFullName(user?.fullName ?? '');
+    setAvatar(user?.avatar ?? '');
+  }, [user]);
 
   const handlePasswordChange = async (e: FormEvent) => {
     e.preventDefault();

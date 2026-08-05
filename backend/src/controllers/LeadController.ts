@@ -107,10 +107,18 @@ export class LeadController {
     try {
       const lead = await LeadService.updateLead(req.params.id, req.userId!, req.body);
 
+      if (!lead) {
+        res.status(HTTP_STATUS.NOT_FOUND).json({
+          success: false,
+          message: MESSAGES.ERROR.NOT_FOUND,
+        });
+        return;
+      }
+
       res.status(HTTP_STATUS.OK).json({
         success: true,
         message: MESSAGES.SUCCESS.UPDATED,
-        data: lead ?? undefined,
+        data: lead,
       });
     } catch (error: any) {
       res.status(HTTP_STATUS.BAD_REQUEST).json({
@@ -175,10 +183,18 @@ export class LeadController {
       const { status } = req.body;
       const lead = await LeadService.updateLeadStatus(req.params.id, req.userId!, status);
 
+      if (!lead) {
+        res.status(HTTP_STATUS.NOT_FOUND).json({
+          success: false,
+          message: MESSAGES.ERROR.NOT_FOUND,
+        });
+        return;
+      }
+
       res.status(HTTP_STATUS.OK).json({
         success: true,
         message: 'Estado actualizado',
-        data: lead ?? undefined,
+        data: lead,
       });
     } catch (error: any) {
       res.status(HTTP_STATUS.BAD_REQUEST).json({

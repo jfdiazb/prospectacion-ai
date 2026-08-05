@@ -8,7 +8,7 @@ const router = express.Router();
 /**
  * Rutas pÃºblicas
  */
-router.post('/register', AuthController.register);
+router.post('/register', loginLimiter, AuthController.register);
 router.post('/login', loginLimiter, AuthController.login);
 
 /**

@@ -1,10 +1,5 @@
-import app from "./app";
-import dotenv from "dotenv";
-
-dotenv.config();
-
-const PORT = process.env.PORT || 5001;
-
-app.listen(PORT, () => {
-  console.log(`🔥 Servidor corriendo en http://localhost:${PORT}`);
-});
+/**
+ * Entrada de compatibilidad. La entrada canónica de ALMA es `src/index.ts`.
+ * Mantener este archivo evita romper comandos externos antiguos.
+ */
+import './index';

@@ -12,8 +12,6 @@ export class AuthController {
    * POST /auth/register
    */
   static async register(req: AuthRequest, res: Response<IApiResponse<any>>): Promise<void> {
-    console.log(req.body);
-    
     try {
       const { email, password, fullName } = req.body;
 

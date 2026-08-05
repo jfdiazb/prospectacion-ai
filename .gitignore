@@ -39,6 +39,7 @@ coverage/
 # =========================
 .cache/
 .turbo/
+.npm-cache/
 
 # =========================
 # IDE
@@ -66,6 +67,7 @@ Thumbs.db
 # Temporary files
 # =========================
 tmp/
+.tmp/
 temp/
 *.tmp
 *.swp

@@ -68,7 +68,28 @@ export class LeadService {
    * Actualizar lead
    */
   static async updateLead(leadId: string, userId: string, updateData: Partial<ILead>): Promise<ILead | null> {
-    return await Lead.findOneAndUpdate({ _id: leadId, userId }, updateData, { new: true });
+    const scoreInputsChanged = ['followers', 'engagement', 'bio'].some(key => key in updateData);
+    const currentLead = scoreInputsChanged
+      ? await Lead.findOne({ _id: leadId, userId })
+      : null;
+
+    if (scoreInputsChanged && !currentLead) return null;
+
+    const mergedData = {
+      followers: updateData.followers ?? currentLead?.followers,
+      engagement: updateData.engagement ?? currentLead?.engagement,
+      bio: updateData.bio ?? currentLead?.bio,
+    };
+    const score = scoreInputsChanged ? calculateLeadScore(mergedData) : undefined;
+    const interestLevel = score === undefined
+      ? undefined
+      : score > 70 ? 'hot' : score > 30 ? 'warm' : 'cold';
+
+    return await Lead.findOneAndUpdate(
+      { _id: leadId, userId },
+      { ...updateData, ...(score === undefined ? {} : { score, interestLevel }) },
+      { new: true, runValidators: true }
+    );
   }
 
   /**

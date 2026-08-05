@@ -12,6 +12,8 @@ export interface IUser {
   phone?: string;
   company?: string;
   plan?: 'free' | 'starter' | 'professional' | 'enterprise';
+  isActive?: boolean;
+  lastLogin?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -72,6 +74,22 @@ export interface IMessage {
   platform?: string;
   timestamp: Date;
   isRead?: boolean;
+}
+
+export interface ITask {
+  _id?: string;
+  userId: string;
+  leadId: string;
+  conversationId?: string;
+  title: string;
+  description: string;
+  type: 'follow_up' | 'meeting' | 'call' | 'email' | 'other';
+  status: 'pending' | 'completed' | 'cancelled';
+  dueDate?: Date;
+  priority?: 'low' | 'medium' | 'high';
+  metadata?: Record<string, any>;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface IAutomationFlow {

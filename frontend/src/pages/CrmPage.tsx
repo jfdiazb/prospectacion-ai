@@ -1,81 +1,94 @@
-import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import { AppLayout } from '@components/AppLayout';
-import { Card, Button } from '@components/shared';
-
-const pipeline = [
-  { stage: 'Nuevos', value: 26, color: 'bg-primary-500' },
-  { stage: 'Contactados', value: 14, color: 'bg-green-500' },
-  { stage: 'Interesados', value: 9, color: 'bg-yellow-500' },
-  { stage: 'Negociación', value: 5, color: 'bg-red-500' },
-];
+import { Card } from '@components/shared';
+import { crmService, type CrmActivity, type CrmConversation, type CrmMeeting, type CrmTask } from '@services/crmService';
 
 export const CrmPage = () => {
+  const [activities, setActivities] = useState<CrmActivity[]>([]);
+  const [meetings, setMeetings] = useState<CrmMeeting[]>([]);
+  const [conversations, setConversations] = useState<CrmConversation[]>([]);
+  const [tasks, setTasks] = useState<CrmTask[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([crmService.activities(), crmService.meetings(), crmService.conversations(), crmService.tasks()])
+      .then(([activityData, meetingData, conversationData, taskData]) => {
+        setActivities(activityData);
+        setMeetings(meetingData);
+        setConversations(conversationData);
+        // Ordenar tareas: prioridad (high, medium, low) y luego por dueDate asc
+        const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+        const sortedTasks = (taskData || []).slice().sort((a, b) => {
+          const pa = priorityOrder[a.priority || 'medium'];
+          const pb = priorityOrder[b.priority || 'medium'];
+          if (pa !== pb) return pa - pb;
+          const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+          const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+          return da - db;
+        });
+        setTasks(sortedTasks);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
-    <AppLayout
-      title="CRM"
-      subtitle="Visualiza tus relaciones con clientes y optimiza el flujo de interacción."
-    >
-      <div className="grid gap-6 xl:grid-cols-[1fr_0.8fr]">
-        <section className="space-y-6">
-          <Card>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-2xl font-semibold text-white">Embudo de oportunidades</h2>
-                <p className="text-dark-400">Controla el avance de tus prospectos por etapa.</p>
+    <AppLayout title="CRM" subtitle="Actividad real de captación, seguimiento y reuniones de ALMA.">
+      <div className="grid gap-6 xl:grid-cols-3">
+        <Card>
+          <h2 className="mb-4 text-2xl font-semibold text-white">Actividad reciente</h2>
+          <div className="space-y-3">
+            {activities.slice(0, 12).map(activity => (
+              <div key={activity._id} className="rounded-2xl bg-dark-900 p-4">
+                <p className="font-medium text-white">{activity.leadId?.fullName || activity.leadId?.username || 'Prospecto'}</p>
+                <p className="text-sm text-dark-400">{activity.description}</p>
               </div>
-              <Button variant="secondary">Exportar informe</Button>
-            </div>
-          </Card>
-
-          <div className="grid gap-4 xl:grid-cols-2">
-            {pipeline.map((item, index) => (
-              <motion.div
-                key={item.stage}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.08 }}
-              >
-                <Card hover>
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm text-dark-400">{item.stage}</p>
-                      <p className="text-3xl font-semibold text-white">{item.value}</p>
-                    </div>
-                    <div className={`h-12 w-12 rounded-3xl ${item.color} bg-opacity-30`} />
-                  </div>
-                </Card>
-              </motion.div>
             ))}
+            {!loading && !activities.length && <p className="text-dark-400">Aún no hay actividad registrada.</p>}
           </div>
-        </section>
-
-        <aside className="space-y-4">
-          <Card>
-            <div className="space-y-4">
-              <p className="text-sm uppercase tracking-[0.3em] text-dark-500">Contactos prioritarios</p>
-              <div className="space-y-3">
-                <div className="rounded-3xl bg-dark-900 p-4">
-                  <p className="text-sm text-dark-400">Juan Pérez</p>
-                  <p className="font-semibold text-white">Cita pendiente</p>
-                </div>
-                <div className="rounded-3xl bg-dark-900 p-4">
-                  <p className="text-sm text-dark-400">Sofia Ramos</p>
-                  <p className="font-semibold text-white">Envía propuesta</p>
-                </div>
+        </Card>
+        <Card>
+          <h2 className="mb-4 text-2xl font-semibold text-white">Reuniones Zoom</h2>
+          <div className="space-y-3">
+            {meetings.map(meeting => (
+              <div key={meeting._id} className="rounded-2xl bg-dark-900 p-4">
+                <p className="font-medium text-white">{meeting.leadId?.fullName || meeting.leadId?.username || 'Prospecto'}</p>
+                <p className="text-sm text-dark-400">{meeting.topic || 'Reunión de descubrimiento'} · {meeting.status}</p>
               </div>
-            </div>
-          </Card>
-
-          <Card>
-            <div className="space-y-4">
-              <p className="text-sm uppercase tracking-[0.3em] text-dark-500">Acciones rápidas</p>
-              <div className="grid gap-3">
-                <Button variant="primary" className="w-full">Nuevo contacto</Button>
-                <Button variant="secondary" className="w-full">Registrar llamada</Button>
+            ))}
+            {!loading && !meetings.length && <p className="text-dark-400">Aún no hay reuniones registradas.</p>}
+          </div>
+        </Card>
+        <Card>
+          <h2 className="mb-4 text-2xl font-semibold text-white">Tareas CRM</h2>
+          <div className="space-y-3">
+            {tasks.map(task => (
+              <div key={task._id} className="rounded-2xl bg-dark-900 p-4">
+                <p className="font-medium text-white">{task.title}</p>
+                <p className="text-sm text-dark-400">{task.description}</p>
+                <p className="text-xs text-dark-500">{task.type} · {task.priority} · {task.status} {task.dueDate ? `· ${new Date(task.dueDate).toLocaleString()}` : ''}</p>
               </div>
-            </div>
-          </Card>
-        </aside>
+            ))}
+            {!loading && !tasks.length && <p className="text-dark-400">Aún no hay tareas asignadas.</p>}
+          </div>
+        </Card>
+        <Card>
+          <h2 className="mb-4 text-2xl font-semibold text-white">Conversaciones</h2>
+          <div className="space-y-3">
+            {conversations.slice(0, 8).map(conversation => {
+              const lastMessage = conversation.messages?.[conversation.messages.length - 1];
+              return (
+                <div key={conversation._id} className="rounded-2xl bg-dark-900 p-4">
+                  <p className="font-medium text-white">{conversation.leadId?.fullName || conversation.leadId?.username || 'Prospecto'}</p>
+                  <p className="text-sm text-dark-400">Estado: {conversation.status}</p>
+                  {lastMessage && (
+                    <p className="text-sm text-dark-400 truncate">{lastMessage.sender === 'ai' ? 'ALMA:' : lastMessage.sender === 'lead' ? 'Lead:' : 'Usuario:'} {lastMessage.text}</p>
+                  )}
+                </div>
+              );
+            })}
+            {!loading && !conversations.length && <p className="text-dark-400">Aún no hay conversaciones registradas.</p>}
+          </div>
+        </Card>
       </div>
     </AppLayout>
   );

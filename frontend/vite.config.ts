@@ -23,5 +23,11 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, '/api/v1')
       }
     }
-  }
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/setupTests.ts',
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+  },
 });

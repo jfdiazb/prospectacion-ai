@@ -1,68 +1,30 @@
-﻿import { Router } from "express";
-import { analyzeLead } from "../ai/leadAnalyzer";
-import { LeadController } from "../controllers/LeadController";
+import { Router } from 'express';
+import { LeadController } from '../controllers/LeadController';
+import { analyzeLead } from '../ai/leadAnalyzer';
+import { authMiddleware, type AuthRequest } from '../middlewares/auth';
+import { apiLimiter } from '../middlewares/rateLimiter';
 
 const router = Router();
 
-console.log("👉 leadRoutes cargado");
+router.use(authMiddleware, apiLimiter);
 
-// GET
-router.get("/", (req, res) => {
-  res.json({
-    success: true,
-    message: "Leads funcionando 🚀",
-  });
-});
-
-// POST
-import Lead from "../models/Lead";
-
-router.post("/", async (req, res) => {
+router.get('/', LeadController.getLeads);
+router.get('/stats', LeadController.getStats);
+router.get('/hot', LeadController.getHotLeads);
+router.post('/search', LeadController.advancedSearch);
+router.post('/', LeadController.createLead);
+router.post('/analyze', async (req: AuthRequest, res, next) => {
   try {
-    const data = req.body;
-
-    const lead = new Lead({
-      ...data,
-      userId: data.userId || "000000000000000000000000"
-    });
-
-    await lead.save();
-
-    return res.json({
-      success: true,
-      message: "Lead guardado en MongoDB",
-      lead
-    });
-
+    const analysis = await analyzeLead(req.body);
+    res.status(200).json({ success: true, message: 'Lead analizado', data: analysis });
   } catch (error) {
-    console.error("ERROR:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Error guardando lead",
-      error: error.message
-    });
+    next(error);
   }
 });
-
-router.post("/analyze", async (req, res) => {
-  try {
-    const result = await analyzeLead(req.body);
-
-    return res.json({
-      success: true,
-      analysis: JSON.parse(result || "{}")
-    });
-
-  } catch (error: any) {
-    console.error("❌ Error analizando lead:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Error analizando lead",
-      error: error.message
-    });
-  }
-});
+router.get('/status/:status', LeadController.getLeadsByStatus);
+router.get('/:id', LeadController.getLeadById);
+router.put('/:id', LeadController.updateLead);
+router.put('/:id/status', LeadController.updateLeadStatus);
+router.delete('/:id', LeadController.deleteLead);
 
 export default router;

@@ -42,6 +42,22 @@ export interface IMessage {
   timestamp: Date;
 }
 
+export interface CrmConversation {
+  _id: string;
+  leadId?: {
+    username?: string;
+    fullName?: string;
+  };
+  status: string;
+  lastMessage?: string;
+  messages: Array<{
+    _id: string;
+    sender: 'user' | 'lead' | 'ai';
+    text: string;
+    timestamp: string;
+  }>;
+}
+
 export interface IDashboardMetrics {
   totalLeads: number;
   newLeads: number;

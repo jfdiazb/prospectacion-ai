@@ -1,34 +1,54 @@
-import express from "express";
-import cors from "cors";
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import authRoutes from './routes/authRoutes';
+import leadRoutes from './routes/leadRoutes';
+import hunterRoutes from './routes/hunterRoutes';
+import scraperRoutes from './routes/scraperRoutes';
+import aiRoutes from './routes/aiRoutes';
+import whatsappRoutes from './routes/whatsappRoutes';
+import metaRoutes from './routes/metaRoutes';
+import crmRoutes from './routes/crmRoutes';
+import { errorMiddleware, notFoundMiddleware } from './middlewares/auth';
+import { generalLimiter } from './middlewares/rateLimiter';
 
-import leadRoutes from "./routes/leadRoutes";
+const apiPrefix = '/api/v1';
+const configuredOrigins = (process.env.CORS_ORIGIN ?? '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
 
 const app = express();
 
-app.use((req, res, next) => {
-  console.log("👉 BODY RECIBIDO:", req.body);
-  next();
+app.set('trust proxy', 1);
+app.use(helmet());
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || configuredOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Origen no permitido por CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Authorization', 'Content-Type'],
+}));
+app.use(`${apiPrefix}/whatsapp/webhook`, express.raw({ type: 'application/json', limit: '1mb' }));
+app.use(`${apiPrefix}/meta/webhook`, express.raw({ type: 'application/json', limit: '1mb' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(generalLimiter);
+
+app.get('/health', (_req, res) => {
+  res.status(200).json({ success: true, status: 'ok' });
 });
-console.log("👉 app.ts cargado");
 
-// Middlewares
-app.use(cors());
-app.use(express.json());
-
-// Rutas
-app.use("/api/leads", leadRoutes);
-
-// Test base
-app.get("/", (req, res) => {
-  res.send("API funcionando 🚀");
-});
-
-// 404 global
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: "Recurso no encontrado",
-  });
-});
+app.use(`${apiPrefix}/auth`, authRoutes);
+app.use(`${apiPrefix}/leads`, leadRoutes);
+app.use(`${apiPrefix}/lead-hunter`, hunterRoutes);
+app.use(`${apiPrefix}/social-scraper`, scraperRoutes);
+app.use(`${apiPrefix}/ai`, aiRoutes);
+app.use(`${apiPrefix}/whatsapp`, whatsappRoutes);
+app.use(`${apiPrefix}/meta`, metaRoutes);
+app.use(`${apiPrefix}/crm`, crmRoutes);
+app.use(notFoundMiddleware);
+app.use(errorMiddleware);
 
 export default app;

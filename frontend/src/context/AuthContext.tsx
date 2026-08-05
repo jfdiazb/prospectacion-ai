@@ -13,38 +13,43 @@ interface AuthContextType {
   isLoading: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<IUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Cargar usuario al montar
-useEffect(() => {
-  const loadUser = async () => {
-    const token = authService.getToken();
+  useEffect(() => {
+    const loadUser = async () => {
+      const token = authService.getToken();
+      const storedUser = authService.getStoredUser();
 
-    if (!token) {
-      authService.logout();
-      setUser(null);
+      if (!token) {
+        authService.logout();
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
+      if (storedUser) {
+        setUser(storedUser);
+      }
+
+      try {
+        const userData = await authService.getProfile();
+        setUser(userData);
+        authService.setStoredUser(userData);
+      } catch (error) {
+        authService.logout();
+        setUser(null);
+      }
+
       setIsLoading(false);
-      return;
-    }
+    };
 
-    try {
-      const userData = await authService.getProfile();
-      setUser(userData);
-      authService.setStoredUser(userData);
-    } catch (error) {
-      authService.logout();
-      setUser(null);
-    }
-
-    setIsLoading(false);
-  };
-
-  loadUser();
-}, []);
+    loadUser();
+  }, []);
 
   const login = async (email: string, password: string) => {
     const { token, user: userData } = await authService.login(email, password);

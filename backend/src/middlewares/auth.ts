@@ -15,7 +15,8 @@ export interface AuthRequest extends Request {
  */
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction): void => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    const authorization = req.headers.authorization;
+    const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
 
     if (!token) {
       res.status(HTTP_STATUS.UNAUTHORIZED).json({
@@ -78,7 +79,7 @@ export const errorMiddleware = (
   res: Response,
   next: NextFunction
 ): void => {
-  console.error('Error:', err);
+  console.error('Error de aplicación', { message: err.message, path: req.path });
 
   const status = err.status || HTTP_STATUS.INTERNAL_ERROR;
   const message = err.message || MESSAGES.ERROR.SERVER_ERROR;

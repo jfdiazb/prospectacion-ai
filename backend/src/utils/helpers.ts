@@ -23,7 +23,8 @@ export const comparePassword = async (password: string, hash: string): Promise<b
  * Generar JWT
  */
 export const generateToken = (payload: any, expiresIn = '24h'): string => {
-  const secret = process.env.JWT_SECRET || 'secret';
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT_SECRET no está definido');
   return jwt.sign(payload, secret, { expiresIn } as any);
 };
 
@@ -32,7 +33,9 @@ export const generateToken = (payload: any, expiresIn = '24h'): string => {
  */
 export const verifyToken = (token: string): any => {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET || 'secret');
+    const secret = process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_SECRET no está definido');
+    return jwt.verify(token, secret);
   } catch (error) {
     throw new Error('Token inválido o expirado');
   }

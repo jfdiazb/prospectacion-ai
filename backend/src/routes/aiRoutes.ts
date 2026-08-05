@@ -8,7 +8,7 @@ const router = express.Router();
 /**
  * Todas las rutas de IA requieren autenticaciÃ³n
  */
-//router.use(authMiddleware, apiLimiter);
+router.use(authMiddleware, apiLimiter);
 
 /**
  * Endpoints de IA
