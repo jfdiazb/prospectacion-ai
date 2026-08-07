@@ -4,7 +4,7 @@ export type MessagingRecipient =
   | { type: 'whatsapp_user'; phoneNumber: string }
   | { type: 'youtube_comment'; parentCommentId: string };
 
-export interface MessagingRequest { text: string; recipient: MessagingRecipient }
+export interface MessagingRequest { userId?: string; text: string; recipient: MessagingRecipient }
 export interface MessagingResult { externalMessageId: string; simulated: boolean }
 
 export interface MessagingProvider {

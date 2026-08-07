@@ -1,5 +1,14 @@
 # AGENTS.md
 
+## YouTube OAuth e ingesta — 2026-08-07
+- Configuración incluye una tarjeta de YouTube con estado del canal, inicio OAuth y desconexión protegida por confirmación.
+- YouTube usa OAuth 2.0 web por usuario mediante `/api/v1/youtube/oauth/connect` y callback firmado; ya no requiere un access token estático para operar en live.
+- `YouTubeCredential` cifra access/refresh tokens con AES-256-GCM y una clave externa de 32 bytes; el access token se renueva automáticamente antes de expirar.
+- `YOUTUBE_INGESTION_MODE=mock|live` controla el poller de `commentThreads.list`. El primer enlace parte desde el momento de conexión y cada comentario queda protegido por idempotencia en `InboundEvent`.
+- Un comentario nuevo con `INFO` crea/reutiliza el lead YouTube, abre la conversación, ejecuta ALMA y responde mediante `comments.insert`.
+- Activación live pendiente de crear las credenciales en Google Cloud, registrar el redirect URI y completar consentimiento desde una sesión autenticada.
+- Suite vigente: 29/29 pruebas backend.
+
 ## Preparación de despliegue — 2026-08-06
 - `render.yaml` define el backend Node en Render con `/health`, MongoDB Atlas y todos los proveedores externos en `mock` para el primer despliegue.
 - `frontend/vercel.json` configura Vite y el fallback SPA para que las rutas React funcionen al recargar en Vercel.

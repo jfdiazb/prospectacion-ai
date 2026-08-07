@@ -41,7 +41,15 @@ Render asigna `PORT` automáticamente; el servidor y el healthcheck del contened
 
 ## 5. Activación posterior de YouTube
 
-No cambies todavía `YOUTUBE_MESSAGING_MODE=mock`. El siguiente bloque de producción debe implementar OAuth 2.0 de servidor web, almacenamiento cifrado y renovación del refresh token, además del lector incremental de comentarios mediante `commentThreads.list`. Solo después se habilita `live` y se valida con el canal autorizado.
+La base OAuth e ingesta ya está implementada, pero conserva ambos modos en `mock` durante el primer despliegue. Para activar YouTube:
+
+1. Crea un cliente OAuth 2.0 de aplicación web en Google Cloud y habilita YouTube Data API v3.
+2. Registra exactamente `https://<backend>/api/v1/youtube/oauth/callback` como redirect URI.
+3. Configura `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_OAUTH_REDIRECT_URI`, `YOUTUBE_OAUTH_STATE_SECRET` (mínimo 32 caracteres), `YOUTUBE_TOKEN_ENCRYPTION_KEY` (32 bytes en base64 o 64 hex) y `CRM_OWNER_ID`.
+4. Genera secretos independientes, por ejemplo con `openssl rand -base64 32`; no reutilices `JWT_SECRET` ni guardes valores reales en el repositorio.
+5. Inicia sesión en ALMA, solicita `GET /api/v1/youtube/oauth/connect` con JWT y abre la URL devuelta para autorizar el canal.
+6. Confirma `connected: true` en `GET /api/v1/youtube/status`; después cambia `YOUTUBE_MESSAGING_MODE=live` y `YOUTUBE_INGESTION_MODE=live` y reinicia el backend.
+7. Publica un comentario nuevo que contenga `INFO` y verifica lead, conversación, `InboundEvent`, respuesta y `OutboundMessage`. El sistema no importa comentarios históricos anteriores a la conexión.
 
 ## Variables que debe proporcionar el operador
 

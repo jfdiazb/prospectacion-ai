@@ -20,7 +20,17 @@ export const validateServerEnvironment = (): void => {
   if (ownerId && !/^[0-9a-fA-F]{24}$/.test(ownerId)) throw new Error('CRM_OWNER_ID debe contener exactamente 24 caracteres hexadecimales, sin < > ni comillas');
   const youtubeMode = process.env.YOUTUBE_MESSAGING_MODE || 'mock';
   if (!['mock', 'live'].includes(youtubeMode)) throw new Error('YOUTUBE_MESSAGING_MODE debe ser mock o live');
-  if (youtubeMode === 'live' && !process.env.YOUTUBE_ACCESS_TOKEN?.trim()) throw new Error('YOUTUBE_ACCESS_TOKEN es obligatorio cuando YOUTUBE_MESSAGING_MODE=live');
+  const youtubeIngestionMode = process.env.YOUTUBE_INGESTION_MODE || 'mock';
+  if (!['mock', 'live'].includes(youtubeIngestionMode)) throw new Error('YOUTUBE_INGESTION_MODE debe ser mock o live');
+  if (youtubeMode === 'live' || youtubeIngestionMode === 'live') {
+    const youtubeMissing = ['YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET', 'YOUTUBE_OAUTH_REDIRECT_URI', 'YOUTUBE_OAUTH_STATE_SECRET', 'YOUTUBE_TOKEN_ENCRYPTION_KEY', 'CRM_OWNER_ID']
+      .filter(key => !process.env[key]?.trim());
+    if (youtubeMissing.length) throw new Error(`Faltan variables para YouTube live: ${youtubeMissing.join(', ')}`);
+    if ((process.env.YOUTUBE_OAUTH_STATE_SECRET?.length ?? 0) < 32) throw new Error('YOUTUBE_OAUTH_STATE_SECRET debe tener al menos 32 caracteres');
+    const encryptionKey = process.env.YOUTUBE_TOKEN_ENCRYPTION_KEY!.trim();
+    const decodedKey = /^[a-f\d]{64}$/i.test(encryptionKey) ? Buffer.from(encryptionKey, 'hex') : Buffer.from(encryptionKey, 'base64');
+    if (decodedKey.length !== 32) throw new Error('YOUTUBE_TOKEN_ENCRYPTION_KEY debe representar exactamente 32 bytes');
+  }
   const messagingMode = process.env.INSTAGRAM_MESSAGING_MODE || process.env.META_MESSAGING_MODE || 'mock';
   if (!['mock', 'live'].includes(messagingMode)) throw new Error('META_MESSAGING_MODE debe ser mock o live');
   if (messagingMode === 'live') {

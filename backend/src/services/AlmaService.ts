@@ -7,7 +7,7 @@ import { MessagingService } from './MessagingService';
 import type { MessagingRecipient } from '../integrations/messaging';
 import { MeetingOrchestratorService } from './MeetingOrchestratorService';
 
-type AlmaContext = { userId: string; leadId: string; conversationId: string; text: string; isNewLead: boolean; platform: 'instagram' | 'facebook'; sourceEventId: string; recipient: MessagingRecipient };
+type AlmaContext = { userId: string; leadId: string; conversationId: string; text: string; isNewLead: boolean; platform: 'instagram' | 'facebook' | 'youtube'; sourceEventId: string; recipient: MessagingRecipient };
 
 export class AlmaService {
   static async processMessage(context: AlmaContext): Promise<string> {

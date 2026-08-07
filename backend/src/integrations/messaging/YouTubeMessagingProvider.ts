@@ -1,16 +1,19 @@
 import axios, { type AxiosInstance } from 'axios';
 import { MessagingProviderError, type MessagingProvider, type MessagingRequest, type MessagingResult } from './MessagingProvider';
+import { YouTubeTokenService } from '../youtube/YouTubeTokenService';
 
 type YouTubeCommentResponse = { id?: string };
 
 export class YouTubeMessagingProvider implements MessagingProvider {
   readonly name = 'youtube' as const;
-  constructor(private readonly http: AxiosInstance = axios.create()) {}
+  constructor(private readonly http: AxiosInstance = axios.create(), private readonly getToken?: (userId: string) => Promise<string>) {}
 
   async sendMessage(request: MessagingRequest): Promise<MessagingResult> {
     if (request.recipient.type !== 'youtube_comment') throw new MessagingProviderError('Destinatario de YouTube inválido', 'YOUTUBE_INVALID_RECIPIENT');
-    const accessToken = process.env.YOUTUBE_ACCESS_TOKEN;
-    if (!accessToken) throw new MessagingProviderError('YOUTUBE_ACCESS_TOKEN no configurado', 'YOUTUBE_CONFIGURATION_ERROR');
+    const accessToken = process.env.YOUTUBE_ACCESS_TOKEN || (request.userId
+      ? this.getToken ? await this.getToken(request.userId) : await new YouTubeTokenService(this.http).getAccessToken(request.userId)
+      : undefined);
+    if (!accessToken) throw new MessagingProviderError('Canal de YouTube no conectado', 'YOUTUBE_CONFIGURATION_ERROR');
     try {
       const response = await this.http.post<YouTubeCommentResponse>(
         'https://www.googleapis.com/youtube/v3/comments?part=snippet',

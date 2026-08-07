@@ -1,5 +1,15 @@
 # Documentación AI - Prospectación AI
 
+## YouTube OAuth e ingesta incremental — 2026-08-07
+- La pantalla `/configuracion` consulta el estado del canal y permite iniciar OAuth o eliminar la conexión sin manipular tokens desde el navegador.
+- Endpoints: `GET /api/v1/youtube/oauth/connect` (JWT), `GET /api/v1/youtube/oauth/callback`, `GET /api/v1/youtube/status` (JWT) y `DELETE /api/v1/youtube/connection` (JWT).
+- El estado OAuth está firmado con HMAC y expira en 10 minutos. Google se solicita con acceso offline, consentimiento explícito y scope `youtube.force-ssl` para leer/moderar comentarios y publicar respuestas.
+- `YouTubeCredential` almacena canal, fechas y tokens cifrados con AES-256-GCM; cada valor usa IV y etiqueta de autenticación propios. La clave nunca se guarda en MongoDB.
+- `YouTubeTokenService` intercambia el código, descubre el canal autorizado y renueva el access token 60 segundos antes de expirar.
+- `YouTubeIngestionService` consulta hasta 100 hilos recientes por intervalo, procesa en orden cronológico y usa `youtube:<commentId>` como clave idempotente. No importa comentarios anteriores al momento inicial de conexión.
+- Comentarios `INFO` ingresan al mismo flujo CRM/ALMA: lead YouTube, conversación, calificación, tareas, respuesta y `OutboundMessage`.
+- Modos seguros por defecto: `YOUTUBE_MESSAGING_MODE=mock` y `YOUTUBE_INGESTION_MODE=mock`. Live requiere cliente/secreto OAuth, redirect URI, secreto de estado, clave de cifrado y `CRM_OWNER_ID`.
+
 ## Preparación de producción — 2026-08-06
 - Backend preparado para Render mediante `render.yaml`: build TypeScript, healthcheck `/health`, MongoDB Atlas por secreto y proveedores externos explícitamente en `mock`.
 - Frontend preparado para Vercel mediante `frontend/vercel.json`, con build Vite y fallback de rutas SPA.

@@ -9,6 +9,7 @@ import aiRoutes from './routes/aiRoutes';
 import whatsappRoutes from './routes/whatsappRoutes';
 import metaRoutes from './routes/metaRoutes';
 import crmRoutes from './routes/crmRoutes';
+import youtubeRoutes from './routes/youtubeRoutes';
 import { errorMiddleware, notFoundMiddleware } from './middlewares/auth';
 import { generalLimiter } from './middlewares/rateLimiter';
 
@@ -48,6 +49,7 @@ app.use(`${apiPrefix}/ai`, aiRoutes);
 app.use(`${apiPrefix}/whatsapp`, whatsappRoutes);
 app.use(`${apiPrefix}/meta`, metaRoutes);
 app.use(`${apiPrefix}/crm`, crmRoutes);
+app.use(`${apiPrefix}/youtube`, youtubeRoutes);
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 

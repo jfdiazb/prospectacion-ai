@@ -2,9 +2,34 @@ import { motion } from 'framer-motion';
 import { AppLayout } from '@components/AppLayout';
 import { Button, Card } from '@components/shared';
 import { useAuth } from '@context/AuthContext';
+import { useEffect, useState } from 'react';
+import { Youtube } from 'lucide-react';
+import { youtubeService, type YouTubeStatus } from '@services/youtubeService';
 
 export const SettingsPage = () => {
   const { user, logout } = useAuth();
+  const [youtube, setYoutube] = useState<YouTubeStatus>({ connected: false });
+  const [youtubeLoading, setYoutubeLoading] = useState(true);
+  const [youtubeError, setYoutubeError] = useState('');
+
+  useEffect(() => {
+    youtubeService.getStatus()
+      .then(setYoutube)
+      .catch(() => setYoutubeError('No fue posible consultar la conexión de YouTube.'))
+      .finally(() => setYoutubeLoading(false));
+  }, []);
+
+  const connectYouTube = async () => {
+    setYoutubeError(''); setYoutubeLoading(true);
+    try { await youtubeService.connect(); } catch { setYoutubeError('No fue posible iniciar la autorización de YouTube.'); setYoutubeLoading(false); }
+  };
+
+  const disconnectYouTube = async () => {
+    if (!window.confirm('¿Desconectar el canal de YouTube de ALMA?')) return;
+    setYoutubeLoading(true);
+    try { await youtubeService.disconnect(); setYoutube({ connected: false }); } catch { setYoutubeError('No fue posible desconectar YouTube.'); }
+    finally { setYoutubeLoading(false); }
+  };
 
   return (
     <AppLayout title="Configuración" subtitle="Ajusta tu cuenta, notificaciones y preferencias del sistema.">
@@ -66,6 +91,25 @@ export const SettingsPage = () => {
 
               <Button variant="danger" onClick={logout} className="w-full">Cerrar sesión</Button>
             </div>
+          </motion.div>
+        </Card>
+
+        <Card className="lg:col-span-2" hover={false}>
+          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="rounded-2xl bg-red-500/15 p-3 text-red-400"><Youtube size={28} /></div>
+              <div>
+                <p className="text-sm uppercase tracking-[0.3em] text-dark-500">Canal principal</p>
+                <h2 className="text-2xl font-semibold text-white">YouTube</h2>
+                <p className="mt-1 text-dark-400">
+                  {youtube.connected ? `Conectado${youtube.credential?.channelTitle ? ` a ${youtube.credential.channelTitle}` : ''}.` : 'Conecta tu canal para que ALMA procese comentarios INFO.'}
+                </p>
+                {youtubeError && <p className="mt-2 text-sm text-red-400">{youtubeError}</p>}
+              </div>
+            </div>
+            {youtube.connected
+              ? <Button variant="secondary" loading={youtubeLoading} onClick={disconnectYouTube}>Desconectar</Button>
+              : <Button loading={youtubeLoading} onClick={connectYouTube}>Conectar YouTube</Button>}
           </motion.div>
         </Card>
       </div>
