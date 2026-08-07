@@ -12,6 +12,7 @@
 ## Despliegue gratuito en Render — 2026-08-07
 - El servicio web del Blueprint declara `plan: free`; omitirlo hace que Render seleccione `starter` y solicite información de pago.
 - El primer despliegue permanece en mock y no requiere registrar tarjeta para crear una instancia web gratuita.
+- `backend/package-lock.json` está sincronizado con npm 10; incluye el peer opcional `gcp-metadata` que Render exige para ejecutar `npm ci` con Node 20.
 
 ## Preparación de despliegue — 2026-08-06
 - `render.yaml` define el backend Node en Render con `/health`, MongoDB Atlas y todos los proveedores externos en `mock` para el primer despliegue.

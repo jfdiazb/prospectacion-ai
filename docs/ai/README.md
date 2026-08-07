@@ -13,6 +13,7 @@
 ## Render Free — 2026-08-07
 - `render.yaml` fija `plan: free` para evitar que el Blueprint use `starter` por defecto y solicite una tarjeta.
 - La instancia gratuita es adecuada para la primera verificación pública; puede suspenderse tras inactividad y reiniciar al recibir una petición.
+- El lockfile del backend se regeneró con npm 10 para mantener `npm ci` reproducible en Render/Node 20, incluyendo el peer opcional `gcp-metadata` requerido por la resolución de dependencias.
 
 ## Preparación de producción — 2026-08-06
 - Backend preparado para Render mediante `render.yaml`: build TypeScript, healthcheck `/health`, MongoDB Atlas por secreto y proveedores externos explícitamente en `mock`.
