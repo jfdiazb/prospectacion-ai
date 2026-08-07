@@ -14,6 +14,7 @@
 - El primer despliegue permanece en mock y no requiere registrar tarjeta para crear una instancia web gratuita.
 - `backend/package-lock.json` está sincronizado con npm 10; incluye el peer opcional `gcp-metadata` que Render exige para ejecutar `npm ci` con Node 20.
 - El backend compila con TypeScript 5.9 usando `module` y `moduleResolution` en `Node16`; la resolución heredada `node10` ya no es admitida por esa versión.
+- El build de Render usa `npm ci --include=dev` porque `NODE_ENV=production` omite por defecto TypeScript y las declaraciones `@types` requeridas para compilar; el runtime continúa ejecutando únicamente `dist/index.js`.
 
 ## Preparación de despliegue — 2026-08-06
 - `render.yaml` define el backend Node en Render con `/health`, MongoDB Atlas y todos los proveedores externos en `mock` para el primer despliegue.
