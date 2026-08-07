@@ -10,6 +10,10 @@
 - Comentarios `INFO` ingresan al mismo flujo CRM/ALMA: lead YouTube, conversación, calificación, tareas, respuesta y `OutboundMessage`.
 - Modos seguros por defecto: `YOUTUBE_MESSAGING_MODE=mock` y `YOUTUBE_INGESTION_MODE=mock`. Live requiere cliente/secreto OAuth, redirect URI, secreto de estado, clave de cifrado y `CRM_OWNER_ID`.
 
+## Render Free — 2026-08-07
+- `render.yaml` fija `plan: free` para evitar que el Blueprint use `starter` por defecto y solicite una tarjeta.
+- La instancia gratuita es adecuada para la primera verificación pública; puede suspenderse tras inactividad y reiniciar al recibir una petición.
+
 ## Preparación de producción — 2026-08-06
 - Backend preparado para Render mediante `render.yaml`: build TypeScript, healthcheck `/health`, MongoDB Atlas por secreto y proveedores externos explícitamente en `mock`.
 - Frontend preparado para Vercel mediante `frontend/vercel.json`, con build Vite y fallback de rutas SPA.

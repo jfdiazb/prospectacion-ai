@@ -9,6 +9,10 @@
 - Activación live pendiente de crear las credenciales en Google Cloud, registrar el redirect URI y completar consentimiento desde una sesión autenticada.
 - Suite vigente: 29/29 pruebas backend.
 
+## Despliegue gratuito en Render — 2026-08-07
+- El servicio web del Blueprint declara `plan: free`; omitirlo hace que Render seleccione `starter` y solicite información de pago.
+- El primer despliegue permanece en mock y no requiere registrar tarjeta para crear una instancia web gratuita.
+
 ## Preparación de despliegue — 2026-08-06
 - `render.yaml` define el backend Node en Render con `/health`, MongoDB Atlas y todos los proveedores externos en `mock` para el primer despliegue.
 - `frontend/vercel.json` configura Vite y el fallback SPA para que las rutas React funcionen al recargar en Vercel.
