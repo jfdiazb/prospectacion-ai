@@ -7,6 +7,18 @@ export class TaskService {
     return task;
   }
 
+  static async upsertPendingFollowUp(userId: string, taskData: Partial<ITask>): Promise<ITask> {
+    const task = await Task.findOneAndUpdate(
+      { userId, leadId: taskData.leadId, conversationId: taskData.conversationId, type: 'follow_up', status: 'pending' },
+      {
+        $set: { description: taskData.description, dueDate: taskData.dueDate, priority: taskData.priority, metadata: taskData.metadata },
+        $setOnInsert: { title: taskData.title || 'Hacer seguimiento al prospecto', type: 'follow_up', status: 'pending' },
+      },
+      { upsert: true, new: true },
+    );
+    return task;
+  }
+
   static async getUserTasks(userId: string): Promise<ITask[]> {
     return await Task.find({ userId }).sort({ dueDate: 1, createdAt: -1 });
   }

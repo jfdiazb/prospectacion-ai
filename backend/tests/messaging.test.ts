@@ -1,0 +1,58 @@
+import type { AxiosInstance } from 'axios';
+import { AxiosError } from 'axios';
+import { MetaMessagingProvider } from '../src/integrations/messaging/MetaMessagingProvider';
+import { MessagingProviderError } from '../src/integrations/messaging/MessagingProvider';
+
+describe('MetaMessagingProvider', () => {
+  const originalEnv = process.env;
+  beforeEach(() => {
+    process.env = { ...originalEnv, META_ACCESS_TOKEN: 'test-token-never-logged', META_IG_USER_ID: 'ig-business-1', META_GRAPH_API_VERSION: 'v23.0' };
+  });
+  afterAll(() => { process.env = originalEnv; });
+
+  test('sends an initial private reply with comment_id', async () => {
+    const post = jest.fn().mockResolvedValue({ data: { message_id: 'meta-message-1' } });
+    const provider = new MetaMessagingProvider({ post } as unknown as AxiosInstance);
+    await expect(provider.sendMessage({ text: 'Hola', recipient: { type: 'comment', commentId: 'comment-1' } }))
+      .resolves.toEqual({ externalMessageId: 'meta-message-1', simulated: false });
+    expect(post).toHaveBeenCalledWith(
+      'https://graph.facebook.com/v23.0/ig-business-1/messages',
+      { recipient: { comment_id: 'comment-1' }, message: { text: 'Hola' } },
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer test-token-never-logged' }) }),
+    );
+  });
+
+  test('maps a Meta authentication failure without exposing credentials', async () => {
+    const error = new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, { status: 401, data: { error: { code: 190, message: 'Invalid OAuth access token.' } } } as any);
+    const provider = new MetaMessagingProvider({ post: jest.fn().mockRejectedValue(error) } as unknown as AxiosInstance);
+    await expect(provider.sendMessage({ text: 'Hola', recipient: { type: 'comment', commentId: 'comment-1' } }))
+      .rejects.toMatchObject({ code: '190', status: 401, message: 'Invalid OAuth access token.' });
+  });
+
+  test('maps a Meta timeout', async () => {
+    const error = new AxiosError('timeout', 'ECONNABORTED');
+    const provider = new MetaMessagingProvider({ post: jest.fn().mockRejectedValue(error) } as unknown as AxiosInstance);
+    await expect(provider.sendMessage({ text: 'Hola', recipient: { type: 'instagram_user', instagramScopedId: 'igsid-1' } }))
+      .rejects.toMatchObject({ code: 'META_TIMEOUT' });
+  });
+
+  test('rejects an invalid Meta response', async () => {
+    const provider = new MetaMessagingProvider({ post: jest.fn().mockResolvedValue({ data: {} }) } as unknown as AxiosInstance);
+    await expect(provider.sendMessage({ text: 'Hola', recipient: { type: 'comment', commentId: 'comment-1' } }))
+      .rejects.toBeInstanceOf(MessagingProviderError);
+    await expect(provider.sendMessage({ text: 'Hola', recipient: { type: 'comment', commentId: 'comment-1' } }))
+      .rejects.toMatchObject({ code: 'META_INVALID_RESPONSE' });
+  });
+
+  test('sends WhatsApp through the same official Meta provider', async () => {
+    process.env.WHATSAPP_TOKEN = 'whatsapp-test-token';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = 'phone-number-id';
+    const post = jest.fn().mockResolvedValue({ data: { messages: [{ id: 'wamid.official-1' }] } });
+    const provider = new MetaMessagingProvider({ post } as unknown as AxiosInstance);
+    await expect(provider.sendMessage({ text: 'Hola desde ALMA', recipient: { type: 'whatsapp_user', phoneNumber: '573001234567' } }))
+      .resolves.toEqual({ externalMessageId: 'wamid.official-1', simulated: false });
+    expect(post).toHaveBeenCalledWith('https://graph.facebook.com/v23.0/phone-number-id/messages',
+      { messaging_product: 'whatsapp', to: '573001234567', type: 'text', text: { body: 'Hola desde ALMA' } },
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer whatsapp-test-token' }) }));
+  });
+});

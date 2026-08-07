@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { authService } from '@services/authService';
@@ -48,5 +48,29 @@ describe('RegisterPage', () => {
 
     expect(authService.register).toHaveBeenCalledWith('new@example.com', 'newpass123', 'New User');
     expect(authService.register).toHaveBeenCalledTimes(1);
+  });
+
+  it('displays an error when registration fails', async () => {
+    (authService.register as any).mockRejectedValueOnce({ response: { data: { message: 'El email ya existe' } } });
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <RegisterPage />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    const nameInput = screen.getByPlaceholderText('Tu nombre completo');
+    const emailInput = screen.getByPlaceholderText('tu@email.com');
+    const passwordInput = screen.getByPlaceholderText('••••••••');
+    const submitButton = screen.getByRole('button', { name: /crear cuenta/i });
+
+    await userEvent.type(nameInput, 'Existing User');
+    await userEvent.type(emailInput, 'existing@example.com');
+    await userEvent.type(passwordInput, 'password123');
+    await userEvent.click(submitButton);
+
+    await waitFor(() => expect(screen.getByText(/El email ya existe/i)).toBeInTheDocument());
   });
 });

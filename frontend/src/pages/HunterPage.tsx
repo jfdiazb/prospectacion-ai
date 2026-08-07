@@ -7,7 +7,7 @@ import type { IHunterProfile } from '@types';
 
 export const HunterPage = () => {
   const [keyword, setKeyword] = useState('marketing digital');
-  const [platform, setPlatform] = useState('instagram');
+  const [platform, setPlatform] = useState('youtube');
   const [profiles, setProfiles] = useState<IHunterProfile[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -17,21 +17,21 @@ export const HunterPage = () => {
       const response = await hunterService.searchProfiles({ keyword, platform });
       setProfiles(response.data || []);
     } catch (error) {
-      console.error('Error buscando perfiles:', error);
+      console.error('Error buscando canales:', error);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AppLayout title="Lead Hunter" subtitle="Busca y analiza perfiles potenciales para convertirlos en prospectos." >
+    <AppLayout title="YouTube Lead Hunter" subtitle="Busca y analiza canales y creadores de YouTube para convertirlos en prospectos." >
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
         <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
           <Card>
             <div className="space-y-4">
               <div>
                 <h2 className="text-xl font-semibold text-white">Búsqueda inteligente</h2>
-                <p className="text-dark-400">Introduce una palabra clave y selecciona la plataforma para obtener perfiles.</p>
+                <p className="text-dark-400">Introduce una palabra clave para encontrar canales de YouTube relacionados.</p>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
@@ -47,14 +47,12 @@ export const HunterPage = () => {
                   onChange={e => setPlatform(e.target.value)}
                   className="w-full rounded-2xl border border-white/10 bg-dark-900/95 px-4 py-3 text-sm text-white outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
                 >
-                  <option value="instagram">Instagram</option>
-                  <option value="linkedin">LinkedIn</option>
-                  <option value="tiktok">TikTok</option>
+                  <option value="youtube">YouTube</option>
                 </select>
               </div>
 
               <Button variant="primary" onClick={handleSearch} disabled={loading}>
-                {loading ? 'Buscando...' : 'Buscar perfiles'}
+                {loading ? 'Buscando...' : 'Buscar canales'}
               </Button>
             </div>
           </Card>
@@ -62,10 +60,10 @@ export const HunterPage = () => {
           <Card>
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-white">Resultados</h3>
-              <p className="text-dark-400">Los perfiles encontrados se mostrarán aquí para que puedas analizarlos y convertirlos en leads.</p>
+              <p className="text-dark-400">Los canales encontrados se mostrarán aquí para analizarlos y convertirlos en leads.</p>
               <div className="rounded-3xl border border-white/10 bg-dark-900/95 p-4 text-sm text-dark-300">
                 <p>
-                  {profiles.length} perfil{profiles.length === 1 ? '' : 'es'} encontrado{profiles.length === 1 ? '' : 's'}.
+                  {profiles.length} canal{profiles.length === 1 ? '' : 'es'} encontrado{profiles.length === 1 ? '' : 's'}.
                 </p>
               </div>
             </div>
@@ -97,7 +95,7 @@ export const HunterPage = () => {
                     rel="noreferrer"
                     className="inline-flex items-center justify-center rounded-lg border border-white/10 bg-dark-700 px-3 py-2 text-sm font-medium text-dark-100 transition hover:bg-dark-600"
                   >
-                    Ver perfil
+                    Ver canal
                   </a>
                 </div>
               </div>

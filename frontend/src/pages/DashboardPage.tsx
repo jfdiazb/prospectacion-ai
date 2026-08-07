@@ -68,10 +68,10 @@ export const DashboardPage = () => {
   const channelData = useMemo(
     () =>
       stats?.channelPerformance ?? [
-        { name: 'Email', value: 42 },
-        { name: 'LinkedIn', value: 28 },
-        { name: 'Instagram', value: 16 },
-        { name: 'WhatsApp', value: 14 },
+        { name: 'YouTube', value: 58 },
+        { name: 'Referidos', value: 20 },
+        { name: 'Email', value: 14 },
+        { name: 'Manual', value: 8 },
       ],
     [stats],
   );

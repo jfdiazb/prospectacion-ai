@@ -15,27 +15,27 @@ export class HunterService {
     // Placeholder inicial: esta función puede evolucionar con scraping real.
     return [
       {
-        username: 'juan.marketing',
-        platform: query.platform || 'instagram',
+        username: '@juanmarketing',
+        platform: query.platform || 'youtube',
         fullName: 'Juan Pérez',
         bio: 'Ayudo a emprendedores a vender más con contenido orgánico',
         followers: query.minFollowers ? Math.max(query.minFollowers, 4200) : 4200,
         engagement: 8.7,
         interestLevel: 'warm',
         score: 68,
-        profileUrl: `https://www.${query.platform || 'instagram'}.com/juan.marketing`,
+        profileUrl: 'https://www.youtube.com/@juanmarketing',
         tags: ['networking', 'ventas', 'marketing'],
       },
       {
-        username: 'ana.digital',
-        platform: query.platform || 'instagram',
+        username: '@anadigital',
+        platform: query.platform || 'youtube',
         fullName: 'Ana García',
         bio: 'Asesoro equipos comerciales para crecer en redes sociales',
         followers: query.minFollowers ? Math.max(query.minFollowers, 9800) : 9800,
         engagement: 11.2,
         interestLevel: 'hot',
         score: 82,
-        profileUrl: `https://www.${query.platform || 'instagram'}.com/ana.digital`,
+        profileUrl: 'https://www.youtube.com/@anadigital',
         tags: ['socialmedia', 'growth', 'estrategia'],
       },
     ];

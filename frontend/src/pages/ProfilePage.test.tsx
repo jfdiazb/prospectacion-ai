@@ -69,4 +69,25 @@ describe('ProfilePage', () => {
 
     expect(authService.changePassword).toHaveBeenCalledWith('oldpass1', 'newpass2');
   });
+
+  it('shows an error when profile update fails', async () => {
+    (authService.updateProfile as any).mockRejectedValueOnce({ response: { data: { message: 'Error al actualizar perfil' } } });
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <ProfilePage />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    const nameInput = await screen.findByDisplayValue('Me User');
+    const saveButton = screen.getByRole('button', { name: /guardar cambios/i });
+
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, 'Updated Name');
+    await userEvent.click(saveButton);
+
+    await waitFor(() => expect(screen.getByText(/Error al actualizar perfil/i)).toBeInTheDocument());
+  });
 });

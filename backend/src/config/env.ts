@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import User from '../models/User';
 
 dotenv.config();
 dotenv.config({ path: path.resolve(process.cwd(), '../.env'), override: false });
@@ -12,4 +13,37 @@ export const validateServerEnvironment = (): void => {
   if (process.env.NODE_ENV === 'production' && (process.env.JWT_SECRET?.length ?? 0) < 32) {
     throw new Error('JWT_SECRET debe tener al menos 32 caracteres en producción');
   }
+  const aiMode = process.env.AI_MODE;
+  if (aiMode && !['mock', 'live'].includes(aiMode)) throw new Error('AI_MODE debe ser mock o live');
+  if (aiMode === 'live' && !process.env.GEMINI_API_KEY?.trim()) throw new Error('GEMINI_API_KEY es obligatoria cuando AI_MODE=live');
+  const ownerId = process.env.CRM_OWNER_ID?.trim();
+  if (ownerId && !/^[0-9a-fA-F]{24}$/.test(ownerId)) throw new Error('CRM_OWNER_ID debe contener exactamente 24 caracteres hexadecimales, sin < > ni comillas');
+  const youtubeMode = process.env.YOUTUBE_MESSAGING_MODE || 'mock';
+  if (!['mock', 'live'].includes(youtubeMode)) throw new Error('YOUTUBE_MESSAGING_MODE debe ser mock o live');
+  if (youtubeMode === 'live' && !process.env.YOUTUBE_ACCESS_TOKEN?.trim()) throw new Error('YOUTUBE_ACCESS_TOKEN es obligatorio cuando YOUTUBE_MESSAGING_MODE=live');
+  const messagingMode = process.env.INSTAGRAM_MESSAGING_MODE || process.env.META_MESSAGING_MODE || 'mock';
+  if (!['mock', 'live'].includes(messagingMode)) throw new Error('META_MESSAGING_MODE debe ser mock o live');
+  if (messagingMode === 'live') {
+    const metaMissing = ['META_ACCESS_TOKEN', 'META_IG_USER_ID'].filter(key => !process.env[key]?.trim());
+    if (metaMissing.length) throw new Error(`Faltan variables para mensajería Meta live: ${metaMissing.join(', ')}`);
+  }
+  const whatsappMessagingMode = process.env.WHATSAPP_MESSAGING_MODE || 'live';
+  if (!['mock', 'live'].includes(whatsappMessagingMode)) throw new Error('WHATSAPP_MESSAGING_MODE debe ser mock o live');
+  if (process.env.WHATSAPP_AUTO_REPLY_ENABLED === 'true' && whatsappMessagingMode === 'live') {
+    const whatsappMissing = ['WHATSAPP_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_APP_SECRET'].filter(key => !process.env[key]?.trim());
+    if (whatsappMissing.length) throw new Error(`Faltan variables para WhatsApp live: ${whatsappMissing.join(', ')}`);
+  }
+  const zoomMode = process.env.ZOOM_MODE || 'mock';
+  if (!['mock', 'live'].includes(zoomMode)) throw new Error('ZOOM_MODE debe ser mock o live');
+  if (zoomMode === 'live') {
+    const zoomMissing = ['ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET', 'ZOOM_ACCOUNT_ID', 'ZOOM_USER_ID'].filter(key => !process.env[key]?.trim());
+    if (zoomMissing.length) throw new Error(`Faltan variables para Zoom live: ${zoomMissing.join(', ')}`);
+  }
+};
+
+export const validateDatabaseEnvironment = async (): Promise<void> => {
+  const ownerId = process.env.CRM_OWNER_ID?.trim();
+  if (!ownerId) return;
+  const exists = await User.exists({ _id: ownerId });
+  if (!exists) throw new Error('CRM_OWNER_ID no corresponde a un usuario existente en MongoDB');
 };

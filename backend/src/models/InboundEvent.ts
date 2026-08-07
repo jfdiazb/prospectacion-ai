@@ -3,7 +3,7 @@ import mongoose, { Schema } from 'mongoose';
 const inboundEventSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   externalEventId: { type: String, required: true, unique: true },
-  channel: { type: String, enum: ['instagram', 'facebook', 'whatsapp'], required: true },
+  channel: { type: String, enum: ['youtube', 'instagram', 'facebook', 'whatsapp'], required: true },
   eventType: { type: String, required: true },
   senderId: { type: String, required: true },
   text: String,

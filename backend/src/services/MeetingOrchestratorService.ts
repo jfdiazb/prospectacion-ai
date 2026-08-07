@@ -1,0 +1,123 @@
+import Meeting from '../models/Meeting';
+import Activity from '../models/Activity';
+import { TaskService } from './TaskService';
+import { getMeetingProvider, MeetingProviderError } from '../integrations/meetings';
+
+type MeetingContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; wantsMeeting: boolean };
+type MeetingOutcome = { handled: boolean; reply?: string };
+
+const TIMEZONE_ALIASES: Record<string, string> = {
+  bogota: 'America/Bogota', colombia: 'America/Bogota', lima: 'America/Lima', peru: 'America/Lima',
+  mexico: 'America/Mexico_City', 'ciudad de mexico': 'America/Mexico_City', madrid: 'Europe/Madrid',
+  miami: 'America/New_York', 'nueva york': 'America/New_York', santiago: 'America/Santiago',
+  'buenos aires': 'America/Argentina/Buenos_Aires', caracas: 'America/Caracas',
+};
+
+export class MeetingOrchestratorService {
+  static async process(context: MeetingContext): Promise<MeetingOutcome> {
+    let meeting = await Meeting.findOne({ conversationId: context.conversationId, status: { $in: ['pending_details', 'failed'] } }).sort({ createdAt: -1 });
+    if (!meeting && context.wantsMeeting) {
+      const existing = await Meeting.findOne({ conversationId: context.conversationId, status: { $in: ['scheduled', 'pending_configuration'] } }).sort({ createdAt: -1 });
+      if (existing) return { handled: true, reply: existing.status === 'scheduled'
+        ? `Ya tienes una reunión registrada${existing.scheduledFor ? ` para ${existing.scheduledFor.toISOString()}` : ''}. ${existing.joinUrl ? `Enlace: ${existing.joinUrl}` : ''}`.trim()
+        : 'Ya tengo los datos de tu reunión y está pendiente de confirmación mientras Zoom se encuentra en modo de prueba.' };
+    }
+    if (!meeting && !context.wantsMeeting) return { handled: false };
+    if (!meeting) {
+      meeting = await Meeting.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId,
+        status: 'pending_details', topic: 'Reunión de descubrimiento con ALMA', sourceEventId: context.sourceEventId });
+      await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'meeting_requested', description: 'El prospecto solicitó una reunión por Zoom' });
+    }
+
+    if (/\b(cancelar|cancela|olvida la reuni[oó]n|ya no quiero la (cita|reuni[oó]n))\b/i.test(context.text)) {
+      meeting.status = 'cancelled';
+      await meeting.save();
+      return { handled: true, reply: 'Entendido, cancelé la solicitud de reunión. Si cambias de opinión, aquí estaré.' };
+    }
+
+    const extracted = this.extractDetails(context.text);
+    if (extracted.email) meeting.attendeeEmail = extracted.email;
+    if (extracted.date) meeting.requestedDate = extracted.date;
+    if (extracted.time) meeting.requestedTime = extracted.time;
+    if (extracted.timezone) meeting.timezone = extracted.timezone;
+    meeting.status = 'pending_details';
+    meeting.error = undefined;
+    meeting.errorCode = undefined;
+    meeting.errorMessage = undefined;
+    meeting.failedAt = undefined;
+    await meeting.save();
+
+    const missing: string[] = [];
+    if (!meeting.attendeeEmail) missing.push('tu correo');
+    if (!meeting.requestedDate) missing.push('la fecha');
+    if (!meeting.requestedTime) missing.push('la hora');
+    if (!meeting.timezone) missing.push('tu ciudad o zona horaria');
+    if (missing.length) return { handled: true, reply: `Perfecto. Para agendar la reunión me falta ${this.joinList(missing)}.` };
+
+    const requestedDate = meeting.requestedDate as string;
+    const requestedTime = meeting.requestedTime as string;
+    const timezone = meeting.timezone as string;
+    const scheduledFor = this.toUtc(requestedDate, requestedTime, timezone);
+    if (!scheduledFor || scheduledFor.getTime() <= Date.now()) {
+      meeting.requestedDate = undefined;
+      meeting.requestedTime = undefined;
+      await meeting.save();
+      return { handled: true, reply: 'La fecha y hora deben estar en el futuro. Envíame una nueva fecha y hora, por favor.' };
+    }
+
+    const provider = getMeetingProvider();
+    try {
+      const result = await provider.createMeeting({ topic: meeting.topic || 'Reunión de descubrimiento con ALMA', scheduledFor, timezone, agenda: `Contacto: ${meeting.attendeeEmail}` });
+      meeting.status = result.simulated ? 'pending_configuration' : 'scheduled';
+      meeting.scheduledFor = result.scheduledFor ?? scheduledFor;
+      meeting.externalId = result.externalId;
+      meeting.joinUrl = result.joinUrl;
+      await meeting.save();
+      await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: result.simulated ? 'task_created' : 'meeting_created',
+        description: result.simulated ? 'Datos de reunión completos; Zoom continúa en modo mock' : 'Reunión creada en Zoom', metadata: { externalId: result.externalId, scheduledFor } });
+      await TaskService.createTask(context.userId, { leadId: context.leadId, conversationId: context.conversationId,
+        title: result.simulated ? 'Activar o confirmar reunión de descubrimiento' : 'Preparar reunión de descubrimiento',
+        description: `Reunión solicitada para ${meeting.requestedDate} ${meeting.requestedTime} (${meeting.timezone}).`, type: 'meeting', status: 'pending', priority: 'high', dueDate: scheduledFor,
+        metadata: { meetingId: meeting._id.toString(), externalId: result.externalId, joinUrl: result.joinUrl, attendeeEmail: meeting.attendeeEmail, autoGenerated: true } });
+      return { handled: true, reply: result.simulated
+        ? `Gracias. Registré la reunión para el ${meeting.requestedDate} a las ${meeting.requestedTime} (${meeting.timezone}). Zoom está en modo de prueba, así que queda pendiente de confirmación.`
+        : `¡Listo! Agendé la reunión para el ${meeting.requestedDate} a las ${meeting.requestedTime} (${meeting.timezone}). Puedes unirte aquí: ${result.joinUrl}` };
+    } catch (error) {
+      const providerError = error instanceof MeetingProviderError ? error : new MeetingProviderError('Error inesperado al crear la reunión', 'MEETING_UNKNOWN_ERROR');
+      meeting.status = 'failed'; meeting.error = providerError.message; meeting.errorCode = providerError.code; meeting.errorMessage = providerError.message; meeting.failedAt = new Date();
+      await meeting.save();
+      return { handled: true, reply: 'Ya tengo todos tus datos, pero no pude crear la reunión en este momento. La solicitud quedó registrada para revisión.' };
+    }
+  }
+
+  static extractDetails(text: string): { email?: string; date?: string; time?: string; timezone?: string } {
+    const email = text.match(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i)?.[0]?.toLowerCase();
+    const isoDate = text.match(/\b(20\d{2})[-/]([01]?\d)[-/]([0-3]?\d)\b/);
+    const latinDate = text.match(/\b([0-3]?\d)[/]([01]?\d)[/](20\d{2})\b/);
+    let date: string | undefined;
+    if (isoDate) date = `${isoDate[1]}-${isoDate[2].padStart(2, '0')}-${isoDate[3].padStart(2, '0')}`;
+    else if (latinDate) date = `${latinDate[3]}-${latinDate[2].padStart(2, '0')}-${latinDate[1].padStart(2, '0')}`;
+    else if (/\bma[nñ]ana\b/i.test(text)) { const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000); date = tomorrow.toISOString().slice(0, 10); }
+    const timeMatch = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\s*(am|pm)?\b/i) || text.match(/\b(1[0-2]|0?[1-9])\s*(am|pm)\b/i);
+    let time: string | undefined;
+    if (timeMatch) { let hour = Number(timeMatch[1]); const minute = Number(timeMatch[2] && !/am|pm/i.test(timeMatch[2]) ? timeMatch[2] : 0); const meridiem = (timeMatch[3] || timeMatch[2] || '').toLowerCase(); if (meridiem === 'pm' && hour < 12) hour += 12; if (meridiem === 'am' && hour === 12) hour = 0; time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`; }
+    const iana = text.match(/\b(?:America|Europe|Asia|Africa|Australia)\/[A-Za-z_]+(?:\/[A-Za-z_]+)?\b/)?.[0];
+    const normalized = text.toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const alias = Object.keys(TIMEZONE_ALIASES).sort((a, b) => b.length - a.length).find(key => normalized.includes(key));
+    return { email, date, time, timezone: iana || (alias ? TIMEZONE_ALIASES[alias] : undefined) };
+  }
+
+  private static toUtc(date: string, time: string, timezone: string): Date | null {
+    try {
+      const [year, month, day] = date.split('-').map(Number); const [hour, minute] = time.split(':').map(Number);
+      const calendarCheck = new Date(Date.UTC(year, month - 1, day));
+      if (calendarCheck.getUTCFullYear() !== year || calendarCheck.getUTCMonth() !== month - 1 || calendarCheck.getUTCDate() !== day) return null;
+      let utc = Date.UTC(year, month - 1, day, hour, minute);
+      const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+      for (let i = 0; i < 2; i++) { const parts = Object.fromEntries(formatter.formatToParts(new Date(utc)).map(part => [part.type, part.value])); const represented = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute)); utc += Date.UTC(year, month - 1, day, hour, minute) - represented; }
+      const result = new Date(utc); return Number.isNaN(result.getTime()) ? null : result;
+    } catch { return null; }
+  }
+
+  private static joinList(items: string[]): string { return items.length === 1 ? items[0] : `${items.slice(0, -1).join(', ')} y ${items[items.length - 1]}`; }
+}

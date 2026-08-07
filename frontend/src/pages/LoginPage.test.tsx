@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { authService } from '@services/authService';
@@ -46,5 +46,27 @@ describe('LoginPage', () => {
 
     expect(authService.login).toHaveBeenCalledWith('test@example.com', 'password123');
     expect(authService.login).toHaveBeenCalledTimes(1);
+  });
+
+  it('displays an error when login fails', async () => {
+    (authService.login as any).mockRejectedValueOnce({ response: { data: { message: 'Credenciales inválidas' } } });
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    const emailInput = screen.getByPlaceholderText('tu@email.com');
+    const passwordInput = screen.getByPlaceholderText('••••••••');
+    const submitButton = screen.getByRole('button', { name: /iniciar sesión/i });
+
+    await userEvent.type(emailInput, 'wrong@example.com');
+    await userEvent.type(passwordInput, 'wrongpass');
+    await userEvent.click(submitButton);
+
+    await waitFor(() => expect(screen.getByText(/Credenciales inválidas/i)).toBeInTheDocument());
   });
 });

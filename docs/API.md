@@ -104,7 +104,7 @@ Authorization: Bearer YOUR_JWT_TOKEN
 ```json
 {
   "username": "@juanperez",
-  "platform": "instagram",
+  "platform": "youtube",
   "fullName": "Juan Pérez",
   "bio": "Emprendedor digital 💼 Network marketing",
   "followers": 5001,
@@ -123,7 +123,7 @@ Authorization: Bearer YOUR_JWT_TOKEN
     "_id": "507f1f77bcf86cd799439012",
     "userId": "507f1f77bcf86cd799439011",
     "username": "@juanperez",
-    "platform": "instagram",
+    "platform": "youtube",
     "score": 65,
     "interestLevel": "warm",
     "status": "new",
@@ -224,7 +224,7 @@ Authorization: Bearer YOUR_JWT_TOKEN
 ```json
 {
   "status": "hot_prospect",
-  "platform": "instagram",
+  "platform": "youtube",
   "interestLevel": "hot",
   "minFollowers": 1000,
   "maxFollowers": 100000,
@@ -243,7 +243,7 @@ Authorization: Bearer YOUR_JWT_TOKEN
 {
   "username": "@juanperez",
   "bio": "Emprendedor digital",
-  "platform": "instagram",
+  "platform": "youtube",
   "interestLevel": "warm"
 }
 ```

@@ -1,5 +1,89 @@
 # Documentación AI - Prospectación AI
 
+## Preparación de producción — 2026-08-06
+- Backend preparado para Render mediante `render.yaml`: build TypeScript, healthcheck `/health`, MongoDB Atlas por secreto y proveedores externos explícitamente en `mock`.
+- Frontend preparado para Vercel mediante `frontend/vercel.json`, con build Vite y fallback de rutas SPA.
+- El contenedor backend usa el puerto dinámico de la plataforma y ambos contextos Docker excluyen `.env`, dependencias, cobertura y artefactos de pruebas.
+- Procedimiento operativo completo en `docs/DEPLOYMENT.md`; el despliegue inicial no genera tráfico hacia YouTube, Meta, Gemini ni Zoom.
+- Próximo bloque tras validar URLs públicas: OAuth 2.0 de YouTube, almacenamiento/renovación segura de tokens e ingesta incremental de comentarios.
+
+## Base del canal YouTube — 2026-08-06
+- YouTube ya es el único canal seleccionable por defecto en Lead Hunter y la fuente principal del gráfico demo del dashboard.
+- Los ejemplos generales de `docs/API.md` y `docs/GUIA_DESARROLLO.md` usan `platform: youtube`; las rutas Meta permanecen documentadas solo en su sección técnica de compatibilidad.
+- `YouTubeMessagingProvider` implementa el contrato de respuesta a un comentario mediante `POST /youtube/v3/comments?part=snippet`, usando `snippet.parentId` y `snippet.textOriginal`.
+- `YOUTUBE_MESSAGING_MODE=mock` no realiza red. El live exige token OAuth y persiste la respuesta mediante el mismo `MessagingService` usado por otros canales.
+- Modelos habilitados: `InboundEvent.channel=youtube`, `OutboundMessage.channel=youtube`, `messageType=youtube_reply`, `provider=youtube|mock`.
+- Seguridad: no usar service accounts para un canal YouTube normal. La activación definitiva requiere OAuth 2.0 para aplicación web, consentimiento, refresh token cifrado y scope mínimo para gestionar comentarios.
+- Próximo bloque: lector incremental de comentarios con `commentThreads.list`, cursor/idempotencia y conexión con `AlmaService`; no existe todavía polling live.
+
+## Modos locales y diagnóstico — 2026-08-06
+- Usar `AI_MODE=mock` para pruebas aisladas; esto garantiza `MockAIProvider` incluso si `.env` contiene una clave Gemini.
+- `AI_MODE=live` requiere `GEMINI_API_KEY`; valores distintos de `mock|live` detienen el arranque con un error claro.
+- Si existe `CRM_OWNER_ID`, el arranque valida formato hexadecimal de 24 caracteres y existencia del usuario después de conectar MongoDB. Marcadores como `<ID>` ya no producen un `500` tardío en el webhook.
+- Solo existe una tarea `follow_up` pendiente por lead/conversación: una nueva interacción actualiza vencimiento, prioridad y metadatos de la tarea abierta.
+- Configuración local recomendada: `AI_MODE=mock`, mensajería mock y `ZOOM_MODE=mock`; las credenciales live no son necesarias.
+
+## Canal principal y compatibilidad — 2026-08-06
+- YouTube es el canal principal para toda experiencia y contenido nuevo de ALMA.
+- Meta no se reactiva ni se usa como estrategia de producto: su código queda preservado exclusivamente para compatibilidad y una eventual operación autorizada mediante APIs oficiales.
+- No se modificaron todavía los defaults históricos de Instagram presentes en Hunter/frontend; requieren una migración específica a YouTube.
+
+## Arquitectura definitiva de mensajería Meta — 2026-08-06
+- `MessagingProvider` admite destinatarios tipados de comentario Instagram, usuario Instagram-scoped y teléfono WhatsApp.
+- `MetaMessagingProvider` es el único cliente de Graph API para envíos; construye el payload oficial según el tipo de destinatario.
+- `MessagingService` es la frontera de persistencia común: canal, tipo, proveedor, estado, ID externo, destinatario, fechas y error sanitizado.
+- `WhatsAppController` mantiene verificación HMAC y compatibilidad de ruta, reclama cada `message.id` mediante `InboundEvent` y delega el envío al proveedor.
+- Se retiró la copia provisional de webhook/transporte que estaba dentro de `GeminiService` y carecía de validación de firma.
+- Modos: Instagram usa `INSTAGRAM_MESSAGING_MODE` (`META_MESSAGING_MODE` sigue aceptado); WhatsApp usa `WHATSAPP_MESSAGING_MODE`. Ambos admiten `mock|live`.
+- `WHATSAPP_AUTO_REPLY_ENABLED=false` conserva el envío automático apagado; al activarlo en live se validan token, Phone Number ID y App Secret.
+
+## Orquestación conversacional de reuniones — 2026-08-06
+- Una intención de cita crea un `Meeting` en `pending_details`, sin llamar todavía a Zoom.
+- Los mensajes posteriores completan `attendeeEmail`, `requestedDate`, `requestedTime` y `timezone` sobre el mismo registro de conversación.
+- ALMA sustituye la respuesta genérica por una pregunta concreta con los campos faltantes.
+- Se reconocen fechas `YYYY-MM-DD`, `DD/MM/YYYY` y `mañana`; horas `HH:mm`, `h:mm am/pm` y `h am/pm`; zonas IANA y ciudades latinoamericanas frecuentes.
+- Antes de crear se convierte la hora local a UTC, se valida que exista en calendario y que esté en el futuro.
+- Con datos completos, mock deja confirmación pendiente y live devuelve el enlace real. Reintentos conversacionales no duplican reuniones finalizadas.
+- El prospecto puede cancelar el borrador escribiendo una intención explícita de cancelación.
+
+### Ejemplo de flujo
+1. Prospecto: `Quiero agendar una reunión`.
+2. ALMA pide correo, fecha, hora y ciudad/zona horaria.
+3. Prospecto: `prospecto@example.com, 20/08/2027 a las 3:30 pm en Bogotá`.
+4. ALMA valida, crea una única reunión mediante el proveedor configurado y registra la tarea CRM asociada.
+
+## Zoom Server-to-Server OAuth — 2026-08-06
+- `ZoomProvider` solicita tokens en `https://zoom.us/oauth/token` mediante `grant_type=account_credentials` y autenticación Basic.
+- El token se conserva únicamente en memoria hasta poco antes de expirar y nunca se escribe en MongoDB ni logs.
+- Las reuniones se crean con `POST https://api.zoom.us/v2/users/{ZOOM_USER_ID}/meetings`, autenticación Bearer, sala de espera y entrada antes del anfitrión deshabilitada.
+- `ZOOM_MODE=mock` conserva el flujo local y registra `pending_configuration`; `ZOOM_MODE=live` registra `scheduled` con `externalId` y `joinUrl`.
+- Fallos de configuración, OAuth, timeout, HTTP o respuesta inválida se guardan como `Meeting.status=failed` con `errorCode`, `errorMessage` y `failedAt`; la respuesta comercial de ALMA continúa su envío.
+- Variables live: `ZOOM_ACCOUNT_ID`, `ZOOM_CLIENT_ID`, `ZOOM_CLIENT_SECRET`, `ZOOM_USER_ID`; opcionales `ZOOM_TIMEOUT_MS` y `ZOOM_MEETING_DURATION_MINUTES`.
+
+### Activación de Zoom live
+1. Crear y activar una aplicación Server-to-Server OAuth en Zoom Marketplace.
+2. Conceder únicamente el scope granular `meeting:write:meeting:admin` (o el scope equivalente permitido por la cuenta) para crear reuniones del anfitrión.
+3. Configurar las cuatro credenciales/identificadores y verificar que `ZOOM_USER_ID` corresponda a un usuario anfitrión habilitado para reuniones.
+4. Establecer `ZOOM_MODE=live`, reiniciar el backend y enviar una conversación que solicite una reunión.
+5. Verificar en MongoDB `Meeting.status=scheduled`, `externalId` y `joinUrl`; ante fallo, revisar solamente el código/mensaje sanitizado almacenado.
+
+## Mensajería Instagram — 2026-08-06
+- `integrations/messaging` desacopla ALMA del canal mediante `MessagingProvider`, con implementaciones mock y Meta.
+- `AlmaService` genera y registra la respuesta como antes, y delega la entrega a `MessagingService`.
+- La primera respuesta privada usa el ID externo del comentario; los mensajes posteriores usan el Instagram-scoped user ID recibido en Direct.
+- `OutboundMessage` registra `pending`, `sent`, `delivered`, `failed` o `simulated`, además de proveedor, destinatario, `commentId`, ID externo, fechas y errores.
+- `sourceEventId` es único; junto con `InboundEvent.externalEventId` evita dobles respuestas ante reintentos del webhook.
+- Variables: `META_ACCESS_TOKEN`, `META_IG_USER_ID`, `META_GRAPH_API_VERSION`, `META_MESSAGING_MODE` y opcional `META_MESSAGING_TIMEOUT_MS`.
+- En `mock` no hay tráfico externo. En `live`, Meta recibe `POST /{META_IG_USER_ID}/messages` con token Bearer; los errores se persisten sin registrar el token.
+- Zoom permanece sin cambios y no se activa en este bloque.
+
+### Prueba local de mensajería
+1. Configurar MongoDB/JWT/propietario y usar `META_MESSAGING_MODE=mock`, `META_MOCK_MODE=true` y `NODE_ENV` distinto de producción.
+2. Levantar el backend y verificar el webhook con `META_VERIFY_TOKEN`.
+3. Enviar un evento de comentario con encabezado `X-ALMA-MOCK-EVENT: true`; comprobar lead, conversación y `OutboundMessage.deliveryStatus=simulated`.
+4. Enviar después un evento Direct del mismo Instagram-scoped ID y comprobar `messageType=direct_message`.
+5. Para live, desactivar `META_MOCK_MODE`, configurar secreto, token, IG user ID y versión, establecer `META_MESSAGING_MODE=live`, suscribir el webhook público en Meta y probar primero con una cuenta autorizada.
+
 ## Avance ALMA — 2026-08-03
 - Entrada backend canónica: `backend/src/index.ts`; `src/server.ts` y `server.js` solo conservan compatibilidad.
 - Webhook Meta disponible en `GET/POST /api/v1/meta/webhook`.

@@ -1,11 +1,67 @@
 # AGENTS.md
 
+## Preparación de despliegue — 2026-08-06
+- `render.yaml` define el backend Node en Render con `/health`, MongoDB Atlas y todos los proveedores externos en `mock` para el primer despliegue.
+- `frontend/vercel.json` configura Vite y el fallback SPA para que las rutas React funcionen al recargar en Vercel.
+- Los Dockerfiles excluyen credenciales, dependencias y artefactos locales; el healthcheck backend respeta el `PORT` asignado por la plataforma.
+- `docs/DEPLOYMENT.md` contiene el orden Atlas → Render → Vercel, las variables secretas y la verificación segura.
+- No se activa YouTube live: OAuth, refresh token cifrado e ingesta incremental siguen siendo el próximo bloque.
+
+## Base YouTube — 2026-08-06
+- Hunter y dashboard usan YouTube como canal/default visible; se retiraron referencias promocionales de Instagram/WhatsApp de esas pantallas y los ejemplos generales de API/desarrollo usan `platform: youtube`.
+- `MessagingProvider` admite `youtube_comment`; `YouTubeMessagingProvider` prepara respuestas oficiales con `comments.insert`, mientras `YOUTUBE_MESSAGING_MODE=mock` es el valor predeterminado sin red.
+- `InboundEvent` y `OutboundMessage` aceptan canal YouTube; los mensajes salientes distinguen `youtube_reply` y proveedor `youtube`.
+- El modo live requiere `YOUTUBE_ACCESS_TOKEN`, pero no debe activarse hasta completar OAuth 2.0 de servidor web y almacenamiento seguro de refresh token. YouTube Data API no admite cuentas de servicio para un canal normal.
+- Pendiente: ingesta periódica con `commentThreads.list`, OAuth completo y orquestación de comentarios `INFO` hacia ALMA.
+- Suite vigente: 26/26 pruebas backend.
+
+## Robustez local de ALMA — 2026-08-06
+- `AI_MODE=mock|live` controla el proveedor de IA de forma explícita; `mock` prevalece aunque exista una clave local y evita llamadas accidentales. Sin variable se conserva la selección heredada por presencia de `GEMINI_API_KEY`.
+- El backend valida al iniciar que `AI_MODE=live` tenga clave Gemini y que `CRM_OWNER_ID` sea un ObjectId de 24 caracteres correspondiente a un usuario real.
+- Los seguimientos abiertos ahora usan `upsertPendingFollowUp`: mensajes posteriores actualizan la misma tarea pendiente por conversación en lugar de crear duplicados.
+- Suite vigente: 22/22 pruebas backend.
+
+## Directriz de canal — 2026-08-06
+- YouTube es el canal principal vigente de ALMA para producto, CTA, enlaces, botones, textos y contenido nuevo.
+- No proponer publicaciones, cuentas, automatizaciones ni estrategias para Instagram/Facebook, ni mecanismos para evadir restricciones de Meta.
+- Las integraciones Meta existentes se conservan únicamente como compatibilidad técnica oficial, desactivables y en mock por defecto donde corresponda.
+- Antes de modificar referencias históricas de Instagram/Facebook fuera de la arquitectura `MessagingProvider`, informar al usuario.
+
+## Consolidación de MessagingProvider — 2026-08-06
+- `MetaMessagingProvider` centraliza los transportes oficiales de Instagram y WhatsApp; ningún controlador realiza llamadas directas a Graph API.
+- `MessagingService` selecciona canal/proveedor, persiste `OutboundMessage` e idempotencia, y soporta `private_reply`, `direct_message` y `whatsapp_message`.
+- WhatsApp conserva firma HMAC, ruta y modo de auto-respuesta, ahora con idempotencia `InboundEvent`. Se corrigió la referencia estática de validación que fallaba al ser invocada por Express.
+- Se eliminó el controlador WhatsApp duplicado y sin firma que estaba provisionalmente dentro de `GeminiService`; la generación Gemini queda enfocada solo en IA.
+- `INSTAGRAM_MESSAGING_MODE` es el nombre explícito preferido, con compatibilidad para `META_MESSAGING_MODE`; WhatsApp usa `WHATSAPP_MESSAGING_MODE`.
+- Hunter/frontend y datos históricos de Instagram/Facebook no fueron modificados en esta consolidación.
+
+## Actualización técnica — 2026-08-06 (orquestación de reuniones)
+- `MeetingOrchestratorService` mantiene un único borrador de reunión por conversación y recopila progresivamente correo, fecha, hora y ciudad/zona IANA.
+- ALMA pide solamente los campos faltantes, acepta fechas ISO o `DD/MM/YYYY`, horas de 12/24 horas y la expresión `mañana`, y rechaza fechas pasadas o calendarios inválidos.
+- Zoom se invoca únicamente al completar datos válidos. Mock pasa a `pending_configuration`; live pasa a `scheduled`; fallos quedan persistidos sin interrumpir Instagram.
+- Solicitudes repetidas no duplican una reunión ya programada o pendiente de configuración; la cancelación conversacional cambia el estado a `cancelled`.
+- Suite vigente: 17/17 pruebas backend.
+
+## Actualización técnica — 2026-08-06 (Zoom)
+- `ZoomProvider` ya implementa Server-to-Server OAuth con `account_credentials`, caché del token y creación real mediante `/v2/users/{ZOOM_USER_ID}/meetings`.
+- `ZOOM_MODE=mock|live` selecciona el proveedor. El modo live exige cuenta, cliente, secreto y usuario anfitrión; timeout y duración son configurables.
+- Los errores de OAuth/API se normalizan y persisten en `Meeting` sin registrar secretos ni impedir que ALMA envíe su respuesta por Instagram.
+- El mock permanece como comportamiento predeterminado y conserva reuniones `pending_configuration` sin tráfico externo.
+- Suite vigente: 14/14 pruebas backend, incluidas OAuth, caché, creación, autenticación, timeout, respuesta inválida y flujo mock.
+
+## Actualización técnica — 2026-08-06
+- ALMA envía respuestas salientes mediante la abstracción `MessagingProvider`; `MockMessagingProvider` conserva el desarrollo/E2E sin red y `MetaMessagingProvider` deja preparada la Graph API oficial.
+- Los comentarios `INFO` usan `recipient.comment_id`; las respuestas posteriores de Instagram Direct usan el Instagram-scoped ID en `recipient.id`.
+- Cada intento se persiste en `OutboundMessage` con estado, proveedor, destinatario, IDs externos, fechas, error sanitizado y clave única `sourceEventId` para idempotencia.
+- `META_MESSAGING_MODE=mock|live` controla la entrega. El modo `live` exige `META_ACCESS_TOKEN` y `META_IG_USER_ID`; la versión y timeout son configurables.
+- Zoom real quedó implementado y preparado para activación mediante credenciales Server-to-Server OAuth.
+
 ## Actualización técnica — 2026-08-03
 - `backend/src/index.ts` es la única entrada canónica; los otros inicios son shims de compatibilidad sin lógica propia.
 - Las pruebas de autenticación usan MongoDB efímero y ya no pueden ejecutar `dropDatabase()` sobre el `MONGO_URI` configurado.
 - Se añadió el webhook `/api/v1/meta/webhook`, validación HMAC, idempotencia de eventos y captura de comentarios con la palabra `INFO`.
 - El evento crea el lead de Instagram y abre/registra su conversación en MongoDB.
-- Pendiente inmediato: respuesta privada oficial de Instagram, orquestador de calificación, seguimientos y Zoom.
+- La respuesta privada oficial de Instagram quedó implementada y preparada para activación con credenciales; Zoom real continúa pendiente.
 - ALMA ya procesa mensajes posteriores al `INFO`, asigna score/estado/interés, programa seguimiento a 24 horas y registra actividades CRM.
 - Las solicitudes de reunión crean un registro Zoom `pending_configuration` cuando no hay credenciales, sin efectuar llamadas externas.
 - API CRM inicial: `/api/v1/crm/conversations`, `/activities` y `/meetings` (JWT).

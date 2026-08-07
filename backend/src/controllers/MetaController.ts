@@ -48,13 +48,14 @@ export class MetaController {
           if (!text || !senderId || !eventId) continue;
           const platform = value.platform === 'facebook' ? 'facebook' : 'instagram';
           const hasInfoKeyword = /(^|\s)info(\s|$)/i.test(text);
+          const isComment = change.field === 'comments' || Boolean(value.comment_id) || Boolean(value.media?.id && !value.message);
           const existingLead = await Lead.findOne({ userId: ownerId, username: senderId, platform });
           if (!existingLead && !hasInfoKeyword) continue;
 
           const claimed = await InboundEvent.findOneAndUpdate(
             { externalEventId: eventId },
             { $setOnInsert: { userId: ownerId, externalEventId: eventId, channel: platform, eventType: change.field ?? 'comment', senderId, text, mediaId: value.media?.id, matchedKeyword: hasInfoKeyword ? 'INFO' : undefined } },
-            { upsert: true, new: true, rawResult: true },
+            { upsert: true, new: true, includeResultMetadata: true },
           );
           if (claimed.lastErrorObject?.updatedExisting) continue;
 
@@ -70,7 +71,11 @@ export class MetaController {
           if (!lead) throw new Error('No fue posible crear el lead');
           const conversation = await ConversationService.getOrCreateConversation(ownerId, lead._id.toString());
           await ConversationService.addMessage(conversation._id.toString(), ownerId, { sender: 'lead', text, platform: 'instagram' });
-          await AlmaService.processMessage({ userId: ownerId, leadId: lead._id.toString(), conversationId: conversation._id.toString(), text, isNewLead, platform });
+          await AlmaService.processMessage({
+            userId: ownerId, leadId: lead._id.toString(), conversationId: conversation._id.toString(), text, isNewLead, platform,
+            sourceEventId: eventId,
+            recipient: isComment ? { type: 'comment', commentId: value.comment_id ?? value.id } : { type: 'instagram_user', instagramScopedId: senderId },
+          });
         }
       }
       return res.sendStatus(200);

@@ -1,6 +1,7 @@
 process.env.NODE_ENV = 'test';
 process.env.PORT = '0';
 import axios from 'axios';
+import crypto from 'crypto';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { startServer } from '../src/index';
@@ -12,6 +13,10 @@ import Conversation from '../src/models/Conversation';
 import InboundEvent from '../src/models/InboundEvent';
 import Activity from '../src/models/Activity';
 import Task from '../src/models/Task';
+import OutboundMessage from '../src/models/OutboundMessage';
+import Meeting from '../src/models/Meeting';
+import { MessagingService } from '../src/services/MessagingService';
+import { MessagingProviderError, type MessagingProvider } from '../src/integrations/messaging';
 
 jest.setTimeout(120000);
 
@@ -22,7 +27,10 @@ describe('Auth integration tests', () => {
 
   beforeAll(async () => {
     delete process.env.GEMINI_API_KEY;
+    process.env.AI_MODE = 'mock';
     process.env.ZOOM_MODE = 'mock';
+    process.env.META_MESSAGING_MODE = 'mock';
+    delete process.env.CRM_OWNER_ID;
     mongoServer = await MongoMemoryServer.create();
     process.env.MONGO_URI = mongoServer.getUri('alma-test');
     process.env.JWT_SECRET = 'alma-test-only-secret-with-at-least-32-characters';
@@ -197,6 +205,10 @@ describe('Auth integration tests', () => {
     expect(await InboundEvent.countDocuments({ externalEventId: eventId })).toBe(1);
     expect(await Activity.countDocuments({ leadId: lead!._id })).toBeGreaterThanOrEqual(3);
     expect(await Task.countDocuments({ leadId: lead!._id, status: 'pending' })).toBeGreaterThanOrEqual(1);
+    const initialOutbound = await OutboundMessage.findOne({ sourceEventId: eventId });
+    expect(initialOutbound).toMatchObject({ deliveryStatus: 'simulated', provider: 'mock', recipientId: eventId, commentId: eventId, messageType: 'private_reply', simulatedDelivery: true });
+    expect(initialOutbound?.externalMessageId).toBeTruthy();
+    expect(initialOutbound?.sentAt).toBeTruthy();
 
     const loginRes = await axios.post(`${baseURL}/api/v1/auth/login`, {
       email: 'owner@example.com',
@@ -214,5 +226,73 @@ describe('Auth integration tests', () => {
       headers: { 'x-alma-mock-event': 'true', 'Content-Type': 'application/json' },
     });
     expect(await InboundEvent.countDocuments({ externalEventId: eventId })).toBe(1);
+    expect(await OutboundMessage.countDocuments({ sourceEventId: eventId })).toBe(1);
+
+    const directEventId = 'mock-direct-message-1';
+    await axios.post(`${baseURL}/api/v1/meta/webhook`, {
+      entry: [{ changes: [{ field: 'messages', value: { sender: { id: 'instagram-user-1' }, message: { mid: directEventId, text: 'Quiero agendar una reunión' }, platform: 'instagram' } }] }],
+    }, { headers: { 'x-alma-mock-event': 'true', 'Content-Type': 'application/json' } });
+    const directOutbound = await OutboundMessage.findOne({ sourceEventId: directEventId });
+    expect(directOutbound).toMatchObject({ deliveryStatus: 'simulated', provider: 'mock', recipientId: 'instagram-user-1', messageType: 'direct_message', simulatedDelivery: true });
+    expect(directOutbound?.commentId).toBeUndefined();
+    expect(await Meeting.findOne({ leadId: lead!._id })).toMatchObject({ status: 'pending_details', provider: 'zoom' });
+
+    const detailsEventId = 'mock-direct-meeting-details-1';
+    await axios.post(`${baseURL}/api/v1/meta/webhook`, {
+      entry: [{ changes: [{ field: 'messages', value: { sender: { id: 'instagram-user-1' }, message: { mid: detailsEventId, text: 'Mi correo es prospecto@example.com, el 20/08/2027 a las 3:30 pm en Bogotá' }, platform: 'instagram' } }] }],
+    }, { headers: { 'x-alma-mock-event': 'true', 'Content-Type': 'application/json' } });
+    expect(await Meeting.findOne({ leadId: lead!._id })).toMatchObject({ status: 'pending_configuration', attendeeEmail: 'prospecto@example.com', requestedDate: '2027-08-20', requestedTime: '15:30', timezone: 'America/Bogota' });
+    expect(await Meeting.countDocuments({ leadId: lead!._id })).toBe(1);
+    expect(await OutboundMessage.findOne({ sourceEventId: detailsEventId })).toMatchObject({ messageType: 'direct_message', deliveryStatus: 'simulated' });
+    expect(await Task.countDocuments({ leadId: lead!._id, type: 'follow_up', status: 'pending' })).toBe(1);
+  });
+
+  test('an already claimed comment does not create a lead or outbound message', async () => {
+    await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'claimed@example.com', password: 'password123', fullName: 'Claimed Owner' });
+    const owner = await User.findOne({ email: 'claimed@example.com' });
+    process.env.CRM_OWNER_ID = owner!._id.toString();
+    process.env.META_MOCK_MODE = 'true';
+    await InboundEvent.create({ userId: owner!._id, externalEventId: 'already-claimed-comment', channel: 'instagram', eventType: 'comments', senderId: 'ignored-user', text: 'INFO' });
+    await axios.post(`${baseURL}/api/v1/meta/webhook`, {
+      entry: [{ changes: [{ field: 'comments', value: { id: 'already-claimed-comment', text: 'INFO', from: { id: 'ignored-user' }, platform: 'instagram' } }] }],
+    }, { headers: { 'x-alma-mock-event': 'true', 'Content-Type': 'application/json' } });
+    expect(await Lead.countDocuments({ username: 'ignored-user' })).toBe(0);
+    expect(await OutboundMessage.countDocuments({ sourceEventId: 'already-claimed-comment' })).toBe(0);
+  });
+
+  test('persists failed delivery details', async () => {
+    await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'failure@example.com', password: 'password123', fullName: 'Failure Owner' });
+    const owner = await User.findOne({ email: 'failure@example.com' });
+    process.env.CRM_OWNER_ID = owner!._id.toString();
+    process.env.META_MOCK_MODE = 'true';
+    await axios.post(`${baseURL}/api/v1/meta/webhook`, {
+      entry: [{ changes: [{ field: 'comments', value: { id: 'failure-seed', text: 'INFO', from: { id: 'failure-user' }, platform: 'instagram' } }] }],
+    }, { headers: { 'x-alma-mock-event': 'true', 'Content-Type': 'application/json' } });
+    const lead = await Lead.findOne({ username: 'failure-user' });
+    const conversation = await Conversation.findOne({ leadId: lead!._id });
+    const failingProvider: MessagingProvider = { name: 'meta', sendMessage: async () => { throw new MessagingProviderError('Invalid OAuth access token.', '190', 401); } };
+    await MessagingService.send({ userId: owner!._id.toString(), leadId: lead!._id.toString(), conversationId: conversation!._id.toString(), sourceEventId: 'failed-delivery-event', text: 'Hola', recipient: { type: 'instagram_user', instagramScopedId: 'failure-user' } }, failingProvider);
+    const outbound = await OutboundMessage.findOne({ sourceEventId: 'failed-delivery-event' });
+    expect(outbound).toMatchObject({ deliveryStatus: 'failed', provider: 'meta', recipientId: 'failure-user', errorCode: '190', errorMessage: 'Invalid OAuth access token.', simulatedDelivery: false });
+    expect(outbound?.failedAt).toBeTruthy();
+  });
+
+  test('keeps the signed WhatsApp webhook compatible and idempotent', async () => {
+    await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'whatsapp@example.com', password: 'password123', fullName: 'WhatsApp Owner' });
+    const owner = await User.findOne({ email: 'whatsapp@example.com' });
+    process.env.CRM_OWNER_ID = owner!._id.toString();
+    process.env.WHATSAPP_APP_SECRET = 'whatsapp-test-secret';
+    process.env.WHATSAPP_AUTO_REPLY_ENABLED = 'false';
+    const eventId = 'wamid.webhook-compatible-1';
+    const rawPayload = JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ id: eventId, from: '573001234567', type: 'text', text: { body: 'Hola ALMA' } }] } }] }] });
+    const signature = `sha256=${crypto.createHmac('sha256', process.env.WHATSAPP_APP_SECRET).update(Buffer.from(rawPayload)).digest('hex')}`;
+    const config = { headers: { 'Content-Type': 'application/json', 'x-hub-signature-256': signature } };
+    expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(200);
+    expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(200);
+    const lead = await Lead.findOne({ userId: owner!._id, phone: '573001234567' });
+    expect(lead).toMatchObject({ platform: 'whatsapp', source: 'whatsapp_webhook' });
+    expect(await Conversation.countDocuments({ leadId: lead!._id })).toBe(1);
+    expect(await InboundEvent.countDocuments({ externalEventId: eventId })).toBe(1);
+    expect(await OutboundMessage.countDocuments({ sourceEventId: eventId })).toBe(0);
   });
 });

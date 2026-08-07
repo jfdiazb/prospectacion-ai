@@ -80,6 +80,14 @@ temp/
 .vercel/
 
 # =========================
+# Browser / E2E test artifacts
+# =========================
+**/test-results/
+**/playwright-report/
+**/blob-report/
+**/.auth/
+
+# =========================
 # Yarn
 # =========================
 .yarn/cache/

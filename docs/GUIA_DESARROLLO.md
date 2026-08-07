@@ -161,7 +161,7 @@ import { AIService } from '../services/AIService.js';
 const message = await AIService.generatePersonalizedMessage({
   username: 'usuario',
   bio: 'su bio',
-  platform: 'instagram',
+  platform: 'youtube',
   interestLevel: 'warm'
 });
 
@@ -176,7 +176,7 @@ const analysis = await AIService.analyzeSentiment('mensaje del usuario');
 const lead = await Lead.create({
   userId: req.userId,
   username: 'usuario',
-  platform: 'instagram'
+  platform: 'youtube'
 });
 
 // Buscar
@@ -243,7 +243,7 @@ const { data: leads } = await leadService.getLeads(1, 20);
 const message = await aiService.generateMessage({
   username: '@user',
   bio: 'bio',
-  platform: 'instagram',
+  platform: 'youtube',
   interestLevel: 'warm'
 });
 ```
