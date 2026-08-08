@@ -3,13 +3,14 @@
 ## YouTube live persistente en Render — 2026-08-08
 - `render.yaml` mantiene la ingesta y la mensajería de YouTube en modo `live` para que cada despliegue conserve el recorrido real comentario `INFO` → ALMA → respuesta.
 - Los valores sensibles de OAuth permanecen fuera del repositorio como secretos de Render.
+- La prueba real `INFO ALMA` fue capturada y recibió respuesta oficial de ALMA en YouTube; quedan por validar conversacionalmente calificación, seguimiento y agenda Zoom.
 
 ## YouTube live y cursor tolerante — 2026-08-08
 - El cliente OAuth de Google Cloud ya incluye `https://alma-backend-9eo1.onrender.com/api/v1/youtube/oauth/callback` y Render contiene las credenciales cifradas/secretas requeridas.
 - Ingesta y mensajería YouTube están activas en producción; ALMA muestra conectado el canal `100 % Mentalmente`.
 - Para no perder comentarios que la API expone con retraso, cada sondeo solapa 10 minutos mediante `YOUTUBE_POLL_OVERLAP_MS` (configurable) y limita el retroceso a `connectedAt`.
 - El reprocesamiento del solapamiento es seguro porque `InboundEvent.externalEventId=youtube:<commentId>` mantiene idempotencia.
-- Próxima validación: desplegar los modos live persistentes y comprobar la creación del lead y la respuesta oficial para el comentario principal `INFO` ya publicado.
+- El recorrido comentario principal `INFO` → ingesta → ALMA → respuesta oficial está validado en producción.
 
 ## Despliegue público verificado — 2026-08-07
 - Frontend: `https://prospectacion-ai.vercel.app` (Vercel, Vite, raíz `frontend`).
