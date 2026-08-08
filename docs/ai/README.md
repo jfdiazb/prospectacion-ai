@@ -1,5 +1,12 @@
 # Documentación AI - Prospectación AI
 
+## YouTube live y cursor tolerante — 2026-08-08
+- El cliente OAuth de Google Cloud ya incluye `https://alma-backend-9eo1.onrender.com/api/v1/youtube/oauth/callback` y Render contiene las credenciales cifradas/secretas requeridas.
+- Ingesta y mensajería YouTube están activas en producción; ALMA muestra conectado el canal `José Fernando Diaz`.
+- Para no perder comentarios que la API expone con retraso, cada sondeo solapa 10 minutos mediante `YOUTUBE_POLL_OVERLAP_MS` (configurable) y limita el retroceso a `connectedAt`.
+- El reprocesamiento del solapamiento es seguro porque `InboundEvent.externalEventId=youtube:<commentId>` mantiene idempotencia.
+- Próxima validación: comentario `INFO` posterior al despliegue, creación del lead y respuesta oficial en YouTube.
+
 ## Despliegue público verificado — 2026-08-07
 - Frontend: `https://prospectacion-ai.vercel.app` (Vercel, Vite, raíz `frontend`).
 - Backend: `https://alma-backend-9eo1.onrender.com` (Render Free, Node 20); healthcheck público aprobado.

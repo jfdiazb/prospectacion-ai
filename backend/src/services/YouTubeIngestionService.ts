@@ -24,12 +24,20 @@ export class YouTubeIngestionService {
     const token = await this.tokens.getAccessToken(credential.userId.toString());
     const params = new URLSearchParams({ part: 'snippet', allThreadsRelatedToChannelId: credential.channelId, order: 'time', maxResults: '100', textFormat: 'plainText' });
     const response = await this.http.get<ThreadResponse>(`https://www.googleapis.com/youtube/v3/commentThreads?${params}`, { headers: { Authorization: `Bearer ${token}` }, timeout: Number(process.env.YOUTUBE_TIMEOUT_MS || 10000) });
-    const cutoff = credential.lastPolledAt?.getTime() ?? 0;
+    const cutoff = YouTubeIngestionService.getPollingCutoff(credential);
     const comments = (response.data.items ?? []).map(item => item.snippet?.topLevelComment).filter((item): item is TopComment => Boolean(item));
     comments.sort((a, b) => new Date(a.snippet?.publishedAt ?? 0).getTime() - new Date(b.snippet?.publishedAt ?? 0).getTime());
     for (const comment of comments) if (new Date(comment.snippet?.publishedAt ?? 0).getTime() > cutoff) await this.processComment(credential.userId.toString(), comment);
     credential.lastPolledAt = new Date();
     await credential.save();
+  }
+
+  static getPollingCutoff(credential: { connectedAt?: Date; lastPolledAt?: Date }): number {
+    const connectedAt = credential.connectedAt?.getTime() ?? 0;
+    const lastPolledAt = credential.lastPolledAt?.getTime();
+    if (!lastPolledAt) return connectedAt;
+    const overlapMs = Math.max(0, Number(process.env.YOUTUBE_POLL_OVERLAP_MS || 10 * 60 * 1000));
+    return Math.max(connectedAt, lastPolledAt - overlapMs);
   }
 
   async processComment(userId: string, comment: TopComment): Promise<void> {

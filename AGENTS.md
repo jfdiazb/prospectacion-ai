@@ -1,5 +1,11 @@
 # AGENTS.md
 
+## YouTube live y tolerancia de ingesta — 2026-08-08
+- Google Cloud autoriza el callback público de Render y producción tiene `YOUTUBE_INGESTION_MODE=live` y `YOUTUBE_MESSAGING_MODE=live` con secretos almacenados en Render.
+- El canal `José Fernando Diaz` aparece conectado mediante OAuth y el backend desplegado inicia correctamente en modo live.
+- El cursor del poller relee por defecto los últimos 10 minutos (`YOUTUBE_POLL_OVERLAP_MS`) sin retroceder antes de `connectedAt`; la idempotencia de `InboundEvent` evita duplicados y cubre retrasos de consistencia de YouTube.
+- Pendiente inmediato: desplegar esta corrección y repetir comentario real `INFO` para verificar lead, respuesta, calificación y tarea en producción.
+
 ## ALMA pública en Internet — 2026-08-07
 - Backend `https://alma-backend-9eo1.onrender.com` está Live en Render Free; `/health` responde `{"success":true,"status":"ok"}`.
 - Frontend `https://prospectacion-ai.vercel.app` está publicado en Vercel desde `main`, con `VITE_API_URL` apuntando a Render.
