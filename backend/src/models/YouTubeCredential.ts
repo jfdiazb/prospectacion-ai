@@ -15,6 +15,7 @@ const youtubeCredentialSchema = new Schema({
   accessTokenExpiresAt: { type: Date, required: true },
   scope: [String],
   lastPolledAt: Date,
+  lastRepliesPolledAt: Date,
   connectedAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 

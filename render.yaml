@@ -24,6 +24,12 @@ services:
         value: live
       - key: YOUTUBE_INGESTION_MODE
         value: live
+      - key: YOUTUBE_REPLY_POLL_INTERVAL_MS
+        value: "120000"
+      - key: YOUTUBE_REPLY_ACTIVE_DAYS
+        value: "7"
+      - key: YOUTUBE_REPLY_MAX_THREADS
+        value: "5"
       - key: ZOOM_MODE
         value: mock
       - key: INSTAGRAM_MESSAGING_MODE

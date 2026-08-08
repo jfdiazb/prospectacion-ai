@@ -1,5 +1,10 @@
 # AGENTS.md
 
+## Conversación continua en hilos de YouTube — 2026-08-08
+- El poller consulta las respuestas de hasta 5 hilos recientes con actividad saliente de ALMA, cada 2 minutos y durante una ventana configurable de 7 días.
+- Cada respuesta entrante conserva como destino el comentario raíz para que ALMA continúe en el mismo hilo; `InboundEvent` mantiene la idempotencia por ID de comentario.
+- Los comentarios y respuestas del propio canal se descartan para impedir bucles de autorrespuesta. Los límites `YOUTUBE_REPLY_POLL_INTERVAL_MS`, `YOUTUBE_REPLY_ACTIVE_DAYS` y `YOUTUBE_REPLY_MAX_THREADS` controlan la cuota.
+
 ## YouTube live persistente en Render — 2026-08-08
 - El Blueprint fija `YOUTUBE_INGESTION_MODE=live` y `YOUTUBE_MESSAGING_MODE=live`; así los despliegues posteriores no revierten accidentalmente la integración activa a `mock`.
 - Las credenciales OAuth y secretos continúan siendo variables externas de Render y no se almacenan en el repositorio.

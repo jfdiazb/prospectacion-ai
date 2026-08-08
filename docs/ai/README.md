@@ -1,5 +1,10 @@
 # Documentación AI - Prospectación AI
 
+## Conversación continua en hilos de YouTube — 2026-08-08
+- ALMA relee respuestas de hilos recientes a partir de los `OutboundMessage.youtube_reply` persistidos y responde siempre sobre el comentario raíz.
+- La consulta de respuestas usa un intervalo separado de 2 minutos, máximo 5 hilos activos y 7 días de actividad para mantenerse dentro de la cuota gratuita de YouTube.
+- Se ignoran eventos cuyo autor sea el canal conectado, evitando que ALMA procese sus propias respuestas.
+
 ## YouTube live persistente en Render — 2026-08-08
 - `render.yaml` mantiene la ingesta y la mensajería de YouTube en modo `live` para que cada despliegue conserve el recorrido real comentario `INFO` → ALMA → respuesta.
 - Los valores sensibles de OAuth permanecen fuera del repositorio como secretos de Render.
