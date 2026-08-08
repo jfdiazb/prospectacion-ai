@@ -3,7 +3,7 @@ import Activity from '../models/Activity';
 import { TaskService } from './TaskService';
 import { getMeetingProvider, MeetingProviderError } from '../integrations/meetings';
 
-type MeetingContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; wantsMeeting: boolean };
+type MeetingContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; wantsMeeting: boolean; platform?: 'instagram' | 'facebook' | 'youtube' };
 type MeetingOutcome = { handled: boolean; reply?: string };
 
 const TIMEZONE_ALIASES: Record<string, string> = {
@@ -37,6 +37,7 @@ export class MeetingOrchestratorService {
 
     const extracted = this.extractDetails(context.text);
     if (extracted.email) meeting.attendeeEmail = extracted.email;
+    else if (!meeting.attendeeEmail && context.platform === 'youtube') meeting.attendeeEmail = this.getContactIdentifier('youtube', context.leadId);
     if (extracted.date) meeting.requestedDate = extracted.date;
     if (extracted.time) meeting.requestedTime = extracted.time;
     if (extracted.timezone) meeting.timezone = extracted.timezone;
@@ -105,6 +106,10 @@ export class MeetingOrchestratorService {
     const normalized = text.toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const alias = Object.keys(TIMEZONE_ALIASES).sort((a, b) => b.length - a.length).find(key => normalized.includes(key));
     return { email, date, time, timezone: iana || (alias ? TIMEZONE_ALIASES[alias] : undefined) };
+  }
+
+  static getContactIdentifier(platform: 'youtube', leadId: string): string {
+    return `${platform}:${leadId}`;
   }
 
   private static toUtc(date: string, time: string, timezone: string): Date | null {

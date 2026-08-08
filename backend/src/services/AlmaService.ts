@@ -46,7 +46,7 @@ export class AlmaService {
 
     const aiProvider = getAIProvider();
     const generatedResponse = await aiProvider.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent });
-    const meetingOutcome = await MeetingOrchestratorService.process({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: context.text, wantsMeeting });
+    const meetingOutcome = await MeetingOrchestratorService.process({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: context.text, wantsMeeting, platform: context.platform });
     const response = meetingOutcome.reply ?? generatedResponse;
 
     await ConversationService.addMessage(context.conversationId, context.userId, { sender: 'ai', text: response, platform: context.platform });

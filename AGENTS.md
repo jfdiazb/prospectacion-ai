@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Privacidad de agenda en YouTube — 2026-08-08
+- La orquestación de reuniones no solicita correo en comentarios públicos de YouTube; utiliza internamente `youtube:<leadId>` como identificador de contacto y recopila solo fecha, hora y zona horaria.
+- Los demás canales conservan la recopilación progresiva de correo cuando corresponda.
+
 ## Conversación continua en hilos de YouTube — 2026-08-08
 - El poller consulta las respuestas de hasta 5 hilos recientes con actividad saliente de ALMA, cada 2 minutos y durante una ventana configurable de 7 días.
 - Cada respuesta entrante conserva como destino el comentario raíz para que ALMA continúe en el mismo hilo; `InboundEvent` mantiene la idempotencia por ID de comentario.

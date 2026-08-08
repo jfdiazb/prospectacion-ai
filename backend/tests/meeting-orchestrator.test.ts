@@ -16,4 +16,8 @@ describe('MeetingOrchestratorService detail extraction', () => {
   test('does not treat arbitrary text as meeting details', () => {
     expect(MeetingOrchestratorService.extractDetails('Me interesa conocer más')).toEqual({ email: undefined, date: undefined, time: undefined, timezone: undefined });
   });
+
+  test('uses the YouTube lead identifier instead of requesting email publicly', () => {
+    expect(MeetingOrchestratorService.getContactIdentifier('youtube', 'lead-123')).toBe('youtube:lead-123');
+  });
 });

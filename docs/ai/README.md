@@ -1,5 +1,9 @@
 # Documentación AI - Prospectación AI
 
+## Privacidad de agenda en YouTube — 2026-08-08
+- En YouTube, ALMA evita pedir correo dentro del hilo público y asocia la reunión al identificador interno `youtube:<leadId>`.
+- El flujo público solicita únicamente fecha, hora y ciudad/zona horaria; la coordinación humana posterior puede usar el hilo sin exponer datos personales.
+
 ## Conversación continua en hilos de YouTube — 2026-08-08
 - ALMA relee respuestas de hilos recientes a partir de los `OutboundMessage.youtube_reply` persistidos y responde siempre sobre el comentario raíz.
 - La consulta de respuestas usa un intervalo separado de 2 minutos, máximo 5 hilos activos y 7 días de actividad para mantenerse dentro de la cuota gratuita de YouTube.
