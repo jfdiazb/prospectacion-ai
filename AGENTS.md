@@ -1,5 +1,12 @@
 # AGENTS.md
 
+## ALMA pública en Internet — 2026-08-07
+- Backend `https://alma-backend-9eo1.onrender.com` está Live en Render Free; `/health` responde `{"success":true,"status":"ok"}`.
+- Frontend `https://prospectacion-ai.vercel.app` está publicado en Vercel desde `main`, con `VITE_API_URL` apuntando a Render.
+- Se verificó el flujo real registro web → API Render → MongoDB Atlas → JWT → dashboard.
+- Atlas autoriza únicamente los rangos salientes compartidos de Render `74.220.48.0/24` y `74.220.56.0/24`; la aplicación usa un usuario dedicado con `readWrite` solo sobre `prospectacion-ai`.
+- Producción permanece segura en mock para YouTube, IA, Zoom, Instagram y WhatsApp; activar YouTube live sigue requiriendo credenciales OAuth de Google Cloud.
+
 ## YouTube OAuth e ingesta — 2026-08-07
 - Configuración incluye una tarjeta de YouTube con estado del canal, inicio OAuth y desconexión protegida por confirmación.
 - YouTube usa OAuth 2.0 web por usuario mediante `/api/v1/youtube/oauth/connect` y callback firmado; ya no requiere un access token estático para operar en live.

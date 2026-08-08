@@ -1,5 +1,13 @@
 # Despliegue inicial de ALMA
 
+## Estado público — 2026-08-07
+
+- Frontend: `https://prospectacion-ai.vercel.app`
+- Backend: `https://alma-backend-9eo1.onrender.com`
+- Healthcheck: `https://alma-backend-9eo1.onrender.com/health`
+- Flujo verificado: registro en Vercel, autenticación en Render, persistencia Atlas y acceso al dashboard.
+- Proveedores externos: todos en `mock` hasta completar y autorizar sus credenciales oficiales.
+
 Esta guía publica ALMA con el backend en Render, el frontend en Vercel y MongoDB Atlas. El primer despliegue mantiene todos los proveedores externos en modo `mock`, por lo que no envía comentarios, mensajes, respuestas de IA ni reuniones reales.
 
 ## 1. Preparar MongoDB Atlas

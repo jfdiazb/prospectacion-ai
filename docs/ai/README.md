@@ -1,5 +1,13 @@
 # Documentación AI - Prospectación AI
 
+## Despliegue público verificado — 2026-08-07
+- Frontend: `https://prospectacion-ai.vercel.app` (Vercel, Vite, raíz `frontend`).
+- Backend: `https://alma-backend-9eo1.onrender.com` (Render Free, Node 20); healthcheck público aprobado.
+- Persistencia: MongoDB Atlas con usuario de aplicación de privilegio mínimo y allowlist limitada a los dos rangos CIDR salientes de Render.
+- Integración comprobada creando un usuario desde la URL pública y accediendo al dashboard con JWT.
+- `CORS_ORIGIN` permite el dominio definitivo de Vercel y `VITE_API_URL` usa `/api/v1` del backend público.
+- Todos los proveedores externos continúan en `mock`; el despliegue no contacta YouTube, Meta, Gemini ni Zoom.
+
 ## YouTube OAuth e ingesta incremental — 2026-08-07
 - La pantalla `/configuracion` consulta el estado del canal y permite iniciar OAuth o eliminar la conexión sin manipular tokens desde el navegador.
 - Endpoints: `GET /api/v1/youtube/oauth/connect` (JWT), `GET /api/v1/youtube/oauth/callback`, `GET /api/v1/youtube/status` (JWT) y `DELETE /api/v1/youtube/connection` (JWT).
