@@ -24,6 +24,8 @@ services:
         value: live
       - key: YOUTUBE_INGESTION_MODE
         value: live
+      - key: YOUTUBE_POLL_OVERLAP_MS
+        value: "3600000"
       - key: YOUTUBE_REPLY_POLL_INTERVAL_MS
         value: "120000"
       - key: YOUTUBE_REPLY_ACTIVE_DAYS

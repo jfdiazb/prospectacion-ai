@@ -76,7 +76,7 @@ export class YouTubeIngestionService {
     const connectedAt = credential.connectedAt?.getTime() ?? 0;
     const lastPolledAt = credential.lastPolledAt?.getTime();
     if (!lastPolledAt) return connectedAt;
-    const overlapMs = Math.max(0, Number(process.env.YOUTUBE_POLL_OVERLAP_MS || 10 * 60 * 1000));
+    const overlapMs = Math.max(0, Number(process.env.YOUTUBE_POLL_OVERLAP_MS || 60 * 60 * 1000));
     return Math.max(connectedAt, lastPolledAt - overlapMs);
   }
 

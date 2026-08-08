@@ -13,7 +13,7 @@
 ## YouTube live y tolerancia de ingesta — 2026-08-08
 - Google Cloud autoriza el callback público de Render y producción tiene `YOUTUBE_INGESTION_MODE=live` y `YOUTUBE_MESSAGING_MODE=live` con secretos almacenados en Render.
 - El canal `100 % Mentalmente` aparece conectado mediante OAuth y el backend desplegado inicia correctamente en modo live.
-- El cursor del poller relee por defecto los últimos 10 minutos (`YOUTUBE_POLL_OVERLAP_MS`) sin retroceder antes de `connectedAt`; la idempotencia de `InboundEvent` evita duplicados y cubre retrasos de consistencia de YouTube.
+- El cursor del poller relee por defecto los últimos 60 minutos (`YOUTUBE_POLL_OVERLAP_MS`) sin retroceder antes de `connectedAt`; la idempotencia de `InboundEvent` evita duplicados y cubre retrasos de consistencia de YouTube y despliegues gratuitos.
 - El recorrido comentario principal `INFO` → ingesta → ALMA → respuesta oficial quedó verificado en producción; continúa la validación de calificación, seguimiento y Zoom.
 
 ## ALMA pública en Internet — 2026-08-07
