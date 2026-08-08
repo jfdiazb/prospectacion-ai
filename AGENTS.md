@@ -3,6 +3,7 @@
 ## Privacidad de agenda en YouTube — 2026-08-08
 - La orquestación de reuniones no solicita correo en comentarios públicos de YouTube; utiliza internamente `youtube:<leadId>` como identificador de contacto y recopila solo fecha, hora y zona horaria.
 - Los demás canales conservan la recopilación progresiva de correo cuando corresponda.
+- Validación real completada con un prospecto externo: ALMA calificó, mantuvo la conversación en el hilo y registró una reunión para `2026-08-09 10:00 America/Bogota`, pendiente de confirmación porque Zoom continúa en modo mock.
 
 ## Conversación continua en hilos de YouTube — 2026-08-08
 - El poller consulta las respuestas de hasta 5 hilos recientes con actividad saliente de ALMA, cada 2 minutos y durante una ventana configurable de 7 días.

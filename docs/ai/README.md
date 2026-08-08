@@ -3,6 +3,7 @@
 ## Privacidad de agenda en YouTube — 2026-08-08
 - En YouTube, ALMA evita pedir correo dentro del hilo público y asocia la reunión al identificador interno `youtube:<leadId>`.
 - El flujo público solicita únicamente fecha, hora y ciudad/zona horaria; la coordinación humana posterior puede usar el hilo sin exponer datos personales.
+- El flujo real quedó validado hasta reunión `pending_configuration`: prospecto externo, calificación, seguimiento, conversación continua y datos de agenda completos para `2026-08-09 10:00 America/Bogota`.
 
 ## Conversación continua en hilos de YouTube — 2026-08-08
 - ALMA relee respuestas de hilos recientes a partir de los `OutboundMessage.youtube_reply` persistidos y responde siempre sobre el comentario raíz.
