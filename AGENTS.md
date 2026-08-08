@@ -1,10 +1,14 @@
 # AGENTS.md
 
+## YouTube live persistente en Render — 2026-08-08
+- El Blueprint fija `YOUTUBE_INGESTION_MODE=live` y `YOUTUBE_MESSAGING_MODE=live`; así los despliegues posteriores no revierten accidentalmente la integración activa a `mock`.
+- Las credenciales OAuth y secretos continúan siendo variables externas de Render y no se almacenan en el repositorio.
+
 ## YouTube live y tolerancia de ingesta — 2026-08-08
 - Google Cloud autoriza el callback público de Render y producción tiene `YOUTUBE_INGESTION_MODE=live` y `YOUTUBE_MESSAGING_MODE=live` con secretos almacenados en Render.
-- El canal `José Fernando Diaz` aparece conectado mediante OAuth y el backend desplegado inicia correctamente en modo live.
+- El canal `100 % Mentalmente` aparece conectado mediante OAuth y el backend desplegado inicia correctamente en modo live.
 - El cursor del poller relee por defecto los últimos 10 minutos (`YOUTUBE_POLL_OVERLAP_MS`) sin retroceder antes de `connectedAt`; la idempotencia de `InboundEvent` evita duplicados y cubre retrasos de consistencia de YouTube.
-- Pendiente inmediato: desplegar esta corrección y repetir comentario real `INFO` para verificar lead, respuesta, calificación y tarea en producción.
+- Pendiente inmediato: desplegar el Blueprint con los modos live persistentes y verificar que el comentario principal `INFO` ya publicado cree el lead y la respuesta.
 
 ## ALMA pública en Internet — 2026-08-07
 - Backend `https://alma-backend-9eo1.onrender.com` está Live en Render Free; `/health` responde `{"success":true,"status":"ok"}`.
