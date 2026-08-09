@@ -1,5 +1,16 @@
 # AGENTS.md
 
+## Healthcheck estable para el poller — 2026-08-08
+- `/health` se registra antes de `generalLimiter`; los sondeos internos de Render ya no consumen el cupo general ni reciben `429`.
+- Esto evita reinicios periódicos de la instancia que interrumpían el poller de YouTube.
+- Una prueba de integración verifica 105 healthchecks consecutivos con respuesta `200`.
+
+## Zoom live en producción — 2026-08-08
+- La aplicación Server-to-Server OAuth `ALMA Prospectación` está activa en Zoom Marketplace con el alcance mínimo para crear reuniones.
+- Render almacena externamente `ZOOM_ACCOUNT_ID`, `ZOOM_CLIENT_ID`, `ZOOM_CLIENT_SECRET` y `ZOOM_USER_ID`; ningun secreto se guarda en el repositorio.
+- Producción usa `ZOOM_MODE=live`, el Blueprint conserva ese modo y el backend desplegado responde correctamente en `/health`.
+- Pendiente: validar una nueva solicitud conversacional real y confirmar `Meeting.status=scheduled` con `externalId` y `joinUrl`.
+
 ## Privacidad de agenda en YouTube — 2026-08-08
 - La orquestación de reuniones no solicita correo en comentarios públicos de YouTube; utiliza internamente `youtube:<leadId>` como identificador de contacto y recopila solo fecha, hora y zona horaria.
 - Los demás canales conservan la recopilación progresiva de correo cuando corresponda.

@@ -1,5 +1,17 @@
 # Documentación AI - Prospectación AI
 
+## Healthcheck estable y continuidad del poller — 2026-08-08
+- Render había registrado fallos de salud `429`: `/health` estaba detrás del limitador general de 100 solicitudes por 15 minutos.
+- El healthcheck ahora se expone antes de `generalLimiter`, por lo que conserva respuesta `200` sin reducir la protección de las rutas API.
+- La corrección evita reinicios periódicos que podían interrumpir la ingesta de comentarios de YouTube.
+- La suite cubre 105 solicitudes consecutivas a `/health` sin rate limiting.
+
+## Zoom live en producción — 2026-08-08
+- La aplicación Server-to-Server OAuth `ALMA Prospectación` está activa y limitada al permiso de creación de reuniones para usuarios de la cuenta.
+- Las cuatro credenciales/identificadores live permanecen como secretos externos de Render; `render.yaml` fija solamente `ZOOM_MODE=live`.
+- El despliegue posterior al cambio quedó `live` y `GET /health` respondió `{"success":true,"status":"ok"}`.
+- La siguiente reunión solicitada por YouTube debe crear un enlace real; verificar en CRM/MongoDB `status=scheduled`, `externalId` y `joinUrl`.
+
 ## Privacidad de agenda en YouTube — 2026-08-08
 - En YouTube, ALMA evita pedir correo dentro del hilo público y asocia la reunión al identificador interno `youtube:<leadId>`.
 - El flujo público solicita únicamente fecha, hora y ciudad/zona horaria; la coordinación humana posterior puede usar el hilo sin exponer datos personales.

@@ -59,6 +59,14 @@ describe('Auth integration tests', () => {
     }
   });
 
+  test('healthcheck should not be rate limited', async () => {
+    const responses = await Promise.all(
+      Array.from({ length: 105 }, () => axios.get(`${baseURL}/health`)),
+    );
+
+    expect(responses.every(response => response.status === 200)).toBe(true);
+  });
+
   test('register then login should work', async () => {
     const email = 'testuser@example.com';
     const password = 'password123';

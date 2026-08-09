@@ -33,7 +33,7 @@ services:
       - key: YOUTUBE_REPLY_MAX_THREADS
         value: "5"
       - key: ZOOM_MODE
-        value: mock
+        value: live
       - key: INSTAGRAM_MESSAGING_MODE
         value: mock
       - key: WHATSAPP_MESSAGING_MODE

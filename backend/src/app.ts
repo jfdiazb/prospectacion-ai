@@ -35,11 +35,12 @@ app.use(cors({
 app.use(`${apiPrefix}/whatsapp/webhook`, express.raw({ type: 'application/json', limit: '1mb' }));
 app.use(`${apiPrefix}/meta/webhook`, express.raw({ type: 'application/json', limit: '1mb' }));
 app.use(express.json({ limit: '1mb' }));
-app.use(generalLimiter);
 
 app.get('/health', (_req, res) => {
   res.status(200).json({ success: true, status: 'ok' });
 });
+
+app.use(generalLimiter);
 
 app.use(`${apiPrefix}/auth`, authRoutes);
 app.use(`${apiPrefix}/leads`, leadRoutes);
