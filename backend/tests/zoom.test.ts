@@ -18,7 +18,7 @@ describe('ZoomProvider', () => {
     const result = await provider.createMeeting({ topic: 'ALMA', timezone: 'America/Bogota', scheduledFor: new Date('2026-08-07T15:00:00Z') });
     expect(result).toMatchObject({ externalId: '987654321', joinUrl: 'https://zoom.us/j/987654321', simulated: false });
     expect(post).toHaveBeenNthCalledWith(1, 'https://zoom.us/oauth/token', 'grant_type=account_credentials&account_id=account-id', expect.objectContaining({ headers: expect.objectContaining({ Authorization: expect.stringMatching(/^Basic /) }) }));
-    expect(post).toHaveBeenNthCalledWith(2, 'https://api.zoom.us/v2/users/host%40example.com/meetings', expect.objectContaining({ topic: 'ALMA', type: 2, timezone: 'America/Bogota', start_time: '2026-08-07T15:00:00.000Z' }), expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer zoom-test-token' }) }));
+    expect(post).toHaveBeenNthCalledWith(2, 'https://api.zoom.us/v2/users/host%40example.com/meetings', expect.objectContaining({ topic: 'ALMA', type: 2, timezone: 'America/Bogota', start_time: '2026-08-07T10:00:00' }), expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer zoom-test-token' }) }));
   });
 
   test('reuses the cached OAuth token', async () => {

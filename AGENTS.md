@@ -1,5 +1,10 @@
 # AGENTS.md
 
+## Hora local correcta en Zoom — 2026-08-08
+- `ZoomProvider` envía `start_time` como hora local sin sufijo UTC junto con la zona IANA solicitada.
+- Se evita aplicar dos veces el desplazamiento horario; `10:00 America/Bogota` ya no aparece como `15:00` en Zoom.
+- `scheduledFor` conserva internamente el instante UTC validado por el orquestador.
+
 ## Reintento de reuniones mock al activar Zoom — 2026-08-08
 - Si una conversación conserva una reunión `pending_configuration` y producción usa `ZOOM_MODE=live`, una nueva intención de agenda reutiliza sus datos y reintenta la creación real en Zoom.
 - En modo mock se conserva la respuesta pendiente sin duplicar reuniones, actividades ni tareas.

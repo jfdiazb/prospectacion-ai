@@ -39,14 +39,14 @@ export class ZoomProvider implements MeetingProvider {
     const payload: Record<string, unknown> = { topic: request.topic, type: 2, timezone: request.timezone,
       duration: request.durationMinutes ?? Number(process.env.ZOOM_MEETING_DURATION_MINUTES || 30), agenda: request.agenda,
       settings: { join_before_host: false, waiting_room: true } };
-    if (request.scheduledFor) payload.start_time = request.scheduledFor.toISOString();
+    if (request.scheduledFor) payload.start_time = this.formatLocalStartTime(request.scheduledFor, request.timezone);
     try {
       const response = await this.http.post<ZoomMeetingResponse>(`${token.apiUrl}/v2/users/${encodeURIComponent(userId)}/meetings`, payload,
         { headers: { Authorization: `Bearer ${token.value}`, 'Content-Type': 'application/json' }, timeout: Number(process.env.ZOOM_TIMEOUT_MS || 10000) });
       const externalId = response.data?.id;
       const joinUrl = response.data?.join_url;
       if ((typeof externalId !== 'string' && typeof externalId !== 'number') || !joinUrl || typeof joinUrl !== 'string') throw new MeetingProviderError('Respuesta inválida al crear la reunión en Zoom', 'ZOOM_INVALID_MEETING_RESPONSE');
-      return { externalId: String(externalId), joinUrl, simulated: false, scheduledFor: response.data.start_time ? new Date(response.data.start_time) : request.scheduledFor };
+      return { externalId: String(externalId), joinUrl, simulated: false, scheduledFor: request.scheduledFor };
     } catch (error) { throw this.normalizeError(error, 'ZOOM_CREATE_MEETING_ERROR'); }
   }
 
@@ -54,6 +54,16 @@ export class ZoomProvider implements MeetingProvider {
     if (!value) return 'https://api.zoom.us';
     try { const url = new URL(value); return url.protocol === 'https:' && (url.hostname === 'api.zoom.us' || url.hostname.endsWith('.zoom.us')) ? url.origin : 'https://api.zoom.us'; }
     catch { return 'https://api.zoom.us'; }
+  }
+
+  private formatLocalStartTime(value: Date, timezone: string): string {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+    });
+    const parts = Object.fromEntries(formatter.formatToParts(value).map(part => [part.type, part.value]));
+    return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
   }
 
   private normalizeError(error: unknown, fallbackCode: string): MeetingProviderError {

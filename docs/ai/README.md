@@ -1,5 +1,11 @@
 # Documentación AI - Prospectación AI
 
+## Corrección de zona horaria en Zoom — 2026-08-08
+- Zoom recibe `start_time` en formato local `YYYY-MM-DDTHH:mm:ss` y el campo `timezone` con la zona IANA.
+- Antes se enviaba un ISO UTC con `Z` junto con `timezone`, lo que produjo un segundo desplazamiento de cinco horas en la interfaz de Zoom.
+- La persistencia y las tareas continúan usando el instante UTC de `scheduledFor`; solo cambia el formato del payload externo.
+- La prueba del proveedor verifica que `2026-08-07T15:00:00Z` se envía como `2026-08-07T10:00:00` para `America/Bogota`.
+
 ## Reintento de reuniones pendientes tras activar Zoom — 2026-08-08
 - `MeetingOrchestratorService` recupera reuniones `pending_configuration` además de borradores y fallos.
 - Cuando `ZOOM_MODE=live` y llega una nueva intención de reunión, conserva fecha, hora, zona y contacto existentes y vuelve a invocar Zoom sobre el mismo registro.
