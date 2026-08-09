@@ -1,7 +1,7 @@
 import apiClient from './api';
 
 export interface CrmActivity { _id: string; description: string; createdAt: string; leadId?: { username?: string; fullName?: string } }
-export interface CrmMeeting { _id: string; status: string; topic?: string; leadId?: { username?: string; fullName?: string } }
+export interface CrmMeeting { _id: string; status: string; provider?: 'zoom' | 'calendly'; topic?: string; scheduledFor?: string; joinUrl?: string; bookingUrl?: string; leadId?: { username?: string; fullName?: string } }
 export interface CrmConversation { _id: string; status: string; lastMessage?: string; leadId?: { username?: string; fullName?: string }; messages: Array<{ _id: string; sender: 'user' | 'lead' | 'ai'; text: string; timestamp: string }> }
 export interface CrmTask { _id: string; title: string; description: string; type: 'follow_up' | 'meeting' | 'call' | 'email' | 'other'; status: 'pending' | 'completed' | 'cancelled'; dueDate?: string; priority?: 'low' | 'medium' | 'high'; leadId?: { username?: string; fullName?: string } }
 

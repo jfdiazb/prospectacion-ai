@@ -10,6 +10,7 @@ import whatsappRoutes from './routes/whatsappRoutes';
 import metaRoutes from './routes/metaRoutes';
 import crmRoutes from './routes/crmRoutes';
 import youtubeRoutes from './routes/youtubeRoutes';
+import calendlyRoutes from './routes/calendlyRoutes';
 import { errorMiddleware, notFoundMiddleware } from './middlewares/auth';
 import { generalLimiter } from './middlewares/rateLimiter';
 
@@ -34,6 +35,7 @@ app.use(cors({
 }));
 app.use(`${apiPrefix}/whatsapp/webhook`, express.raw({ type: 'application/json', limit: '1mb' }));
 app.use(`${apiPrefix}/meta/webhook`, express.raw({ type: 'application/json', limit: '1mb' }));
+app.use(`${apiPrefix}/calendly/webhook`, express.raw({ type: 'application/json', limit: '256kb' }));
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/health', (_req, res) => {
@@ -51,6 +53,7 @@ app.use(`${apiPrefix}/whatsapp`, whatsappRoutes);
 app.use(`${apiPrefix}/meta`, metaRoutes);
 app.use(`${apiPrefix}/crm`, crmRoutes);
 app.use(`${apiPrefix}/youtube`, youtubeRoutes);
+app.use(`${apiPrefix}/calendly`, calendlyRoutes);
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 

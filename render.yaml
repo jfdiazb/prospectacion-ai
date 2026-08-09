@@ -34,6 +34,12 @@ services:
         value: "5"
       - key: ZOOM_MODE
         value: live
+      - key: SCHEDULING_MODE
+        value: calendly
+      - key: CALENDLY_BOOKING_URL
+        sync: false
+      - key: CALENDLY_WEBHOOK_SIGNING_KEY
+        sync: false
       - key: INSTAGRAM_MESSAGING_MODE
         value: mock
       - key: WHATSAPP_MESSAGING_MODE

@@ -49,6 +49,15 @@ export const validateServerEnvironment = (): void => {
     const zoomMissing = ['ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET', 'ZOOM_ACCOUNT_ID', 'ZOOM_USER_ID'].filter(key => !process.env[key]?.trim());
     if (zoomMissing.length) throw new Error(`Faltan variables para Zoom live: ${zoomMissing.join(', ')}`);
   }
+  const schedulingMode = process.env.SCHEDULING_MODE || 'zoom';
+  if (!['zoom', 'calendly'].includes(schedulingMode)) throw new Error('SCHEDULING_MODE debe ser zoom o calendly');
+  if (schedulingMode === 'calendly') {
+    const bookingUrl = process.env.CALENDLY_BOOKING_URL?.trim();
+    if (!bookingUrl) throw new Error('CALENDLY_BOOKING_URL es obligatoria cuando SCHEDULING_MODE=calendly');
+    try {
+      if (new URL(bookingUrl).protocol !== 'https:') throw new Error();
+    } catch { throw new Error('CALENDLY_BOOKING_URL debe ser una URL HTTPS válida'); }
+  }
 };
 
 export const validateDatabaseEnvironment = async (): Promise<void> => {

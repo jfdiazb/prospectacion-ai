@@ -52,6 +52,9 @@ describe('Auth integration tests', () => {
   });
 
   beforeEach(async () => {
+    process.env.SCHEDULING_MODE = 'zoom';
+    delete process.env.CALENDLY_BOOKING_URL;
+    delete process.env.CALENDLY_WEBHOOK_SIGNING_KEY;
     const collections = Object.keys(mongoose.connection.collections);
     for (const collectionName of collections) {
       const collection = mongoose.connection.collections[collectionName];

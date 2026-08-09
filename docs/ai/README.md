@@ -1,5 +1,15 @@
 # Documentación AI - Prospectación AI
 
+## Agenda segura y disponibilidad mediante Calendly — 2026-08-09
+- Calendly quedó configurado en `America/Bogota`, de lunes a viernes entre `19:30` y `20:30`, con Google Calendar reconectado para evitar conflictos.
+- Evento creado y validado públicamente: `Reunión de descubrimiento con ALMA`, 30 minutos, Zoom y franjas visibles a las `19:30` y `20:00`. URL: `https://calendly.com/josefernandodiazasesoria/new-meetingreunion-de-descubrimiento-con-alma`.
+- La agenda admite `SCHEDULING_MODE=zoom|calendly`. En modo Calendly, ALMA ya no pide fecha/hora por el comentario: entrega la página de reserva, donde el prospecto solo ve los espacios definidos por el anfitrión.
+- `Meeting.provider=calendly` y el nuevo estado `pending_booking` representan una invitación aún no reservada. Un token aleatorio en `utm_content` vincula la reserva con el lead sin exponer su ID.
+- `POST /api/v1/calendly/webhook` recibe cuerpo crudo, exige `calendly-webhook-signature`, valida HMAC-SHA256 y rechaza firmas con más de cinco minutos. `invitee.created` guarda fecha, correo, zona, identificadores y `joinUrl`; `invitee.canceled` cancela reunión y tarea.
+- El enlace Zoom jamás se incorpora a respuestas públicas de YouTube, incluso si se conserva temporalmente `SCHEDULING_MODE=zoom`. El CRM autenticado sí muestra un acceso privado para reuniones confirmadas.
+- Configuración pendiente fuera del repositorio: registrar el webhook público y cargar la URL ya creada junto con `CALENDLY_WEBHOOK_SIGNING_KEY` en Render.
+- Validación: backend compila y pasan 37/37 pruebas.
+
 ## Corrección de zona horaria en Zoom — 2026-08-08
 - Zoom recibe `start_time` en formato local `YYYY-MM-DDTHH:mm:ss` y el campo `timezone` con la zona IANA.
 - Antes se enviaba un ISO UTC con `Z` junto con `timezone`, lo que produjo un segundo desplazamiento de cinco horas en la interfaz de Zoom.

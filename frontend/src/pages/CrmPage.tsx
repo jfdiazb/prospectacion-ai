@@ -47,12 +47,16 @@ export const CrmPage = () => {
           </div>
         </Card>
         <Card>
-          <h2 className="mb-4 text-2xl font-semibold text-white">Reuniones Zoom</h2>
+          <h2 className="mb-4 text-2xl font-semibold text-white">Reuniones</h2>
           <div className="space-y-3">
             {meetings.map(meeting => (
               <div key={meeting._id} className="rounded-2xl bg-dark-900 p-4">
                 <p className="font-medium text-white">{meeting.leadId?.fullName || meeting.leadId?.username || 'Prospecto'}</p>
-                <p className="text-sm text-dark-400">{meeting.topic || 'Reunión de descubrimiento'} · {meeting.status}</p>
+                <p className="text-sm text-dark-400">{meeting.topic || 'Reunión de descubrimiento'} · {meeting.provider || 'zoom'} · {meeting.status}</p>
+                {meeting.scheduledFor && <p className="text-xs text-dark-500">{new Date(meeting.scheduledFor).toLocaleString()}</p>}
+                {meeting.joinUrl && meeting.status === 'scheduled' && (
+                  <a className="mt-2 inline-block text-sm font-medium text-primary-400 hover:text-primary-300" href={meeting.joinUrl} target="_blank" rel="noreferrer">Abrir acceso privado</a>
+                )}
               </div>
             ))}
             {!loading && !meetings.length && <p className="text-dark-400">Aún no hay reuniones registradas.</p>}

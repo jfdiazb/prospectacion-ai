@@ -1,5 +1,14 @@
 # AGENTS.md
 
+## Agenda segura con Calendly — 2026-08-09
+- Cuenta Calendly configurada: Google Calendar reconectado, zona `America/Bogota` y disponibilidad de lunes a viernes de `19:30` a `20:30`.
+- Evento público activo: `Reunión de descubrimiento con ALMA`, duración 30 minutos, ubicación Zoom y URL `https://calendly.com/josefernandodiazasesoria/new-meetingreunion-de-descubrimiento-con-alma`.
+- `SCHEDULING_MODE=calendly` hace que ALMA ofrezca la disponibilidad configurada en Calendly en vez de aceptar una hora arbitraria y crear Zoom directamente.
+- Cada solicitud crea una reunión `pending_booking` con un token aleatorio enviado como `utm_content`; el webhook firmado de Calendly la cambia a `scheduled` o `cancelled` y sincroniza tareas/actividades CRM.
+- Las respuestas públicas de YouTube nunca incluyen `joinUrl`; el enlace particular de Zoom queda únicamente en el CRM autenticado y en las confirmaciones privadas de Calendly.
+- Render declara `CALENDLY_BOOKING_URL` y `CALENDLY_WEBHOOK_SIGNING_KEY` como valores externos. Pendiente: cargar la URL pública anterior, obtener/configurar la clave del webhook y desplegar.
+- Suite vigente: 37/37 pruebas backend y compilación TypeScript correcta.
+
 ## Hora local correcta en Zoom — 2026-08-08
 - `ZoomProvider` envía `start_time` como hora local sin sufijo UTC junto con la zona IANA solicitada.
 - Se evita aplicar dos veces el desplazamiento horario; `10:00 America/Bogota` ya no aparece como `15:00` en Zoom.
