@@ -6,6 +6,7 @@
 - La agenda admite `SCHEDULING_MODE=zoom|calendly`. En modo Calendly, ALMA ya no pide fecha/hora por el comentario: entrega la página de reserva, donde el prospecto solo ve los espacios definidos por el anfitrión.
 - `Meeting.provider=calendly` y el nuevo estado `pending_booking` representan una invitación aún no reservada. Un token aleatorio en `utm_content` vincula la reserva con el lead sin exponer su ID.
 - `POST /api/v1/calendly/webhook` recibe cuerpo crudo, exige `calendly-webhook-signature`, valida HMAC-SHA256 y rechaza firmas con más de cinco minutos. `invitee.created` guarda fecha, correo, zona, identificadores y `joinUrl`; `invitee.canceled` cancela reunión y tarea.
+- Para webhooks internos creados mediante token personal, el mismo endpoint admite un `CALENDLY_WEBHOOK_SECRET` aleatorio en la URL y lo valida en tiempo constante. La firma HMAC queda como opción preferida al migrar a OAuth público.
 - El enlace Zoom jamás se incorpora a respuestas públicas de YouTube, incluso si se conserva temporalmente `SCHEDULING_MODE=zoom`. El CRM autenticado sí muestra un acceso privado para reuniones confirmadas.
 - Configuración pendiente fuera del repositorio: registrar el webhook público y cargar la URL ya creada junto con `CALENDLY_WEBHOOK_SIGNING_KEY` en Render.
 - Validación: backend compila y pasan 37/37 pruebas.

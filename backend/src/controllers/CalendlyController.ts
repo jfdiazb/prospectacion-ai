@@ -23,7 +23,7 @@ type CalendlyPayload = {
 export class CalendlyController {
   static async receive(req: Request, res: Response): Promise<void> {
     const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body ?? {}));
-    if (!CalendlyController.isValidSignature(raw, req.header('calendly-webhook-signature'))) {
+    if (!CalendlyController.isAuthorizedWebhook(raw, req.header('calendly-webhook-signature'), req.query.token)) {
       res.status(401).json({ success: false, error: 'Firma de Calendly inválida' });
       return;
     }
@@ -83,5 +83,14 @@ export class CalendlyController {
     const suppliedBuffer = Buffer.from(supplied, 'hex');
     const expectedBuffer = Buffer.from(expected, 'hex');
     return suppliedBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(suppliedBuffer, expectedBuffer);
+  }
+
+  static isAuthorizedWebhook(raw: Buffer, signatureHeader?: string, queryToken?: unknown): boolean {
+    if (CalendlyController.isValidSignature(raw, signatureHeader)) return true;
+    const secret = process.env.CALENDLY_WEBHOOK_SECRET?.trim();
+    if (!secret || typeof queryToken !== 'string') return false;
+    const received = Buffer.from(queryToken);
+    const expected = Buffer.from(secret);
+    return received.length === expected.length && crypto.timingSafeEqual(received, expected);
   }
 }

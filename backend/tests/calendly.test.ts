@@ -21,4 +21,11 @@ describe('Calendly webhook security', () => {
     const signature = crypto.createHmac('sha256', secret).update(`${old}.${raw.toString('utf8')}`).digest('hex');
     expect(CalendlyController.isValidSignature(raw, `t=${old},v1=${signature}`)).toBe(false);
   });
+
+  test('accepts a constant-time secret for personal-token webhooks', () => {
+    process.env.CALENDLY_WEBHOOK_SECRET = 'alma-calendly-test-secret-with-32-characters';
+    expect(CalendlyController.isAuthorizedWebhook(raw, undefined, process.env.CALENDLY_WEBHOOK_SECRET)).toBe(true);
+    expect(CalendlyController.isAuthorizedWebhook(raw, undefined, 'wrong-secret')).toBe(false);
+    delete process.env.CALENDLY_WEBHOOK_SECRET;
+  });
 });

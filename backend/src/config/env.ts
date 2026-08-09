@@ -57,6 +57,8 @@ export const validateServerEnvironment = (): void => {
     try {
       if (new URL(bookingUrl).protocol !== 'https:') throw new Error();
     } catch { throw new Error('CALENDLY_BOOKING_URL debe ser una URL HTTPS válida'); }
+    const webhookSecret = process.env.CALENDLY_WEBHOOK_SECRET?.trim();
+    if (webhookSecret && webhookSecret.length < 32) throw new Error('CALENDLY_WEBHOOK_SECRET debe tener al menos 32 caracteres');
   }
 };
 

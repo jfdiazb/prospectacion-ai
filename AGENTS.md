@@ -5,6 +5,7 @@
 - Evento público activo: `Reunión de descubrimiento con ALMA`, duración 30 minutos, ubicación Zoom y URL `https://calendly.com/josefernandodiazasesoria/new-meetingreunion-de-descubrimiento-con-alma`.
 - `SCHEDULING_MODE=calendly` hace que ALMA ofrezca la disponibilidad configurada en Calendly en vez de aceptar una hora arbitraria y crear Zoom directamente.
 - Cada solicitud crea una reunión `pending_booking` con un token aleatorio enviado como `utm_content`; el webhook firmado de Calendly la cambia a `scheduled` o `cancelled` y sincroniza tareas/actividades CRM.
+- Para la cuenta interna con token personal, el webhook también admite `CALENDLY_WEBHOOK_SECRET` en la URL y lo compara en tiempo constante; la firma HMAC continúa disponible para una futura aplicación OAuth pública.
 - Las respuestas públicas de YouTube nunca incluyen `joinUrl`; el enlace particular de Zoom queda únicamente en el CRM autenticado y en las confirmaciones privadas de Calendly.
 - Render declara `CALENDLY_BOOKING_URL` y `CALENDLY_WEBHOOK_SIGNING_KEY` como valores externos. Pendiente: cargar la URL pública anterior, obtener/configurar la clave del webhook y desplegar.
 - Suite vigente: 37/37 pruebas backend y compilación TypeScript correcta.
