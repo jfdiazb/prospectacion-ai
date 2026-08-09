@@ -3,6 +3,7 @@ import app from './app';
 import { connectDB } from './config/database';
 import { validateDatabaseEnvironment, validateServerEnvironment } from './config/env';
 import { startYouTubePolling } from './services/YouTubeIngestionService';
+import { startCalendlyPolling } from './services/CalendlyPollingService';
 
 const port = Number(process.env.PORT ?? 5001);
 
@@ -11,6 +12,7 @@ export const startServer = async () => {
   await connectDB();
   await validateDatabaseEnvironment();
   startYouTubePolling();
+  startCalendlyPolling();
   return app.listen(port, () => console.info(`API ALMA iniciada en el puerto ${port}`));
 };
 

@@ -1,5 +1,13 @@
 # AGENTS.md
 
+## Sincronización Calendly Free por polling — 2026-08-09
+- El plan gratuito rechazó la suscripción webhook con `403`; no se realizó ninguna compra ni cambio de plan.
+- `CalendlyPollingService` consulta cada 2 minutos los eventos e invitados del usuario mediante la API v2 y `CALENDLY_PERSONAL_ACCESS_TOKEN`, que permanece externo al repositorio.
+- El `utm_content` aleatorio enlaza cada invitado con su `Meeting`; reservas y cancelaciones actualizan reunión, tareas y actividades con idempotencia.
+- Las reprogramaciones priorizan el invitado activo frente al registro cancelado anterior. El poller impide ejecuciones simultáneas y revisa desde 24 horas atrás hasta 90 días adelante.
+- Variables: `CALENDLY_PERSONAL_ACCESS_TOKEN`, `CALENDLY_POLL_INTERVAL_MS`, `CALENDLY_LOOKAHEAD_DAYS` y `CALENDLY_TIMEOUT_MS`.
+- Validación vigente: compilación TypeScript correcta y 5/5 pruebas enfocadas de Calendly.
+
 ## Agenda segura con Calendly — 2026-08-09
 - Cuenta Calendly configurada: Google Calendar reconectado, zona `America/Bogota` y disponibilidad de lunes a viernes de `19:30` a `20:30`.
 - Evento público activo: `Reunión de descubrimiento con ALMA`, duración 30 minutos, ubicación Zoom y URL `https://calendly.com/josefernandodiazasesoria/new-meetingreunion-de-descubrimiento-con-alma`.
@@ -7,7 +15,7 @@
 - Cada solicitud crea una reunión `pending_booking` con un token aleatorio enviado como `utm_content`; el webhook firmado de Calendly la cambia a `scheduled` o `cancelled` y sincroniza tareas/actividades CRM.
 - Para la cuenta interna con token personal, el webhook también admite `CALENDLY_WEBHOOK_SECRET` en la URL y lo compara en tiempo constante; la firma HMAC continúa disponible para una futura aplicación OAuth pública.
 - Las respuestas públicas de YouTube nunca incluyen `joinUrl`; el enlace particular de Zoom queda únicamente en el CRM autenticado y en las confirmaciones privadas de Calendly.
-- Render declara `CALENDLY_BOOKING_URL` y `CALENDLY_WEBHOOK_SIGNING_KEY` como valores externos. Pendiente: cargar la URL pública anterior, obtener/configurar la clave del webhook y desplegar.
+- Render declara las credenciales de Calendly como valores externos; el webhook queda disponible para una futura cuenta de pago, mientras producción gratuita usa polling.
 - Suite vigente: 37/37 pruebas backend y compilación TypeScript correcta.
 
 ## Hora local correcta en Zoom — 2026-08-08

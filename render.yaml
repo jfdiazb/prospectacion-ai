@@ -42,6 +42,14 @@ services:
         sync: false
       - key: CALENDLY_WEBHOOK_SECRET
         sync: false
+      - key: CALENDLY_PERSONAL_ACCESS_TOKEN
+        sync: false
+      - key: CALENDLY_POLL_INTERVAL_MS
+        value: 120000
+      - key: CALENDLY_LOOKAHEAD_DAYS
+        value: 90
+      - key: CALENDLY_TIMEOUT_MS
+        value: 10000
       - key: INSTAGRAM_MESSAGING_MODE
         value: mock
       - key: WHATSAPP_MESSAGING_MODE

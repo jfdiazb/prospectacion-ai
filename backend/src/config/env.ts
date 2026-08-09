@@ -59,6 +59,9 @@ export const validateServerEnvironment = (): void => {
     } catch { throw new Error('CALENDLY_BOOKING_URL debe ser una URL HTTPS válida'); }
     const webhookSecret = process.env.CALENDLY_WEBHOOK_SECRET?.trim();
     if (webhookSecret && webhookSecret.length < 32) throw new Error('CALENDLY_WEBHOOK_SECRET debe tener al menos 32 caracteres');
+    if (!process.env.CALENDLY_PERSONAL_ACCESS_TOKEN?.trim()) throw new Error('CALENDLY_PERSONAL_ACCESS_TOKEN es obligatorio cuando SCHEDULING_MODE=calendly');
+    const pollInterval = Number(process.env.CALENDLY_POLL_INTERVAL_MS || 120000);
+    if (!Number.isFinite(pollInterval) || pollInterval < 60000) throw new Error('CALENDLY_POLL_INTERVAL_MS debe ser un número de al menos 60000');
   }
 };
 

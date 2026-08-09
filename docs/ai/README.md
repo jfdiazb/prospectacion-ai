@@ -1,5 +1,12 @@
 # Documentación AI - Prospectación AI
 
+## Calendly gratuito sincronizado por API — 2026-08-09
+- Calendly Free permite consultas API pero no webhooks. ALMA usa `CalendlyPollingService` para consultar eventos e invitados cada 120 segundos sin cambiar de plan.
+- El servicio obtiene el usuario autenticado, recorre eventos entre las últimas 24 horas y los próximos 90 días, sigue paginación y relaciona `tracking.utm_content` con `Meeting.bookingToken`.
+- Una reserva activa establece `scheduledFor`, correo, zona, URI externa y enlace Zoom privado; una cancelación actualiza la reunión y sus tareas. Actividades CRM solo se crean cuando cambia el estado.
+- En reprogramaciones se prefiere la nueva reserva activa aunque la API también devuelva el invitado cancelado anterior. Un bloqueo en memoria evita solapamiento de ciclos.
+- El token personal se configura exclusivamente en Render como `CALENDLY_PERSONAL_ACCESS_TOKEN`; nunca se guarda en Git ni se registra en logs.
+
 ## Agenda segura y disponibilidad mediante Calendly — 2026-08-09
 - Calendly quedó configurado en `America/Bogota`, de lunes a viernes entre `19:30` y `20:30`, con Google Calendar reconectado para evitar conflictos.
 - Evento creado y validado públicamente: `Reunión de descubrimiento con ALMA`, 30 minutos, Zoom y franjas visibles a las `19:30` y `20:00`. URL: `https://calendly.com/josefernandodiazasesoria/new-meetingreunion-de-descubrimiento-con-alma`.
