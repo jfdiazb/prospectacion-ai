@@ -1,5 +1,11 @@
 # Documentación AI - Prospectación AI
 
+## Reintento de reuniones pendientes tras activar Zoom — 2026-08-08
+- `MeetingOrchestratorService` recupera reuniones `pending_configuration` además de borradores y fallos.
+- Cuando `ZOOM_MODE=live` y llega una nueva intención de reunión, conserva fecha, hora, zona y contacto existentes y vuelve a invocar Zoom sobre el mismo registro.
+- Cuando Zoom sigue en mock, mantiene el mensaje pendiente y no crea duplicados.
+- La intención de cancelación puede cancelar directamente una reunión `pending_configuration`.
+
 ## Healthcheck estable y continuidad del poller — 2026-08-08
 - Render había registrado fallos de salud `429`: `/health` estaba detrás del limitador general de 100 solicitudes por 15 minutos.
 - El healthcheck ahora se expone antes de `generalLimiter`, por lo que conserva respuesta `200` sin reducir la protección de las rutas API.

@@ -1,5 +1,10 @@
 # AGENTS.md
 
+## Reintento de reuniones mock al activar Zoom — 2026-08-08
+- Si una conversación conserva una reunión `pending_configuration` y producción usa `ZOOM_MODE=live`, una nueva intención de agenda reutiliza sus datos y reintenta la creación real en Zoom.
+- En modo mock se conserva la respuesta pendiente sin duplicar reuniones, actividades ni tareas.
+- La cancelación ahora también alcanza reuniones `pending_configuration`, permitiendo cerrar borradores antiguos desde la conversación.
+
 ## Healthcheck estable para el poller — 2026-08-08
 - `/health` se registra antes de `generalLimiter`; los sondeos internos de Render ya no consumen el cupo general ni reciben `429`.
 - Esto evita reinicios periódicos de la instancia que interrumpían el poller de YouTube.

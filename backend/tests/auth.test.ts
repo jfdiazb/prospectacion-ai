@@ -253,6 +253,12 @@ describe('Auth integration tests', () => {
     expect(await Meeting.countDocuments({ leadId: lead!._id })).toBe(1);
     expect(await OutboundMessage.findOne({ sourceEventId: detailsEventId })).toMatchObject({ messageType: 'direct_message', deliveryStatus: 'simulated' });
     expect(await Task.countDocuments({ leadId: lead!._id, type: 'follow_up', status: 'pending' })).toBe(1);
+
+    const cancellationEventId = 'mock-direct-meeting-cancellation-1';
+    await axios.post(`${baseURL}/api/v1/meta/webhook`, {
+      entry: [{ changes: [{ field: 'messages', value: { sender: { id: 'instagram-user-1' }, message: { mid: cancellationEventId, text: 'Cancela la reunion anterior' }, platform: 'instagram' } }] }],
+    }, { headers: { 'x-alma-mock-event': 'true', 'Content-Type': 'application/json' } });
+    expect(await Meeting.findOne({ leadId: lead!._id })).toMatchObject({ status: 'cancelled' });
   });
 
   test('an already claimed comment does not create a lead or outbound message', async () => {

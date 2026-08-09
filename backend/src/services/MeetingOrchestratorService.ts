@@ -15,12 +15,22 @@ const TIMEZONE_ALIASES: Record<string, string> = {
 
 export class MeetingOrchestratorService {
   static async process(context: MeetingContext): Promise<MeetingOutcome> {
-    let meeting = await Meeting.findOne({ conversationId: context.conversationId, status: { $in: ['pending_details', 'failed'] } }).sort({ createdAt: -1 });
+    const wantsCancellation = /\b(cancelar|cancela|olvida la reuni[oó]n|ya no quiero la (cita|reuni[oó]n))\b/i.test(context.text);
+    let meeting = await Meeting.findOne({ conversationId: context.conversationId, status: { $in: ['pending_details', 'pending_configuration', 'failed'] } }).sort({ createdAt: -1 });
+    if (meeting?.status === 'pending_configuration') {
+      if (wantsCancellation) {
+        meeting.status = 'cancelled';
+        await meeting.save();
+        return { handled: true, reply: 'Entendido, cancelé la solicitud de reunión. Si cambias de opinión, aquí estaré.' };
+      }
+      if (!context.wantsMeeting) return { handled: false };
+      if ((process.env.ZOOM_MODE || 'mock') !== 'live') {
+        return { handled: true, reply: 'Ya tengo los datos de tu reunión y está pendiente de confirmación mientras Zoom se encuentra en modo de prueba.' };
+      }
+    }
     if (!meeting && context.wantsMeeting) {
-      const existing = await Meeting.findOne({ conversationId: context.conversationId, status: { $in: ['scheduled', 'pending_configuration'] } }).sort({ createdAt: -1 });
-      if (existing) return { handled: true, reply: existing.status === 'scheduled'
-        ? `Ya tienes una reunión registrada${existing.scheduledFor ? ` para ${existing.scheduledFor.toISOString()}` : ''}. ${existing.joinUrl ? `Enlace: ${existing.joinUrl}` : ''}`.trim()
-        : 'Ya tengo los datos de tu reunión y está pendiente de confirmación mientras Zoom se encuentra en modo de prueba.' };
+      const existing = await Meeting.findOne({ conversationId: context.conversationId, status: 'scheduled' }).sort({ createdAt: -1 });
+      if (existing) return { handled: true, reply: `Ya tienes una reunión registrada${existing.scheduledFor ? ` para ${existing.scheduledFor.toISOString()}` : ''}. ${existing.joinUrl ? `Enlace: ${existing.joinUrl}` : ''}`.trim() };
     }
     if (!meeting && !context.wantsMeeting) return { handled: false };
     if (!meeting) {
@@ -29,7 +39,7 @@ export class MeetingOrchestratorService {
       await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'meeting_requested', description: 'El prospecto solicitó una reunión por Zoom' });
     }
 
-    if (/\b(cancelar|cancela|olvida la reuni[oó]n|ya no quiero la (cita|reuni[oó]n))\b/i.test(context.text)) {
+    if (wantsCancellation) {
       meeting.status = 'cancelled';
       await meeting.save();
       return { handled: true, reply: 'Entendido, cancelé la solicitud de reunión. Si cambias de opinión, aquí estaré.' };
