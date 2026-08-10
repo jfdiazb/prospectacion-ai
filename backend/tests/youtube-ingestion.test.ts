@@ -39,7 +39,7 @@ describe('YouTubeIngestionService polling cursor', () => {
       .mockResolvedValueOnce({ data: { items: [{ id: 'reply-2', snippet: { textOriginal: 'Segundo', authorChannelId: { value: 'lead-1' }, publishedAt: '2026-08-08T18:02:00.000Z' } }], nextPageToken: 'page-2' } })
       .mockResolvedValueOnce({ data: { items: [{ id: 'reply-1', snippet: { textOriginal: 'Primero', authorChannelId: { value: 'lead-1' }, publishedAt: '2026-08-08T18:01:00.000Z' } }] } }) } as any;
     const service = new YouTubeIngestionService(http);
-    const process = jest.spyOn(service, 'processComment').mockResolvedValue(undefined);
+    const process = jest.spyOn(service, 'processComment').mockResolvedValue('processed');
 
     await service.pollThreadReplies({ userId: { toString: () => 'owner-1' }, channelId: 'channel-owner' }, 'token-1', 'root-comment');
 
@@ -47,5 +47,32 @@ describe('YouTubeIngestionService polling cursor', () => {
     expect(http.get.mock.calls[1][0]).toContain('pageToken=page-2');
     expect(process).toHaveBeenNthCalledWith(1, 'owner-1', expect.objectContaining({ id: 'reply-2' }), 'root-comment', 'channel-owner');
     expect(process).toHaveBeenNthCalledWith(2, 'owner-1', expect.objectContaining({ id: 'reply-1' }), 'root-comment', 'channel-owner');
+  });
+
+  test('logs privacy-safe counters for every credential poll', async () => {
+    const http = { get: jest.fn().mockResolvedValue({ data: { items: [
+      { snippet: { topLevelComment: { id: 'new-comment', snippet: { textOriginal: 'INFO ALMA', authorChannelId: { value: 'lead-1' }, publishedAt: '2026-08-10T18:01:00.000Z' } } } },
+      { snippet: { topLevelComment: { id: 'old-comment', snippet: { textOriginal: 'INFO', authorChannelId: { value: 'lead-2' }, publishedAt: '2026-08-10T16:00:00.000Z' } } } },
+    ] } }) } as any;
+    const tokens = { getAccessToken: jest.fn().mockResolvedValue('token-1') } as any;
+    const service = new YouTubeIngestionService(http, tokens);
+    jest.spyOn(service, 'processComment').mockResolvedValue('processed');
+    const info = jest.spyOn(console, 'info').mockImplementation(() => undefined);
+    const credential = {
+      userId: { toString: () => 'owner-1' }, channelId: 'channel-owner',
+      connectedAt: new Date('2026-08-10T17:00:00.000Z'), lastPolledAt: new Date('2026-08-10T18:00:00.000Z'),
+      lastRepliesPolledAt: new Date(), save: jest.fn().mockResolvedValue(undefined),
+    };
+
+    await service.pollCredential(credential);
+
+    expect(info).toHaveBeenCalledWith('YouTube credential polling summary', expect.objectContaining({
+      receivedThreads: 2, topLevelComments: 2, afterCutoff: 1, processed: 1,
+      invalid: 0, own_channel: 0, not_eligible: 0, duplicate: 0,
+    }));
+    const logged = info.mock.calls[0][1] as Record<string, unknown>;
+    expect(logged).not.toHaveProperty('userId');
+    expect(JSON.stringify(logged)).not.toContain('INFO ALMA');
+    info.mockRestore();
   });
 });

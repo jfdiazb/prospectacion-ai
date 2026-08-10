@@ -274,3 +274,8 @@
 - El poller de YouTube ejecuta un solo ciclo a la vez, valida un intervalo mínimo de 60 segundos y emite telemetría segura de inicio, ciclos, número de credenciales y errores.
 - La conexión OAuth continúa visible como `Conectado a 100 % Mentalmente`; los logs de Render permiten determinar si el bloqueo está en configuración, credenciales o API de YouTube.
 - Validación vigente: compilación TypeScript correcta y 40/40 pruebas backend.
+# Telemetría detallada del poller de YouTube — 2026-08-10
+- Cada consulta por credencial emite `YouTube credential polling summary` con contadores de hilos recibidos, comentarios extraídos, candidatos posteriores al corte y desenlace de procesamiento.
+- Los descartes quedan separados entre comentario inválido, autor del canal propio, comentario no elegible y evento duplicado; los procesados se contabilizan aparte.
+- Los logs conservan privacidad: no contienen texto, tokens, usuario propietario ni IDs de canal/comentario.
+- Validación vigente: prueba enfocada 5/5, suite backend 41/41 y compilación TypeScript correcta.

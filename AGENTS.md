@@ -1,5 +1,11 @@
 # AGENTS.md
 
+## Telemetría de filtros del poller de YouTube — 2026-08-10
+- Cada credencial registra ahora un resumen seguro por ciclo con hilos recibidos, comentarios principales, corte temporal, candidatos posteriores al corte y resultados `processed`, `invalid`, `own_channel`, `not_eligible` y `duplicate`.
+- El resumen no incluye texto de comentarios, tokens, `userId` ni identificadores de canales; permite localizar el filtro exacto que impide una ingesta sin exponer datos personales.
+- `processComment` devuelve un resultado tipado para alimentar los contadores sin alterar la idempotencia ni el flujo CRM/ALMA.
+- Validación vigente: compilación TypeScript correcta y 41/41 pruebas backend.
+
 ## Diagnóstico y exclusión mutua del poller de YouTube — 2026-08-10
 - Una prueba real publicó `INFO ALMA` desde un canal externo, pero la respuesta no apareció durante la ventana inicial de observación; el backend continuó respondiendo `200` y la conexión OAuth figuró activa.
 - `startYouTubePolling` impide ahora ciclos simultáneos, normaliza el intervalo a un mínimo de 60 segundos y registra inicio, finalización, cantidad de credenciales y errores sin exponer tokens.

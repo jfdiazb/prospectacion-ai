@@ -11,6 +11,7 @@ import { YouTubeTokenService } from '../integrations/youtube/YouTubeTokenService
 type TopComment = { id: string; snippet?: { textOriginal?: string; authorDisplayName?: string; authorChannelId?: { value?: string }; videoId?: string; publishedAt?: string } };
 type ThreadResponse = { items?: Array<{ snippet?: { topLevelComment?: TopComment } }> };
 type CommentListResponse = { items?: TopComment[]; nextPageToken?: string };
+type CommentProcessingResult = 'processed' | 'invalid' | 'own_channel' | 'not_eligible' | 'duplicate';
 
 export class YouTubeIngestionService {
   constructor(private readonly http: AxiosInstance = axios, private readonly tokens = new YouTubeTokenService(http)) {}
@@ -29,14 +30,28 @@ export class YouTubeIngestionService {
     const response = await this.http.get<ThreadResponse>(`https://www.googleapis.com/youtube/v3/commentThreads?${params}`, { headers: { Authorization: `Bearer ${token}` }, timeout: Number(process.env.YOUTUBE_TIMEOUT_MS || 10000) });
     const cutoff = YouTubeIngestionService.getPollingCutoff(credential);
     const comments = (response.data.items ?? []).map(item => item.snippet?.topLevelComment).filter((item): item is TopComment => Boolean(item));
+    const summary: Record<CommentProcessingResult, number> = { processed: 0, invalid: 0, own_channel: 0, not_eligible: 0, duplicate: 0 };
+    let afterCutoff = 0;
     comments.sort((a, b) => new Date(a.snippet?.publishedAt ?? 0).getTime() - new Date(b.snippet?.publishedAt ?? 0).getTime());
-    for (const comment of comments) if (new Date(comment.snippet?.publishedAt ?? 0).getTime() > cutoff) await this.processComment(credential.userId.toString(), comment, comment.id, credential.channelId);
+    for (const comment of comments) {
+      if (new Date(comment.snippet?.publishedAt ?? 0).getTime() <= cutoff) continue;
+      afterCutoff += 1;
+      const result = await this.processComment(credential.userId.toString(), comment, comment.id, credential.channelId);
+      summary[result] += 1;
+    }
     if (YouTubeIngestionService.shouldPollReplies(credential)) {
       await this.pollRecentReplies(credential, token);
       credential.lastRepliesPolledAt = new Date();
     }
     credential.lastPolledAt = new Date();
     await credential.save();
+    console.info('YouTube credential polling summary', {
+      receivedThreads: response.data.items?.length ?? 0,
+      topLevelComments: comments.length,
+      cutoffAt: new Date(cutoff).toISOString(),
+      afterCutoff,
+      ...summary,
+    });
   }
 
   static shouldPollReplies(credential: { lastRepliesPolledAt?: Date }, now = Date.now()): boolean {
@@ -81,18 +96,18 @@ export class YouTubeIngestionService {
     return Math.max(connectedAt, lastPolledAt - overlapMs);
   }
 
-  async processComment(userId: string, comment: TopComment, responseParentId = comment.id, ownChannelId?: string): Promise<void> {
+  async processComment(userId: string, comment: TopComment, responseParentId = comment.id, ownChannelId?: string): Promise<CommentProcessingResult> {
     const text = comment.snippet?.textOriginal?.trim();
     const senderId = comment.snippet?.authorChannelId?.value;
-    if (!text || !senderId || !comment.id) return;
-    if (ownChannelId && senderId === ownChannelId) return;
+    if (!text || !senderId || !comment.id) return 'invalid';
+    if (ownChannelId && senderId === ownChannelId) return 'own_channel';
     const hasInfoKeyword = /(^|\s)info(\s|$)/i.test(text);
     const existingLead = await Lead.findOne({ userId, username: senderId, platform: 'youtube' });
-    if (!existingLead && !hasInfoKeyword) return;
+    if (!existingLead && !hasInfoKeyword) return 'not_eligible';
     const claimed: any = await InboundEvent.findOneAndUpdate({ externalEventId: `youtube:${comment.id}` }, { $setOnInsert: {
       userId, externalEventId: `youtube:${comment.id}`, channel: 'youtube', eventType: 'comment', senderId, text, mediaId: comment.snippet?.videoId, matchedKeyword: hasInfoKeyword ? 'INFO' : undefined,
     } }, { upsert: true, new: true, includeResultMetadata: true });
-    if (claimed.lastErrorObject?.updatedExisting || !claimed.value) return;
+    if (claimed.lastErrorObject?.updatedExisting || !claimed.value) return 'duplicate';
     let lead = existingLead;
     const isNewLead = !lead;
     if (!lead) {
@@ -103,6 +118,7 @@ export class YouTubeIngestionService {
     const conversation = await ConversationService.getOrCreateConversation(userId, lead._id.toString());
     await ConversationService.addMessage(conversation._id.toString(), userId, { sender: 'lead', text, platform: 'youtube' });
     await AlmaService.processMessage({ userId, leadId: lead._id.toString(), conversationId: conversation._id.toString(), text, isNewLead, platform: 'youtube', sourceEventId: `youtube:${comment.id}`, recipient: { type: 'youtube_comment', parentCommentId: responseParentId } });
+    return 'processed';
   }
 }
 
