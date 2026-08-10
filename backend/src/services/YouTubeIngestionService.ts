@@ -48,17 +48,20 @@ export class YouTubeIngestionService {
     if (YouTubeIngestionService.shouldPollReplies(credential)) {
       const replySummary = await this.pollRecentReplies(credential, token);
       console.info('YouTube reply polling summary', replySummary);
+      credential.lastReplyPollingSummary = { ...replySummary, recordedAt: new Date() };
       credential.lastRepliesPolledAt = new Date();
     }
     credential.lastPolledAt = new Date();
-    await credential.save();
-    console.info('YouTube credential polling summary', {
+    const credentialSummary = {
       receivedThreads: response.data.items?.length ?? 0,
       topLevelComments: comments.length,
       cutoffAt: new Date(cutoff).toISOString(),
       afterCutoff,
       ...summary,
-    });
+    };
+    credential.lastPollingSummary = { ...credentialSummary, recordedAt: new Date() };
+    await credential.save();
+    console.info('YouTube credential polling summary', credentialSummary);
   }
 
   static shouldPollReplies(credential: { lastRepliesPolledAt?: Date }, now = Date.now()): boolean {

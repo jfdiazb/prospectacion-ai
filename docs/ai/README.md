@@ -274,6 +274,12 @@
 - El poller de YouTube ejecuta un solo ciclo a la vez, valida un intervalo mínimo de 60 segundos y emite telemetría segura de inicio, ciclos, número de credenciales y errores.
 - La conexión OAuth continúa visible como `Conectado a 100 % Mentalmente`; los logs de Render permiten determinar si el bloqueo está en configuración, credenciales o API de YouTube.
 - Validación vigente: compilación TypeScript correcta y 40/40 pruebas backend.
+# Panel de autodiagnóstico operativo — 2026-08-10
+- `/configuracion` muestra señales de YouTube, respuestas y agenda con alertas interpretadas y actualización manual.
+- Endpoint protegido: `GET /api/v1/youtube/diagnostics`; combina los últimos resúmenes seguros del poller con conteos de reuniones `pending_booking`, futuras, vencidas y fallidas.
+- `YouTubeCredential.lastPollingSummary` y `lastReplyPollingSummary` almacenan solo métricas numéricas y fechas, nunca contenido, tokens ni identificadores personales.
+- Validación: backend 44/44 pruebas, compilación TypeScript backend, type-check y build de producción frontend correctos.
+
 # Renovación de reuniones vencidas — 2026-08-10
 - El orquestador solo bloquea una nueva solicitud cuando existe una reunión `scheduled` con `scheduledFor` futuro.
 - Las citas pasadas se conservan en el CRM como historial y una nueva intención vuelve a generar la agenda segura de Calendly.

@@ -1,5 +1,11 @@
 # AGENTS.md
 
+## Panel de autodiagnóstico operativo — 2026-08-10
+- Configuración incorpora un panel autenticado con salud del poller de YouTube, actividad reciente de respuestas y estado agregado de Calendly/reuniones.
+- `GET /api/v1/youtube/diagnostics` interpreta poller detenido, diferencias de identidad de canal, reservas pendientes, reuniones futuras, vencidas y fallidas.
+- La credencial conserva únicamente los últimos contadores numéricos seguros; el panel no expone tokens, textos, correos ni IDs externos.
+- Validación vigente: compilaciones backend/frontend correctas, type-check frontend correcto y 44/44 pruebas backend.
+
 ## Reuniones vencidas no bloquean nuevas reservas — 2026-08-10
 - Una reunión `scheduled` solo se considera activa si `scheduledFor` está en el futuro; las reuniones vencidas permanecen como historial pero ya no impiden que ALMA ofrezca una nueva reserva por Calendly.
 - La búsqueda prioriza la próxima reunión futura por fecha, evitando reutilizar una cita pasada como si todavía estuviera vigente.

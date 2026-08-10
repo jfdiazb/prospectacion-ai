@@ -3,20 +3,30 @@ import { AppLayout } from '@components/AppLayout';
 import { Button, Card } from '@components/shared';
 import { useAuth } from '@context/AuthContext';
 import { useEffect, useState } from 'react';
-import { Youtube } from 'lucide-react';
-import { youtubeService, type YouTubeStatus } from '@services/youtubeService';
+import { AlertTriangle, CalendarCheck, CheckCircle2, Clock, RefreshCw, Youtube } from 'lucide-react';
+import { youtubeService, type OperationalDiagnostics, type YouTubeStatus } from '@services/youtubeService';
 
 export const SettingsPage = () => {
   const { user, logout } = useAuth();
   const [youtube, setYoutube] = useState<YouTubeStatus>({ connected: false });
   const [youtubeLoading, setYoutubeLoading] = useState(true);
   const [youtubeError, setYoutubeError] = useState('');
+  const [diagnostics, setDiagnostics] = useState<OperationalDiagnostics | null>(null);
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(true);
+
+  const loadDiagnostics = async () => {
+    setDiagnosticsLoading(true);
+    try { setDiagnostics(await youtubeService.getDiagnostics()); }
+    catch { setYoutubeError('No fue posible consultar el diagnóstico operativo.'); }
+    finally { setDiagnosticsLoading(false); }
+  };
 
   useEffect(() => {
     youtubeService.getStatus()
       .then(setYoutube)
       .catch(() => setYoutubeError('No fue posible consultar la conexión de YouTube.'))
       .finally(() => setYoutubeLoading(false));
+    void loadDiagnostics();
   }, []);
 
   const connectYouTube = async () => {
@@ -112,7 +122,61 @@ export const SettingsPage = () => {
               : <Button loading={youtubeLoading} onClick={connectYouTube}>Conectar YouTube</Button>}
           </motion.div>
         </Card>
+
+        <Card className="lg:col-span-2" hover={false}>
+          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm uppercase tracking-[0.3em] text-dark-500">Autodiagnóstico</p>
+                <h2 className="text-2xl font-semibold text-white">Estado operativo de ALMA</h2>
+                <p className="mt-1 text-dark-400">Señales seguras de YouTube, conversaciones y agenda, sin mostrar datos privados.</p>
+              </div>
+              <Button variant="secondary" loading={diagnosticsLoading} onClick={() => void loadDiagnostics()}>
+                <RefreshCw size={17} /> Actualizar
+              </Button>
+            </div>
+
+            {diagnostics && <>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-3xl bg-dark-900 p-5">
+                  <div className="flex items-center gap-3 text-red-400"><Youtube size={21} /><span className="font-medium">YouTube</span></div>
+                  <p className="mt-3 text-2xl font-semibold text-white">{diagnostics.youtube.connected ? 'Conectado' : 'Sin conexión'}</p>
+                  <p className="mt-1 text-sm text-dark-400">Último sondeo: {formatDiagnosticDate(diagnostics.youtube.lastPolledAt)}</p>
+                </div>
+                <div className="rounded-3xl bg-dark-900 p-5">
+                  <div className="flex items-center gap-3 text-primary-400"><RefreshCw size={21} /><span className="font-medium">Respuestas</span></div>
+                  <p className="mt-3 text-2xl font-semibold text-white">{diagnostics.youtube.replies?.replies ?? 0} detectadas</p>
+                  <p className="mt-1 text-sm text-dark-400">{diagnostics.youtube.replies?.activeThreads ?? 0} hilos activos · {diagnostics.youtube.replies?.processed ?? 0} nuevas</p>
+                </div>
+                <div className="rounded-3xl bg-dark-900 p-5">
+                  <div className="flex items-center gap-3 text-emerald-400"><CalendarCheck size={21} /><span className="font-medium">Agenda</span></div>
+                  <p className="mt-3 text-2xl font-semibold text-white">{diagnostics.calendly.futureScheduled} futuras</p>
+                  <p className="mt-1 text-sm text-dark-400">{diagnostics.calendly.pendingBooking} pendientes · {diagnostics.calendly.failed} con error</p>
+                </div>
+              </div>
+
+              <div className="grid gap-3">
+                {diagnostics.alerts.map(alert => {
+                  const warning = alert.severity === 'warning' || alert.severity === 'error';
+                  const Icon = warning ? AlertTriangle : alert.severity === 'healthy' ? CheckCircle2 : Clock;
+                  const tone = alert.severity === 'error' ? 'border-red-500/30 bg-red-500/10 text-red-300'
+                    : alert.severity === 'warning' ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                      : alert.severity === 'healthy' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                        : 'border-primary-500/30 bg-primary-500/10 text-primary-300';
+                  return <div key={alert.code} className={`flex items-start gap-3 rounded-2xl border p-4 ${tone}`}>
+                    <Icon className="mt-0.5 shrink-0" size={19} /><p className="text-sm">{alert.message}</p>
+                  </div>;
+                })}
+              </div>
+              <p className="text-xs text-dark-500">Diagnóstico actualizado: {formatDiagnosticDate(diagnostics.checkedAt)}</p>
+            </>}
+          </motion.div>
+        </Card>
       </div>
     </AppLayout>
   );
 };
+
+const formatDiagnosticDate = (value?: string) => value
+  ? new Intl.DateTimeFormat('es-CO', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Bogota' }).format(new Date(value))
+  : 'Sin datos';

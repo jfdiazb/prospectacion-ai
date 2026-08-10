@@ -3,6 +3,7 @@ import type { AuthRequest } from '../middlewares/auth';
 import YouTubeCredential from '../models/YouTubeCredential';
 import { YouTubeOAuthService } from '../integrations/youtube/YouTubeOAuthService';
 import { YouTubeTokenService } from '../integrations/youtube/YouTubeTokenService';
+import { OperationalDiagnosticsService } from '../services/OperationalDiagnosticsService';
 
 export class YouTubeController {
   static connect(req: AuthRequest, res: Response) {
@@ -30,6 +31,10 @@ export class YouTubeController {
       const credential = await YouTubeCredential.findOne({ userId: req.userId }).select('channelId channelTitle connectedAt lastPolledAt');
       res.json({ success: true, data: { connected: Boolean(credential), credential } });
     } catch (error) { next(error); }
+  }
+
+  static async diagnostics(req: AuthRequest, res: Response, next: NextFunction) {
+    try { res.json({ success: true, data: await OperationalDiagnosticsService.getForUser(req.userId!) }); } catch (error) { next(error); }
   }
 
   static async disconnect(req: AuthRequest, res: Response, next: NextFunction) {
