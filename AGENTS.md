@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Reuniones vencidas no bloquean nuevas reservas — 2026-08-10
+- Una reunión `scheduled` solo se considera activa si `scheduledFor` está en el futuro; las reuniones vencidas permanecen como historial pero ya no impiden que ALMA ofrezca una nueva reserva por Calendly.
+- La búsqueda prioriza la próxima reunión futura por fecha, evitando reutilizar una cita pasada como si todavía estuviera vigente.
+
 ## Telemetría del sondeo de respuestas de YouTube — 2026-08-10
 - El ciclo separado de respuestas registra ahora candidatos salientes, hilos activos, páginas y respuestas recuperadas, además de los mismos desenlaces seguros de procesamiento usados para comentarios principales.
 - `YouTube reply polling summary` no expone texto, usuarios ni IDs y permite verificar si una continuación conversacional llega desde YouTube y si ALMA la procesa o la descarta.

@@ -39,7 +39,7 @@ export class MeetingOrchestratorService {
       }
     }
     if (!meeting && context.wantsMeeting) {
-      const existing = await Meeting.findOne({ conversationId: context.conversationId, status: 'scheduled' }).sort({ createdAt: -1 });
+      const existing = await Meeting.findOne(this.activeScheduledMeetingFilter(context.conversationId)).sort({ scheduledFor: 1 });
       if (existing) return { handled: true, reply: `Ya tienes una reunión registrada${existing.scheduledFor ? ` para ${existing.scheduledFor.toISOString()}` : ''}. Los datos de acceso están guardados de forma privada.` };
     }
     if (!meeting && !context.wantsMeeting) return { handled: false };
@@ -149,6 +149,10 @@ export class MeetingOrchestratorService {
 
   static getContactIdentifier(platform: 'youtube', leadId: string): string {
     return `${platform}:${leadId}`;
+  }
+
+  static activeScheduledMeetingFilter(conversationId: string, now = new Date()): Record<string, unknown> {
+    return { conversationId, status: 'scheduled', scheduledFor: { $gt: now } };
   }
 
   private static buildCalendlyBookingUrl(): { url: string; token: string } | null {

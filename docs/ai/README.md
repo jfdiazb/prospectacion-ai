@@ -274,6 +274,10 @@
 - El poller de YouTube ejecuta un solo ciclo a la vez, valida un intervalo mínimo de 60 segundos y emite telemetría segura de inicio, ciclos, número de credenciales y errores.
 - La conexión OAuth continúa visible como `Conectado a 100 % Mentalmente`; los logs de Render permiten determinar si el bloqueo está en configuración, credenciales o API de YouTube.
 - Validación vigente: compilación TypeScript correcta y 40/40 pruebas backend.
+# Renovación de reuniones vencidas — 2026-08-10
+- El orquestador solo bloquea una nueva solicitud cuando existe una reunión `scheduled` con `scheduledFor` futuro.
+- Las citas pasadas se conservan en el CRM como historial y una nueva intención vuelve a generar la agenda segura de Calendly.
+
 # Telemetría de respuestas de YouTube — 2026-08-10
 - `YouTube reply polling summary` contabiliza mensajes salientes candidatos, hilos únicos consultados, páginas, respuestas y desenlaces de procesamiento sin registrar contenido ni identificadores.
 - Este resumen permite diagnosticar continuaciones como la solicitud de reunión en un hilo donde ALMA ya respondió.

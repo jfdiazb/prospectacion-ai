@@ -20,4 +20,11 @@ describe('MeetingOrchestratorService detail extraction', () => {
   test('uses the YouTube lead identifier instead of requesting email publicly', () => {
     expect(MeetingOrchestratorService.getContactIdentifier('youtube', 'lead-123')).toBe('youtube:lead-123');
   });
+
+  test('only treats future scheduled meetings as active', () => {
+    const now = new Date('2026-08-10T22:00:00.000Z');
+    expect(MeetingOrchestratorService.activeScheduledMeetingFilter('conversation-1', now)).toEqual({
+      conversationId: 'conversation-1', status: 'scheduled', scheduledFor: { $gt: now },
+    });
+  });
 });
