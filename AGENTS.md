@@ -1,5 +1,11 @@
 # AGENTS.md
 
+## Diagnóstico y exclusión mutua del poller de YouTube — 2026-08-10
+- Una prueba real publicó `INFO ALMA` desde un canal externo, pero la respuesta no apareció durante la ventana inicial de observación; el backend continuó respondiendo `200` y la conexión OAuth figuró activa.
+- `startYouTubePolling` impide ahora ciclos simultáneos, normaliza el intervalo a un mínimo de 60 segundos y registra inicio, finalización, cantidad de credenciales y errores sin exponer tokens.
+- Esta telemetría permite distinguir en Render entre modo inactivo, cero credenciales, errores OAuth/API y ciclos saludables.
+- Validación vigente: compilación TypeScript correcta y 40/40 pruebas backend.
+
 ## Sincronización Calendly Free por polling — 2026-08-09
 - El plan gratuito rechazó la suscripción webhook con `403`; no se realizó ninguna compra ni cambio de plan.
 - `CalendlyPollingService` consulta cada 2 minutos los eventos e invitados del usuario mediante la API v2 y `CALENDLY_PERSONAL_ACCESS_TOKEN`, que permanece externo al repositorio.

@@ -15,11 +15,12 @@ type CommentListResponse = { items?: TopComment[]; nextPageToken?: string };
 export class YouTubeIngestionService {
   constructor(private readonly http: AxiosInstance = axios, private readonly tokens = new YouTubeTokenService(http)) {}
 
-  async pollAll(): Promise<void> {
+  async pollAll(): Promise<number> {
     const credentials: any[] = await YouTubeCredential.find({});
     for (const credential of credentials) {
       try { await this.pollCredential(credential); } catch (error) { console.error('YouTube polling error', { userId: credential.userId.toString(), message: error instanceof Error ? error.message : 'unknown' }); }
     }
+    return credentials.length;
   }
 
   async pollCredential(credential: any): Promise<void> {
@@ -106,11 +107,29 @@ export class YouTubeIngestionService {
 }
 
 let timer: NodeJS.Timeout | undefined;
+let polling = false;
 export const startYouTubePolling = (): void => {
   if ((process.env.YOUTUBE_INGESTION_MODE || 'mock') !== 'live' || timer) return;
   const service = new YouTubeIngestionService();
-  const run = () => void service.pollAll();
+  const configuredInterval = Number(process.env.YOUTUBE_POLL_INTERVAL_MS || 60000);
+  const intervalMs = Number.isFinite(configuredInterval) ? Math.max(60000, configuredInterval) : 60000;
+  const run = async () => {
+    if (polling) {
+      console.warn('YouTube polling cycle skipped because the previous cycle is still running');
+      return;
+    }
+    polling = true;
+    try {
+      const credentialCount = await service.pollAll();
+      console.info('YouTube polling cycle completed', { credentialCount });
+    } catch (error) {
+      console.error('YouTube polling cycle failed', { message: error instanceof Error ? error.message : 'unknown' });
+    } finally {
+      polling = false;
+    }
+  };
+  console.info('YouTube polling started', { intervalMs });
   run();
-  timer = setInterval(run, Number(process.env.YOUTUBE_POLL_INTERVAL_MS || 60000));
+  timer = setInterval(() => void run(), intervalMs);
   timer.unref();
 };

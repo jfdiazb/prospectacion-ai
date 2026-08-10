@@ -268,3 +268,9 @@
 - Agregar status y notas sobre cambios en `docs/ai/README.md` tras cada tarea.
 - Incluir un sistema de actualizaciones automáticas de documentación bajo cambios de proyecto.
 - Documentar endpoints exactos de backend en `docs/ai/` si son expandidos.
+
+# Diagnóstico del poller de YouTube — 2026-08-10
+- La prueba real `INFO ALMA` confirmó publicación en YouTube y backend saludable, pero no recibió la respuesta automática durante la observación inicial.
+- El poller de YouTube ejecuta un solo ciclo a la vez, valida un intervalo mínimo de 60 segundos y emite telemetría segura de inicio, ciclos, número de credenciales y errores.
+- La conexión OAuth continúa visible como `Conectado a 100 % Mentalmente`; los logs de Render permiten determinar si el bloqueo está en configuración, credenciales o API de YouTube.
+- Validación vigente: compilación TypeScript correcta y 40/40 pruebas backend.
