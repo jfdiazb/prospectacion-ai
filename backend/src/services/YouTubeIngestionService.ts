@@ -12,6 +12,12 @@ type TopComment = { id: string; snippet?: { textOriginal?: string; authorDisplay
 type ThreadResponse = { items?: Array<{ snippet?: { topLevelComment?: TopComment } }> };
 type CommentListResponse = { items?: TopComment[]; nextPageToken?: string };
 type CommentProcessingResult = 'processed' | 'invalid' | 'own_channel' | 'not_eligible' | 'duplicate';
+type ReplyPollingSummary = Record<CommentProcessingResult, number> & {
+  outboundCandidates: number;
+  activeThreads: number;
+  pages: number;
+  replies: number;
+};
 
 export class YouTubeIngestionService {
   constructor(private readonly http: AxiosInstance = axios, private readonly tokens = new YouTubeTokenService(http)) {}
@@ -40,7 +46,8 @@ export class YouTubeIngestionService {
       summary[result] += 1;
     }
     if (YouTubeIngestionService.shouldPollReplies(credential)) {
-      await this.pollRecentReplies(credential, token);
+      const replySummary = await this.pollRecentReplies(credential, token);
+      console.info('YouTube reply polling summary', replySummary);
       credential.lastRepliesPolledAt = new Date();
     }
     credential.lastPolledAt = new Date();
@@ -59,7 +66,7 @@ export class YouTubeIngestionService {
     return !credential.lastRepliesPolledAt || now - credential.lastRepliesPolledAt.getTime() >= intervalMs;
   }
 
-  async pollRecentReplies(credential: any, token: string): Promise<void> {
+  async pollRecentReplies(credential: any, token: string): Promise<ReplyPollingSummary> {
     const activeDays = Math.max(1, Number(process.env.YOUTUBE_REPLY_ACTIVE_DAYS || 7));
     const maxThreads = Math.max(1, Number(process.env.YOUTUBE_REPLY_MAX_THREADS || 5));
     const recent = await OutboundMessage.find({
@@ -70,11 +77,26 @@ export class YouTubeIngestionService {
       createdAt: { $gte: new Date(Date.now() - activeDays * 24 * 60 * 60 * 1000) },
     }).sort({ createdAt: -1 }).limit(maxThreads * 3).select('recipientId').lean();
     const threadIds = [...new Set(recent.map((item: any) => item.recipientId).filter(Boolean))].slice(0, maxThreads);
-    for (const threadId of threadIds) await this.pollThreadReplies(credential, token, threadId);
+    const summary: ReplyPollingSummary = {
+      outboundCandidates: recent.length, activeThreads: threadIds.length, pages: 0, replies: 0,
+      processed: 0, invalid: 0, own_channel: 0, not_eligible: 0, duplicate: 0,
+    };
+    for (const threadId of threadIds) {
+      const threadSummary = await this.pollThreadReplies(credential, token, threadId);
+      summary.pages += threadSummary.pages;
+      summary.replies += threadSummary.replies;
+      summary.processed += threadSummary.processed;
+      summary.invalid += threadSummary.invalid;
+      summary.own_channel += threadSummary.own_channel;
+      summary.not_eligible += threadSummary.not_eligible;
+      summary.duplicate += threadSummary.duplicate;
+    }
+    return summary;
   }
 
-  async pollThreadReplies(credential: any, token: string, threadId: string): Promise<void> {
+  async pollThreadReplies(credential: any, token: string, threadId: string): Promise<Omit<ReplyPollingSummary, 'outboundCandidates' | 'activeThreads'>> {
     let pageToken: string | undefined;
+    const summary = { pages: 0, replies: 0, processed: 0, invalid: 0, own_channel: 0, not_eligible: 0, duplicate: 0 };
     do {
       const params = new URLSearchParams({ part: 'snippet', parentId: threadId, maxResults: '100', textFormat: 'plainText' });
       if (pageToken) params.set('pageToken', pageToken);
@@ -82,10 +104,16 @@ export class YouTubeIngestionService {
         headers: { Authorization: `Bearer ${token}` }, timeout: Number(process.env.YOUTUBE_TIMEOUT_MS || 10000),
       });
       const replies = response.data.items ?? [];
+      summary.pages += 1;
+      summary.replies += replies.length;
       replies.sort((a, b) => new Date(a.snippet?.publishedAt ?? 0).getTime() - new Date(b.snippet?.publishedAt ?? 0).getTime());
-      for (const reply of replies) await this.processComment(credential.userId.toString(), reply, threadId, credential.channelId);
+      for (const reply of replies) {
+        const result = await this.processComment(credential.userId.toString(), reply, threadId, credential.channelId);
+        summary[result] += 1;
+      }
       pageToken = response.data.nextPageToken;
     } while (pageToken);
+    return summary;
   }
 
   static getPollingCutoff(credential: { connectedAt?: Date; lastPolledAt?: Date }): number {

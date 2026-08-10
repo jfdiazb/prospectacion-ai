@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Telemetría del sondeo de respuestas de YouTube — 2026-08-10
+- El ciclo separado de respuestas registra ahora candidatos salientes, hilos activos, páginas y respuestas recuperadas, además de los mismos desenlaces seguros de procesamiento usados para comentarios principales.
+- `YouTube reply polling summary` no expone texto, usuarios ni IDs y permite verificar si una continuación conversacional llega desde YouTube y si ALMA la procesa o la descarta.
+
 ## Telemetría de filtros del poller de YouTube — 2026-08-10
 - Cada credencial registra ahora un resumen seguro por ciclo con hilos recibidos, comentarios principales, corte temporal, candidatos posteriores al corte y resultados `processed`, `invalid`, `own_channel`, `not_eligible` y `duplicate`.
 - El resumen no incluye texto de comentarios, tokens, `userId` ni identificadores de canales; permite localizar el filtro exacto que impide una ingesta sin exponer datos personales.

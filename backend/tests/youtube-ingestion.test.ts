@@ -41,12 +41,13 @@ describe('YouTubeIngestionService polling cursor', () => {
     const service = new YouTubeIngestionService(http);
     const process = jest.spyOn(service, 'processComment').mockResolvedValue('processed');
 
-    await service.pollThreadReplies({ userId: { toString: () => 'owner-1' }, channelId: 'channel-owner' }, 'token-1', 'root-comment');
+    const summary = await service.pollThreadReplies({ userId: { toString: () => 'owner-1' }, channelId: 'channel-owner' }, 'token-1', 'root-comment');
 
     expect(http.get).toHaveBeenCalledTimes(2);
     expect(http.get.mock.calls[1][0]).toContain('pageToken=page-2');
     expect(process).toHaveBeenNthCalledWith(1, 'owner-1', expect.objectContaining({ id: 'reply-2' }), 'root-comment', 'channel-owner');
     expect(process).toHaveBeenNthCalledWith(2, 'owner-1', expect.objectContaining({ id: 'reply-1' }), 'root-comment', 'channel-owner');
+    expect(summary).toEqual(expect.objectContaining({ pages: 2, replies: 2, processed: 2 }));
   });
 
   test('logs privacy-safe counters for every credential poll', async () => {
