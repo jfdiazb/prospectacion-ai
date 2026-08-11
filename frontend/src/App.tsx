@@ -13,6 +13,7 @@ import { SettingsPage } from '@pages/SettingsPage';
 import { HunterPage } from '@pages/HunterPage';
 import { ScraperPage } from '@pages/ScraperPage';
 import { NotFoundPage } from '@pages/NotFoundPage';
+import { YouTubeMonitorPage } from '@pages/YouTubeMonitorPage';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -87,6 +88,10 @@ function App() {
               <ScraperPage />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/youtube-monitor"
+          element={<ProtectedRoute><YouTubeMonitorPage /></ProtectedRoute>}
         />
         <Route
           path="/configuracion"

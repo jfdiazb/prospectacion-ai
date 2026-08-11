@@ -31,7 +31,7 @@ services:
       - key: YOUTUBE_REPLY_ACTIVE_DAYS
         value: "7"
       - key: YOUTUBE_REPLY_MAX_THREADS
-        value: "5"
+        value: "8"
       - key: ZOOM_MODE
         value: live
       - key: SCHEDULING_MODE

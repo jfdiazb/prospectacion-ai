@@ -9,5 +9,6 @@ router.use(authMiddleware, apiLimiter);
 router.get('/oauth/connect', YouTubeController.connect);
 router.get('/status', YouTubeController.status);
 router.get('/diagnostics', YouTubeController.diagnostics);
+router.get('/monitor', YouTubeController.monitor);
 router.delete('/connection', YouTubeController.disconnect);
 export default router;

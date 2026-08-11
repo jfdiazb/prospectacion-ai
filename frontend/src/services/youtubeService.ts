@@ -19,6 +19,15 @@ export interface OperationalDiagnostics {
   alerts: Array<{ severity: 'healthy' | 'info' | 'warning' | 'error'; code: string; message: string }>;
 }
 
+export interface YouTubeMonitor {
+  checkedAt: string; connected: boolean; channelTitle?: string; lastPolledAt?: string; lastRepliesPolledAt?: string;
+  config: { activeDays: number; maxThreads: number; intervalMs: number };
+  activeThreadCount: number; monitoredThreadCount: number; uncoveredThreadCount: number;
+  lastReplySummary?: { replies?: number; processed?: number; own_channel?: number; not_eligible?: number; duplicate?: number };
+  threads: Array<{ position: number; monitored: boolean; lead: { name: string; status?: string; interestLevel?: string; score?: number } | null; conversationStatus?: string; lastActivityAt?: string; deliveryStatus: string }>;
+  alerts: Array<{ severity: 'healthy' | 'warning' | 'error'; code: string; message: string }>;
+}
+
 export const youtubeService = {
   async getStatus(): Promise<YouTubeStatus> {
     const response = await apiClient.get('/youtube/status');
@@ -33,6 +42,10 @@ export const youtubeService = {
   },
   async getDiagnostics(): Promise<OperationalDiagnostics> {
     const response = await apiClient.get('/youtube/diagnostics');
+    return response.data.data;
+  },
+  async getMonitor(): Promise<YouTubeMonitor> {
+    const response = await apiClient.get('/youtube/monitor');
     return response.data.data;
   },
 };

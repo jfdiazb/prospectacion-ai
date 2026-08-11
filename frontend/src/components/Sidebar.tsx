@@ -1,11 +1,12 @@
 ﻿import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, User, Users, Repeat, PhoneCall, Settings, Sparkles, Search, Globe } from 'lucide-react';
+import { LayoutDashboard, User, Users, Repeat, PhoneCall, Settings, Sparkles, Search, Globe, Youtube } from 'lucide-react';
 
 const routes = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { label: 'Perfil', path: '/profile', icon: User },
   { label: 'Prospectos', path: '/prospectos', icon: Users },
   { label: 'Lead Hunter', path: '/lead-hunter', icon: Search },
+  { label: 'YouTube Monitor', path: '/youtube-monitor', icon: Youtube },
   { label: 'Social Scraper', path: '/social-scraper', icon: Globe },
   { label: 'Automatizaciones', path: '/automatizaciones', icon: Repeat },
   { label: 'CRM', path: '/crm', icon: PhoneCall },

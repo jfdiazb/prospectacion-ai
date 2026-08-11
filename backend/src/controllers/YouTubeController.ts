@@ -4,6 +4,7 @@ import YouTubeCredential from '../models/YouTubeCredential';
 import { YouTubeOAuthService } from '../integrations/youtube/YouTubeOAuthService';
 import { YouTubeTokenService } from '../integrations/youtube/YouTubeTokenService';
 import { OperationalDiagnosticsService } from '../services/OperationalDiagnosticsService';
+import { YouTubeMonitorService } from '../services/YouTubeMonitorService';
 
 export class YouTubeController {
   static connect(req: AuthRequest, res: Response) {
@@ -35,6 +36,10 @@ export class YouTubeController {
 
   static async diagnostics(req: AuthRequest, res: Response, next: NextFunction) {
     try { res.json({ success: true, data: await OperationalDiagnosticsService.getForUser(req.userId!) }); } catch (error) { next(error); }
+  }
+
+  static async monitor(req: AuthRequest, res: Response, next: NextFunction) {
+    try { res.json({ success: true, data: await YouTubeMonitorService.getForUser(req.userId!) }); } catch (error) { next(error); }
   }
 
   static async disconnect(req: AuthRequest, res: Response, next: NextFunction) {
