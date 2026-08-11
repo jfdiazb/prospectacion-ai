@@ -25,7 +25,7 @@ services:
       - key: YOUTUBE_INGESTION_MODE
         value: live
       - key: YOUTUBE_HUNTER_MODE
-        value: mock
+        value: live
       - key: YOUTUBE_HUNTER_USER_DAILY_SEARCH_LIMIT
         value: "25"
       - key: YOUTUBE_POLL_OVERLAP_MS

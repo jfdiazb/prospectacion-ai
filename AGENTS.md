@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Lead Hunter live declarado — 2026-08-11
+- Con autorización del propietario, el Blueprint cambia `YOUTUBE_HUNTER_MODE=live`; Render recibe la activación junto con el código versionado, conservando 25 búsquedas por operador y 100 por proyecto.
+- La primera búsqueda real aún debe validarse desde una sesión autenticada del CRM después de que Render complete el despliegue.
+
 ## Límite ampliado y visión SaaS — 2026-08-11
 - El único operador actual del CRM dispone de 25 búsquedas nuevas diarias en Lead Hunter; el proyecto conserva el tope preventivo de 100 y la caché evita consumo repetido.
 - `YOUTUBE_HUNTER_USER_DAILY_SEARCH_LIMIT=25` queda explícito en ejemplos y Blueprint. Al comercializar ALMA, este límite debe migrar desde usuario hacia organización/tenant y asignarse por plan, manteniendo un presupuesto global del proyecto.

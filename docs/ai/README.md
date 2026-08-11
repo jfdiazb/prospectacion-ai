@@ -315,3 +315,6 @@
 - El límite preventivo individual de Lead Hunter sube de 10 a 25 búsquedas nuevas diarias para el único operador actual; el máximo global permanece en 100 y las consultas servidas desde caché no incrementan el contador.
 - La fase comercial debe introducir `Organization`, membresías y planes; la cuota del Hunter se asignará por organización, no por prospecto ni por usuario aislado, y cada documento operativo deberá incluir `organizationId` además del propietario.
 - `YOUTUBE_HUNTER_USER_DAILY_SEARCH_LIMIT=25` queda documentado y declarado en Render sin activar todavía `YOUTUBE_HUNTER_MODE=live`.
+# Activación de Lead Hunter en producción — 2026-08-11
+- `render.yaml` declara `YOUTUBE_HUNTER_MODE=live` con autorización del propietario. La integración reutiliza OAuth cifrado, caché y límites 25/100; no ejecuta búsquedas hasta una acción explícita del usuario autenticado.
+- Pendiente operativo: esperar el despliegue de Render y ejecutar una búsqueda controlada desde `/lead-hunter` para confirmar respuesta oficial y contador de cuota.
