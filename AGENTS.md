@@ -4,7 +4,8 @@
 - Nueva ruta autenticada `/youtube-monitor` muestra hilos activos, cobertura inmediata, última actividad y salud del sondeo sin exponer textos ni IDs de YouTube.
 - `GET /api/v1/youtube/monitor` reutiliza la misma ventana de actividad y prioridad por recencia que el poller; alerta si existen conversaciones fuera de capacidad.
 - La cobertura sube de 5 a 8 hilos activos. Con intervalos de 2 minutos permanece en un presupuesto conservador frente a la cuota diaria predeterminada de YouTube.
-- Validación vigente: 46/46 pruebas backend, compilaciones backend/frontend y type-check frontend correctos.
+- Validación vigente: 47/47 pruebas backend, compilaciones backend/frontend y type-check frontend correctos.
+- Migración defensiva: valores heredados de `YOUTUBE_REPLY_MAX_THREADS` inferiores a 8 ya no reducen la cobertura operativa; el entorno aún puede ampliar el límite por encima de 8.
 
 ## Panel de autodiagnóstico operativo — 2026-08-10
 - Configuración incorpora un panel autenticado con salud del poller de YouTube, actividad reciente de respuestas y estado agregado de Calendly/reuniones.

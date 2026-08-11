@@ -12,4 +12,12 @@ describe('YouTubeMonitorService', () => {
     const alerts = YouTubeMonitorService.buildAlerts(11, 8, new Date());
     expect(alerts).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'thread_capacity', severity: 'warning' })]));
   });
+
+  test('does not allow a stale deployment value to reduce coverage below eight threads', () => {
+    const previous = process.env.YOUTUBE_REPLY_MAX_THREADS;
+    process.env.YOUTUBE_REPLY_MAX_THREADS = '5';
+    expect(YouTubeMonitorService.getConfig().maxThreads).toBe(8);
+    if (previous === undefined) delete process.env.YOUTUBE_REPLY_MAX_THREADS;
+    else process.env.YOUTUBE_REPLY_MAX_THREADS = previous;
+  });
 });

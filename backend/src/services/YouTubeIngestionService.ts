@@ -71,7 +71,7 @@ export class YouTubeIngestionService {
 
   async pollRecentReplies(credential: any, token: string): Promise<ReplyPollingSummary> {
     const activeDays = Math.max(1, Number(process.env.YOUTUBE_REPLY_ACTIVE_DAYS || 7));
-    const maxThreads = Math.max(1, Number(process.env.YOUTUBE_REPLY_MAX_THREADS || 8));
+    const maxThreads = Math.max(8, Number(process.env.YOUTUBE_REPLY_MAX_THREADS || 8));
     const recent = await OutboundMessage.find({
       userId: credential.userId,
       channel: 'youtube',

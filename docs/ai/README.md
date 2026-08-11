@@ -297,4 +297,5 @@
 - `/youtube-monitor` presenta métricas de hilos activos, cobertura, último ciclo de respuestas y una lista segura de conversaciones vigiladas.
 - Endpoint JWT `GET /api/v1/youtube/monitor`; no devuelve textos de mensajes, destinatarios ni IDs externos.
 - Los hilos se priorizan por la actividad saliente más reciente. `YOUTUBE_REPLY_MAX_THREADS=8` amplía cobertura manteniendo control de cuota; el monitor alerta cuando la demanda supera ese límite.
-- Validación: backend 46/46 pruebas, compilación TypeScript backend, type-check y build frontend correctos.
+- Validación: backend 47/47 pruebas, compilación TypeScript backend, type-check y build frontend correctos.
+- El backend aplica un mínimo de 8 hilos aunque Render conserve temporalmente un valor anterior inferior; la variable sigue permitiendo ampliar la capacidad.

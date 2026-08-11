@@ -5,7 +5,7 @@ export class YouTubeMonitorService {
   static getConfig() {
     return {
       activeDays: Math.max(1, Number(process.env.YOUTUBE_REPLY_ACTIVE_DAYS || 7)),
-      maxThreads: Math.max(1, Number(process.env.YOUTUBE_REPLY_MAX_THREADS || 8)),
+      maxThreads: Math.max(8, Number(process.env.YOUTUBE_REPLY_MAX_THREADS || 8)),
       intervalMs: Math.max(60000, Number(process.env.YOUTUBE_REPLY_POLL_INTERVAL_MS || 120000)),
     };
   }
