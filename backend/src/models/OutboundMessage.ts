@@ -17,6 +17,8 @@ const outboundMessageSchema = new Schema({
   failedAt: Date,
   errorCode: String,
   errorMessage: String,
+  retryCount: { type: Number, default: 0 },
+  lastRetryAt: Date,
   simulatedDelivery: { type: Boolean, default: false },
 }, { timestamps: true });
 

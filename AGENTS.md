@@ -1,5 +1,24 @@
 # AGENTS.md
 
+## Límite ampliado y visión SaaS — 2026-08-11
+- El único operador actual del CRM dispone de 25 búsquedas nuevas diarias en Lead Hunter; el proyecto conserva el tope preventivo de 100 y la caché evita consumo repetido.
+- `YOUTUBE_HUNTER_USER_DAILY_SEARCH_LIMIT=25` queda explícito en ejemplos y Blueprint. Al comercializar ALMA, este límite debe migrar desde usuario hacia organización/tenant y asignarse por plan, manteniendo un presupuesto global del proyecto.
+- Validación vigente: prueba enfocada Hunter 3/3 y compilación backend correcta.
+
+## Lead Hunter oficial y Dashboard navegable — 2026-08-11
+- Lead Hunter usa `search.list` y `channels.list` oficiales al activar `YOUTUBE_HUNTER_MODE=live`; permanece en mock por defecto y nunca consulta automáticamente. Busca canales o videos, filtra por suscriptores/país y limita cada página a 20 resultados.
+- La cuota vigente de Google separa `search.list` en un cupo granular predeterminado de 100 búsquedas diarias; `channels.list` consume 1 unidad general. ALMA registra ambos usos, limita por proyecto y usuario, y reutiliza consultas idénticas desde caché durante seis horas.
+- Las oportunidades se guardan idempotentemente por usuario/canal/video y se convierten en leads YouTube sin duplicar el mismo canal dentro del usuario. Ninguna consulta o conversión cruza propietarios.
+- Dashboard incorpora accesos funcionales a Lead Hunter, YouTube Monitor, CRM y Prospectos; las tarjetas métricas y los prospectos calientes también navegan a sus vistas correspondientes.
+- Variables: `YOUTUBE_HUNTER_MODE`, `YOUTUBE_HUNTER_DAILY_SEARCH_LIMIT`, `YOUTUBE_HUNTER_USER_DAILY_SEARCH_LIMIT`, `YOUTUBE_HUNTER_MAX_RESULTS` y `YOUTUBE_HUNTER_CACHE_MS`.
+- Validación vigente: 51/51 pruebas backend, compilaciones backend/frontend y type-check frontend correctos.
+
+## YouTube Monitor operativo y recuperación segura — 2026-08-11
+- `/youtube-monitor` incorpora entregas diarias enviadas, fallidas y pendientes, último comentario procesado, conversaciones que superan el tiempo de respuesta y fallos clasificados como OAuth, cuota, red o API sin mostrar textos ni IDs externos.
+- La cuota visible es una estimación mínima basada en respuestas confirmadas a 50 unidades; Google Cloud continúa siendo la fuente definitiva. `YOUTUBE_DAILY_QUOTA` permite reflejar el límite asignado y `YOUTUBE_RESPONSE_ALERT_MINUTES` controla la alerta de ALMA, con defaults 10.000 y 10 minutos.
+- `POST /api/v1/youtube/monitor/messages/:messageId/retry` reintenta únicamente mensajes fallidos del usuario autenticado, reutiliza el registro original, espera un minuto y admite hasta tres intentos. Los timeouts y errores ambiguos se bloquean para reducir duplicados públicos.
+- Validación vigente: 49/49 pruebas backend, compilaciones backend/frontend y type-check frontend correctos.
+
 ## YouTube Monitor — 2026-08-10
 - Nueva ruta autenticada `/youtube-monitor` muestra hilos activos, cobertura inmediata, última actividad y salud del sondeo sin exponer textos ni IDs de YouTube.
 - `GET /api/v1/youtube/monitor` reutiliza la misma ventana de actividad y prioridad por recencia que el poller; alerta si existen conversaciones fuera de capacidad.

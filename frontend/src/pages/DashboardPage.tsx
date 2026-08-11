@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@components/AppLayout';
 import { Card, Button, Badge } from '@components/shared';
 import { leadService } from '@services/leadService';
@@ -17,7 +18,7 @@ import {
   YAxis,
   Cell,
 } from 'recharts';
-import { Sparkles, Target, Users } from 'lucide-react';
+import { Activity, Search, Sparkles, Target, Users } from 'lucide-react';
 
 const chartColors = {
   primary: '#a78bfa',
@@ -31,6 +32,7 @@ const chartColors = {
  * Dashboard principal
  */
 export const DashboardPage = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<any>(null);
   const [hotLeads, setHotLeads] = useState<any[]>([]);
 
@@ -92,9 +94,14 @@ export const DashboardPage = () => {
   return (
     <AppLayout title="Dashboard" subtitle="Monitorea tus prospectos, conversiones y actividades más importantes.">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+        <div className="flex flex-wrap gap-3">
+          <Button onClick={() => navigate('/lead-hunter')}><Search size={17} /> Buscar oportunidades</Button>
+          <Button variant="secondary" onClick={() => navigate('/youtube-monitor')}><Activity size={17} /> Ver YouTube Monitor</Button>
+          <Button variant="secondary" onClick={() => navigate('/crm')}>Abrir CRM</Button>
+        </div>
         {stats && (
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-            <Card className="bg-gradient-to-br from-primary-600/15 to-purple-700/15 border-white/10">
+            <Card onClick={() => navigate('/prospectos')} className="bg-gradient-to-br from-primary-600/15 to-purple-700/15 border-white/10">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium uppercase tracking-[0.24em] text-primary-300">Total de Leads</p>
@@ -110,7 +117,7 @@ export const DashboardPage = () => {
               </div>
             </Card>
 
-            <Card className="bg-gradient-to-br from-sky-500/10 to-primary-600/10 border-white/10">
+            <Card onClick={() => navigate('/prospectos')} className="bg-gradient-to-br from-sky-500/10 to-primary-600/10 border-white/10">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium uppercase tracking-[0.24em] text-sky-300">Nuevos Leads</p>
@@ -126,7 +133,7 @@ export const DashboardPage = () => {
               </div>
             </Card>
 
-            <Card className="bg-gradient-to-br from-amber-500/10 to-red-500/10 border-white/10">
+            <Card onClick={() => navigate('/crm')} className="bg-gradient-to-br from-amber-500/10 to-red-500/10 border-white/10">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium uppercase tracking-[0.24em] text-amber-300">Conversiones</p>
@@ -225,7 +232,7 @@ export const DashboardPage = () => {
               <h2 className="text-xl font-semibold text-white">Prospectos Calientes</h2>
               <p className="text-dark-300">Sigue los leads con mayor probabilidad de conversión.</p>
             </div>
-            <Button variant="secondary" size="sm">
+            <Button variant="secondary" size="sm" onClick={() => navigate('/prospectos')}>
               Ver todos
             </Button>
           </div>
@@ -233,7 +240,7 @@ export const DashboardPage = () => {
           <div className="grid gap-4">
             {hotLeads.slice(0, 5).map((lead, index) => (
               <motion.div key={lead._id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.08 }}>
-                <Card>
+                <Card onClick={() => navigate('/prospectos')}>
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h3 className="font-semibold text-white">{lead.username}</h3>

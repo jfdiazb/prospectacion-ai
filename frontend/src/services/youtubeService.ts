@@ -21,9 +21,15 @@ export interface OperationalDiagnostics {
 
 export interface YouTubeMonitor {
   checkedAt: string; connected: boolean; channelTitle?: string; lastPolledAt?: string; lastRepliesPolledAt?: string;
-  config: { activeDays: number; maxThreads: number; intervalMs: number };
+  config: { activeDays: number; maxThreads: number; intervalMs: number; dailyQuota: number; responseAlertMinutes: number };
   activeThreadCount: number; monitoredThreadCount: number; uncoveredThreadCount: number;
   lastReplySummary?: { replies?: number; processed?: number; own_channel?: number; not_eligible?: number; duplicate?: number };
+  lastProcessedCommentAt?: string;
+  delivery: { sent: number; failed: number; pending: number; simulated: number };
+  quota: { estimatedUnitsToday: number; dailyLimit: number; estimatedPercent: number; note: string };
+  unanswered: { count: number; oldestAt?: string };
+  errors: { oauth: number; quota: number; network: number; api: number };
+  retryableFailures: Array<{ id: string; category: 'oauth' | 'quota' | 'network' | 'api'; code: string; failedAt?: string; retryCount: number; canRetry: boolean }>;
   threads: Array<{ position: number; monitored: boolean; lead: { name: string; status?: string; interestLevel?: string; score?: number } | null; conversationStatus?: string; lastActivityAt?: string; deliveryStatus: string }>;
   alerts: Array<{ severity: 'healthy' | 'warning' | 'error'; code: string; message: string }>;
 }
@@ -47,5 +53,8 @@ export const youtubeService = {
   async getMonitor(): Promise<YouTubeMonitor> {
     const response = await apiClient.get('/youtube/monitor');
     return response.data.data;
+  },
+  async retryMessage(messageId: string): Promise<void> {
+    await apiClient.post(`/youtube/monitor/messages/${messageId}/retry`);
   },
 };

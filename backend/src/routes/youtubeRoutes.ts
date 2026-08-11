@@ -10,5 +10,6 @@ router.get('/oauth/connect', YouTubeController.connect);
 router.get('/status', YouTubeController.status);
 router.get('/diagnostics', YouTubeController.diagnostics);
 router.get('/monitor', YouTubeController.monitor);
+router.post('/monitor/messages/:messageId/retry', YouTubeController.retryMessage);
 router.delete('/connection', YouTubeController.disconnect);
 export default router;

@@ -5,6 +5,7 @@ import { YouTubeOAuthService } from '../integrations/youtube/YouTubeOAuthService
 import { YouTubeTokenService } from '../integrations/youtube/YouTubeTokenService';
 import { OperationalDiagnosticsService } from '../services/OperationalDiagnosticsService';
 import { YouTubeMonitorService } from '../services/YouTubeMonitorService';
+import { MessagingService } from '../services/MessagingService';
 
 export class YouTubeController {
   static connect(req: AuthRequest, res: Response) {
@@ -40,6 +41,11 @@ export class YouTubeController {
 
   static async monitor(req: AuthRequest, res: Response, next: NextFunction) {
     try { res.json({ success: true, data: await YouTubeMonitorService.getForUser(req.userId!) }); } catch (error) { next(error); }
+  }
+
+  static async retryMessage(req: AuthRequest, res: Response) {
+    try { res.json({ success: true, data: await MessagingService.retryFailedYouTube(req.params.messageId, req.userId!) }); }
+    catch (error) { res.status(400).json({ success: false, message: error instanceof Error ? error.message : 'No fue posible reintentar el mensaje' }); }
   }
 
   static async disconnect(req: AuthRequest, res: Response, next: NextFunction) {

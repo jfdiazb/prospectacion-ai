@@ -166,6 +166,13 @@ export interface IHunterProfile {
   score?: number;
   profileUrl?: string;
   tags?: string[];
+  kind?: 'channel' | 'video';
+  youtubeChannelId?: string;
+  youtubeVideoId?: string;
+  channelTitle?: string;
+  thumbnailUrl?: string;
+  views?: number;
+  publishedAt?: string;
 }
 
 export interface IScraperResult {

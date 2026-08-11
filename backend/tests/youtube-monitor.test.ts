@@ -20,4 +20,16 @@ describe('YouTubeMonitorService', () => {
     if (previous === undefined) delete process.env.YOUTUBE_REPLY_MAX_THREADS;
     else process.env.YOUTUBE_REPLY_MAX_THREADS = previous;
   });
+
+  test('classifies OAuth, quota and network failures without exposing messages', () => {
+    expect(YouTubeMonitorService.errorCategory('quotaExceeded')).toBe('quota');
+    expect(YouTubeMonitorService.errorCategory('authError')).toBe('oauth');
+    expect(YouTubeMonitorService.errorCategory('YOUTUBE_TIMEOUT')).toBe('network');
+    expect(YouTubeMonitorService.summarizeErrors([{ errorCode: 'quotaExceeded' }, { errorCode: 'authError' }])).toEqual({ oauth: 1, quota: 1, network: 0, api: 0 });
+  });
+
+  test('alerts when ALMA leaves conversations unanswered', () => {
+    const alerts = YouTubeMonitorService.buildAlerts(1, 8, new Date(), 2, 0);
+    expect(alerts).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'alma_unanswered', severity: 'error' })]));
+  });
 });

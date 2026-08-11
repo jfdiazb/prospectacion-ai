@@ -299,3 +299,19 @@
 - Los hilos se priorizan por la actividad saliente más reciente. `YOUTUBE_REPLY_MAX_THREADS=8` amplía cobertura manteniendo control de cuota; el monitor alerta cuando la demanda supera ese límite.
 - Validación: backend 47/47 pruebas, compilación TypeScript backend, type-check y build frontend correctos.
 - El backend aplica un mínimo de 8 hilos aunque Render conserve temporalmente un valor anterior inferior; la variable sigue permitiendo ampliar la capacidad.
+# YouTube Monitor operativo y recuperación segura — 2026-08-11
+- El monitor autenticado agrega métricas diarias de entrega, fecha del último evento entrante procesado y detección de conversaciones activas cuyo mensaje más reciente pertenece al prospecto y excede `YOUTUBE_RESPONSE_ALERT_MINUTES`.
+- Los últimos fallos se agrupan en `oauth`, `quota`, `network` y `api`. La respuesta no contiene texto, destinatario, comentario ni ID externo; solo entrega un ID interno del mensaje autorizado para reintento.
+- `POST /api/v1/youtube/monitor/messages/:messageId/retry` exige JWT y propiedad del mensaje, solo acepta `youtube_reply` fallidos, limita a tres intentos y aplica un minuto de enfriamiento. Los códigos ambiguos de timeout/unknown requieren revisión manual porque YouTube pudo haber publicado aunque la respuesta HTTP no llegara.
+- La cuota mostrada calcula como mínimo 50 unidades por respuesta `sent` del día UTC. No intenta sustituir el contador de Google Cloud ni atribuir lecturas históricas que no fueron persistidas. Defaults: `YOUTUBE_DAILY_QUOTA=10000` y `YOUTUBE_RESPONSE_ALERT_MINUTES=10`.
+- Validación: prueba enfocada 5/5, suite backend 49/49, compilaciones backend/frontend y type-check frontend correctos.
+# Lead Hunter oficial y navegación del Dashboard — 2026-08-11
+- `POST /api/v1/lead-hunter/search` valida términos, consulta únicamente al pulsar Buscar y soporta `channel|video`, mínimo/máximo de suscriptores, región, fecha y paginación. En live usa el token OAuth cifrado del usuario; en mock devuelve un resultado claramente identificado sin red.
+- La integración consulta `search.list` y enriquece los canales con `channels.list`. Google aplica actualmente un cupo granular predeterminado de 100 llamadas diarias para búsqueda y 1 unidad general para el enriquecimiento; `YouTubeQuotaUsage` conserva contadores por proyecto y usuario.
+- `HunterSearchCache` evita repetir llamadas idénticas durante seis horas. `HunterOpportunity` aísla oportunidades por `userId`; `POST /opportunities` guarda y `POST /opportunities/:id/convert` crea o reutiliza el lead YouTube correspondiente.
+- El Dashboard enlaza las acciones rápidas, tarjetas principales, botón Ver todos y tarjetas de prospectos calientes con `/lead-hunter`, `/youtube-monitor`, `/crm` o `/prospectos`.
+- Producción conserva `YOUTUBE_HUNTER_MODE=mock` hasta una activación explícita. Validación: 51/51 pruebas backend, build backend/frontend y type-check frontend correctos.
+# Límite actual y evolución multi-tenant — 2026-08-11
+- El límite preventivo individual de Lead Hunter sube de 10 a 25 búsquedas nuevas diarias para el único operador actual; el máximo global permanece en 100 y las consultas servidas desde caché no incrementan el contador.
+- La fase comercial debe introducir `Organization`, membresías y planes; la cuota del Hunter se asignará por organización, no por prospecto ni por usuario aislado, y cada documento operativo deberá incluir `organizationId` además del propietario.
+- `YOUTUBE_HUNTER_USER_DAILY_SEARCH_LIMIT=25` queda documentado y declarado en Render sin activar todavía `YOUTUBE_HUNTER_MODE=live`.

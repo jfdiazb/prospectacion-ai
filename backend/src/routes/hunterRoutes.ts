@@ -9,5 +9,8 @@ router.use(authMiddleware, apiLimiter);
 
 router.post('/search', HunterController.searchProfiles);
 router.post('/enrich', HunterController.enrichProfile);
+router.get('/opportunities', HunterController.listOpportunities);
+router.post('/opportunities', HunterController.saveOpportunity);
+router.post('/opportunities/:id/convert', HunterController.convertOpportunity);
 
 export default router;
