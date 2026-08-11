@@ -1,5 +1,11 @@
 # AGENTS.md
 
+## Diagnóstico visible de comentarios principales — 2026-08-11
+- Configuración separa ahora el último ciclo de comentarios principales del sondeo de respuestas en hilos existentes.
+- El panel muestra comentarios recibidos, candidatos posteriores al corte, procesados, inválidos, del canal propio, no elegibles y duplicados, además de los hilos devueltos y la hora de corte.
+- Los datos provienen de `lastPollingSummary`; no se exponen textos, usuarios ni identificadores externos.
+- Validación vigente: type-check y compilación de producción frontend correctos.
+
 ## Automatizaciones ejecutables por palabra clave — 2026-08-11
 - Los comentarios y respuestas de YouTube consultan las automatizaciones activas del propietario; una coincidencia puede captar un lead nuevo aunque la palabra no sea `INFO`.
 - La coincidencia exige palabras completas, ignora mayúsculas y tildes y selecciona de forma determinista la regla activa más antigua cuando varias coinciden.

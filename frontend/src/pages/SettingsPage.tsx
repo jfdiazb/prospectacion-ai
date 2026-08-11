@@ -157,6 +157,28 @@ export const SettingsPage = () => {
                 </div>
               </div>
 
+              <div className="rounded-3xl border border-dark-700 bg-dark-900 p-5">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="font-medium text-white">Comentarios principales</p>
+                    <p className="text-sm text-dark-400">Último ciclo del poller principal; no incluye respuestas dentro de hilos existentes.</p>
+                  </div>
+                  <p className="text-xs text-dark-500">Corte: {formatDiagnosticDate(diagnostics.youtube.polling?.cutoffAt)}</p>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+                  <DiagnosticMetric label="Recibidos" value={diagnostics.youtube.polling?.topLevelComments ?? 0} />
+                  <DiagnosticMetric label="Candidatos" value={diagnostics.youtube.polling?.afterCutoff ?? 0} />
+                  <DiagnosticMetric label="Procesados" value={diagnostics.youtube.polling?.processed ?? 0} tone="success" />
+                  <DiagnosticMetric label="Inválidos" value={diagnostics.youtube.polling?.invalid ?? 0} />
+                  <DiagnosticMetric label="Canal propio" value={diagnostics.youtube.polling?.own_channel ?? 0} />
+                  <DiagnosticMetric label="No elegibles" value={diagnostics.youtube.polling?.not_eligible ?? 0} tone="warning" />
+                  <DiagnosticMetric label="Duplicados" value={diagnostics.youtube.polling?.duplicate ?? 0} />
+                </div>
+                <p className="mt-3 text-xs text-dark-500">
+                  YouTube devolvió {diagnostics.youtube.polling?.receivedThreads ?? 0} hilos en este ciclo.
+                </p>
+              </div>
+
               <div className="grid gap-3">
                 {diagnostics.alerts.map(alert => {
                   const warning = alert.severity === 'warning' || alert.severity === 'error';
@@ -182,3 +204,11 @@ export const SettingsPage = () => {
 const formatDiagnosticDate = (value?: string) => value
   ? new Intl.DateTimeFormat('es-CO', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Bogota' }).format(new Date(value))
   : 'Sin datos';
+
+const DiagnosticMetric = ({ label, value, tone = 'default' }: { label: string; value: number; tone?: 'default' | 'success' | 'warning' }) => {
+  const valueTone = tone === 'success' ? 'text-emerald-300' : tone === 'warning' ? 'text-amber-300' : 'text-white';
+  return <div className="rounded-2xl bg-dark-800 p-3">
+    <p className={`text-xl font-semibold ${valueTone}`}>{value}</p>
+    <p className="mt-1 text-xs text-dark-400">{label}</p>
+  </div>;
+};

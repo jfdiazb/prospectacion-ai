@@ -335,3 +335,8 @@
 - `/automatizaciones` deja de usar tarjetas estáticas. El nuevo router JWT `/api/v1/automations` lista y crea flujos, y permite `PATCH /:id/toggle` y `DELETE /:id`; todas las operaciones filtran por `userId`.
 - El formulario inicial de automatización define nombre, palabra clave y mensaje `send_message`. Guardar un flujo no lo ejecuta retroactivamente ni publica mensajes; solamente persiste la configuración activa.
 - Configuración dirige el cambio de contraseña a `/profile`, donde ya existen validación y endpoint funcionales.
+# Diagnóstico visible de comentarios principales — 2026-08-11
+- `/configuracion` muestra por separado la telemetría de comentarios principales y la de respuestas dentro de hilos.
+- El bloque principal consume `youtube.polling` de `GET /api/v1/youtube/diagnostics`: hilos recibidos, comentarios extraídos, candidatos posteriores al corte y resultados `processed`, `invalid`, `own_channel`, `not_eligible` y `duplicate`.
+- La separación permite localizar el filtro que detuvo un comentario nuevo sin mostrar contenido ni identificadores de YouTube.
+- Validación: type-check y build de producción frontend correctos.
