@@ -11,7 +11,7 @@ export interface OperationalDiagnostics {
     connected: boolean; channelTitle?: string; lastPolledAt?: string; lastRepliesPolledAt?: string;
     polling?: {
       receivedThreads?: number; topLevelComments?: number; cutoffAt?: string; afterCutoff?: number;
-      processed?: number; invalid?: number; own_channel?: number; not_eligible?: number; duplicate?: number;
+      processed?: number; processing_failed?: number; invalid?: number; own_channel?: number; not_eligible?: number; duplicate?: number;
       recordedAt?: string;
     };
     replies?: { activeThreads?: number; replies?: number; processed?: number; not_eligible?: number; duplicate?: number };

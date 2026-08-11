@@ -9,6 +9,11 @@ const inboundEventSchema = new Schema({
   text: String,
   mediaId: String,
   matchedKeyword: String,
+  processingState: { type: String, enum: ['processing', 'completed', 'failed'] },
+  processingStartedAt: Date,
+  processingAttempts: { type: Number, default: 0 },
+  retryAfter: Date,
+  processingFailedAt: Date,
   processedAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 

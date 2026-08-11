@@ -165,10 +165,11 @@ export const SettingsPage = () => {
                   </div>
                   <p className="text-xs text-dark-500">Corte: {formatDiagnosticDate(diagnostics.youtube.polling?.cutoffAt)}</p>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
                   <DiagnosticMetric label="Recibidos" value={diagnostics.youtube.polling?.topLevelComments ?? 0} />
                   <DiagnosticMetric label="Candidatos" value={diagnostics.youtube.polling?.afterCutoff ?? 0} />
                   <DiagnosticMetric label="Procesados" value={diagnostics.youtube.polling?.processed ?? 0} tone="success" />
+                  <DiagnosticMetric label="Error de proceso" value={diagnostics.youtube.polling?.processing_failed ?? 0} tone="warning" />
                   <DiagnosticMetric label="Inválidos" value={diagnostics.youtube.polling?.invalid ?? 0} />
                   <DiagnosticMetric label="Canal propio" value={diagnostics.youtube.polling?.own_channel ?? 0} />
                   <DiagnosticMetric label="No elegibles" value={diagnostics.youtube.polling?.not_eligible ?? 0} tone="warning" />

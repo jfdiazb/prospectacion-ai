@@ -340,3 +340,8 @@
 - El bloque principal consume `youtube.polling` de `GET /api/v1/youtube/diagnostics`: hilos recibidos, comentarios extraídos, candidatos posteriores al corte y resultados `processed`, `invalid`, `own_channel`, `not_eligible` y `duplicate`.
 - La separación permite localizar el filtro que detuvo un comentario nuevo sin mostrar contenido ni identificadores de YouTube.
 - Validación: type-check y build de producción frontend correctos.
+# Recuperación de eventos YouTube interrumpidos — 2026-08-11
+- Los comentarios de YouTube atraviesan `processingState=processing|completed|failed`, con `processingAttempts`, inicio, fallo y `retryAfter` persistidos en `InboundEvent`.
+- Un fallo anterior a `OutboundMessage` se reintenta después de un minuto; si ya existe una salida para `sourceEventId`, el evento permanece idempotente y se clasifica como duplicado.
+- Los eventos heredados sin estado ni salida pueden ser retomados si el solapamiento del poller vuelve a entregarlos. El resumen del ciclo muestra `processing_failed` sin exponer contenido ni IDs.
+- Validación: suite backend 55/55 y builds backend/frontend correctos.

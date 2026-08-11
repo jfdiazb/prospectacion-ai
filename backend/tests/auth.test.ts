@@ -17,6 +17,7 @@ import OutboundMessage from '../src/models/OutboundMessage';
 import Meeting from '../src/models/Meeting';
 import AutomationFlow from '../src/models/AutomationFlow';
 import { YouTubeIngestionService } from '../src/services/YouTubeIngestionService';
+import { AlmaService } from '../src/services/AlmaService';
 import { MessagingService } from '../src/services/MessagingService';
 import { MessagingProviderError, type MessagingProvider } from '../src/integrations/messaging';
 
@@ -292,6 +293,26 @@ describe('Auth integration tests', () => {
     expect(updatedFlow?.executionStats?.failedExecutions).toBe(0);
     expect(await Activity.findOne({ leadId: lead!._id, 'metadata.automationFlowId': flow._id.toString() })).toBeTruthy();
     expect(await Task.countDocuments({ leadId: lead!._id, status: 'pending' })).toBe(1);
+  });
+
+  test('recovers a claimed YouTube comment when processing failed before an outbound message existed', async () => {
+    await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'youtube-recovery@example.com', password: 'password123', fullName: 'Recovery Owner' });
+    const owner = await User.findOne({ email: 'youtube-recovery@example.com' });
+    const service = new YouTubeIngestionService();
+    const comment = { id: 'youtube-recovery-1', snippet: { textOriginal: 'INFO ALMA', authorDisplayName: 'Recovery Lead', authorChannelId: { value: 'recovery-channel' }, videoId: 'video-recovery' } };
+    const almaFailure = jest.spyOn(AlmaService, 'processMessage').mockRejectedValueOnce(new Error('simulated interruption'));
+
+    expect(await service.processComment(owner!._id.toString(), comment, comment.id, 'owner-channel')).toBe('processing_failed');
+    const failedEvent = await InboundEvent.findOne({ externalEventId: 'youtube:youtube-recovery-1' });
+    expect(failedEvent).toMatchObject({ processingState: 'failed', processingAttempts: 1 });
+    expect(await OutboundMessage.countDocuments({ sourceEventId: 'youtube:youtube-recovery-1' })).toBe(0);
+
+    almaFailure.mockRestore();
+    await InboundEvent.updateOne({ _id: failedEvent!._id }, { retryAfter: new Date(Date.now() - 1000) });
+    expect(await service.processComment(owner!._id.toString(), comment, comment.id, 'owner-channel')).toBe('processed');
+    expect(await service.processComment(owner!._id.toString(), comment, comment.id, 'owner-channel')).toBe('duplicate');
+    expect(await InboundEvent.findById(failedEvent!._id)).toMatchObject({ processingState: 'completed', processingAttempts: 2 });
+    expect(await OutboundMessage.countDocuments({ sourceEventId: 'youtube:youtube-recovery-1' })).toBe(1);
   });
 
   test('an already claimed comment does not create a lead or outbound message', async () => {

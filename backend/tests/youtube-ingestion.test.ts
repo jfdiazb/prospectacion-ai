@@ -76,7 +76,7 @@ describe('YouTubeIngestionService polling cursor', () => {
 
     expect(info).toHaveBeenCalledWith('YouTube credential polling summary', expect.objectContaining({
       receivedThreads: 2, topLevelComments: 2, afterCutoff: 1, processed: 1,
-      invalid: 0, own_channel: 0, not_eligible: 0, duplicate: 0,
+      processing_failed: 0, invalid: 0, own_channel: 0, not_eligible: 0, duplicate: 0,
     }));
     const logged = info.mock.calls[0][1] as Record<string, unknown>;
     expect(logged).not.toHaveProperty('userId');

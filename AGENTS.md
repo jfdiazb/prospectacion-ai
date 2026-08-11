@@ -1,5 +1,11 @@
 # AGENTS.md
 
+## Recuperación de eventos YouTube interrumpidos — 2026-08-11
+- `InboundEvent` registra ahora estado, intentos y ventana de reintento para comentarios de YouTube; una reclamación ya no equivale automáticamente a procesamiento completo.
+- Si ALMA falla antes de crear el mensaje saliente, el evento queda `failed` y puede retomarse después de un minuto. Los eventos heredados sin salida también pueden recuperarse cuando vuelven a aparecer dentro de la ventana del poller.
+- La existencia única de `OutboundMessage.sourceEventId` sigue impidiendo publicaciones dobles; el diagnóstico incorpora `processing_failed` como error de proceso separado.
+- Validación vigente: 55/55 pruebas backend y compilaciones backend/frontend correctas.
+
 ## Diagnóstico visible de comentarios principales — 2026-08-11
 - Configuración separa ahora el último ciclo de comentarios principales del sondeo de respuestas en hilos existentes.
 - El panel muestra comentarios recibidos, candidatos posteriores al corte, procesados, inválidos, del canal propio, no elegibles y duplicados, además de los hilos devueltos y la hora de corte.

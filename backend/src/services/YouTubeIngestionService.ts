@@ -12,7 +12,7 @@ import { YouTubeTokenService } from '../integrations/youtube/YouTubeTokenService
 type TopComment = { id: string; snippet?: { textOriginal?: string; authorDisplayName?: string; authorChannelId?: { value?: string }; videoId?: string; publishedAt?: string } };
 type ThreadResponse = { items?: Array<{ snippet?: { topLevelComment?: TopComment } }> };
 type CommentListResponse = { items?: TopComment[]; nextPageToken?: string };
-type CommentProcessingResult = 'processed' | 'invalid' | 'own_channel' | 'not_eligible' | 'duplicate';
+type CommentProcessingResult = 'processed' | 'processing_failed' | 'invalid' | 'own_channel' | 'not_eligible' | 'duplicate';
 type ReplyPollingSummary = Record<CommentProcessingResult, number> & {
   outboundCandidates: number;
   activeThreads: number;
@@ -37,7 +37,7 @@ export class YouTubeIngestionService {
     const response = await this.http.get<ThreadResponse>(`https://www.googleapis.com/youtube/v3/commentThreads?${params}`, { headers: { Authorization: `Bearer ${token}` }, timeout: Number(process.env.YOUTUBE_TIMEOUT_MS || 10000) });
     const cutoff = YouTubeIngestionService.getPollingCutoff(credential);
     const comments = (response.data.items ?? []).map(item => item.snippet?.topLevelComment).filter((item): item is TopComment => Boolean(item));
-    const summary: Record<CommentProcessingResult, number> = { processed: 0, invalid: 0, own_channel: 0, not_eligible: 0, duplicate: 0 };
+    const summary: Record<CommentProcessingResult, number> = { processed: 0, processing_failed: 0, invalid: 0, own_channel: 0, not_eligible: 0, duplicate: 0 };
     let afterCutoff = 0;
     comments.sort((a, b) => new Date(a.snippet?.publishedAt ?? 0).getTime() - new Date(b.snippet?.publishedAt ?? 0).getTime());
     for (const comment of comments) {
@@ -83,13 +83,14 @@ export class YouTubeIngestionService {
     const threadIds = [...new Set(recent.map((item: any) => item.recipientId).filter(Boolean))].slice(0, maxThreads);
     const summary: ReplyPollingSummary = {
       outboundCandidates: recent.length, activeThreads: threadIds.length, pages: 0, replies: 0,
-      processed: 0, invalid: 0, own_channel: 0, not_eligible: 0, duplicate: 0,
+      processed: 0, processing_failed: 0, invalid: 0, own_channel: 0, not_eligible: 0, duplicate: 0,
     };
     for (const threadId of threadIds) {
       const threadSummary = await this.pollThreadReplies(credential, token, threadId);
       summary.pages += threadSummary.pages;
       summary.replies += threadSummary.replies;
       summary.processed += threadSummary.processed;
+      summary.processing_failed += threadSummary.processing_failed;
       summary.invalid += threadSummary.invalid;
       summary.own_channel += threadSummary.own_channel;
       summary.not_eligible += threadSummary.not_eligible;
@@ -100,7 +101,7 @@ export class YouTubeIngestionService {
 
   async pollThreadReplies(credential: any, token: string, threadId: string): Promise<Omit<ReplyPollingSummary, 'outboundCandidates' | 'activeThreads'>> {
     let pageToken: string | undefined;
-    const summary = { pages: 0, replies: 0, processed: 0, invalid: 0, own_channel: 0, not_eligible: 0, duplicate: 0 };
+    const summary = { pages: 0, replies: 0, processed: 0, processing_failed: 0, invalid: 0, own_channel: 0, not_eligible: 0, duplicate: 0 };
     do {
       const params = new URLSearchParams({ part: 'snippet', parentId: threadId, maxResults: '100', textFormat: 'plainText' });
       if (pageToken) params.set('pageToken', pageToken);
@@ -138,10 +139,10 @@ export class YouTubeIngestionService {
     const automationReply = AutomationService.getReply(automation);
     const existingLead = await Lead.findOne({ userId, username: senderId, platform: 'youtube' });
     if (!existingLead && !hasInfoKeyword && !automationReply) return 'not_eligible';
-    const claimed: any = await InboundEvent.findOneAndUpdate({ externalEventId: `youtube:${comment.id}` }, { $setOnInsert: {
-      userId, externalEventId: `youtube:${comment.id}`, channel: 'youtube', eventType: 'comment', senderId, text, mediaId: comment.snippet?.videoId, matchedKeyword: automation?.trigger?.keyword || (hasInfoKeyword ? 'INFO' : undefined),
-    } }, { upsert: true, new: true, includeResultMetadata: true });
-    if (claimed.lastErrorObject?.updatedExisting || !claimed.value) return 'duplicate';
+    const sourceEventId = `youtube:${comment.id}`;
+    const claimed = await this.claimComment({ userId, sourceEventId, senderId, text, mediaId: comment.snippet?.videoId, matchedKeyword: automation?.trigger?.keyword || (hasInfoKeyword ? 'INFO' : undefined) });
+    if (!claimed) return 'duplicate';
+    try {
     let lead = existingLead;
     const isNewLead = !lead;
     if (!lead) {
@@ -152,8 +153,39 @@ export class YouTubeIngestionService {
     if (!lead) throw new Error('No fue posible crear el lead de YouTube');
     const conversation = await ConversationService.getOrCreateConversation(userId, lead._id.toString());
     await ConversationService.addMessage(conversation._id.toString(), userId, { sender: 'lead', text, platform: 'youtube' });
-    await AlmaService.processMessage({ userId, leadId: lead._id.toString(), conversationId: conversation._id.toString(), text, isNewLead, platform: 'youtube', sourceEventId: `youtube:${comment.id}`, recipient: { type: 'youtube_comment', parentCommentId: responseParentId }, automation: automation && automationReply ? { flowId: automation._id.toString(), response: automationReply } : undefined });
+    await AlmaService.processMessage({ userId, leadId: lead._id.toString(), conversationId: conversation._id.toString(), text, isNewLead, platform: 'youtube', sourceEventId, recipient: { type: 'youtube_comment', parentCommentId: responseParentId }, automation: automation && automationReply ? { flowId: automation._id.toString(), response: automationReply } : undefined });
+    await InboundEvent.updateOne({ _id: claimed._id }, { $set: { processingState: 'completed', processedAt: new Date() }, $unset: { retryAfter: 1, processingFailedAt: 1 } });
     return 'processed';
+    } catch (error) {
+      const retryDelayMs = Math.max(60000, Number(process.env.YOUTUBE_EVENT_RETRY_DELAY_MS || 60000));
+      await InboundEvent.updateOne({ _id: claimed._id }, { $set: { processingState: 'failed', processingFailedAt: new Date(), retryAfter: new Date(Date.now() + retryDelayMs) } });
+      console.error('YouTube comment processing failed', { attempt: claimed.processingAttempts, message: error instanceof Error ? error.message : 'unknown' });
+      return 'processing_failed';
+    }
+  }
+
+  private async claimComment(input: { userId: string; sourceEventId: string; senderId: string; text: string; mediaId?: string; matchedKeyword?: string }): Promise<any | null> {
+    const now = new Date();
+    const initialClaim: any = await InboundEvent.findOneAndUpdate({ externalEventId: input.sourceEventId }, { $setOnInsert: {
+        userId: input.userId, externalEventId: input.sourceEventId, channel: 'youtube', eventType: 'comment',
+        senderId: input.senderId, text: input.text, mediaId: input.mediaId, matchedKeyword: input.matchedKeyword,
+        processingState: 'processing', processingStartedAt: now, processingAttempts: 1,
+      } }, { upsert: true, new: true, includeResultMetadata: true });
+    if (!initialClaim.lastErrorObject?.updatedExisting) return initialClaim.value;
+
+    if (await OutboundMessage.exists({ sourceEventId: input.sourceEventId })) return null;
+    const legacyRetryAt = new Date(now.getTime() - Math.max(60000, Number(process.env.YOUTUBE_EVENT_RETRY_DELAY_MS || 60000)));
+    const claimed = await InboundEvent.findOneAndUpdate({
+      externalEventId: input.sourceEventId,
+      $or: [
+        { processingState: 'failed', retryAfter: { $lte: now } },
+        { processingState: { $exists: false }, createdAt: { $lte: legacyRetryAt } },
+      ],
+    }, {
+      $set: { processingState: 'processing', processingStartedAt: now },
+      $inc: { processingAttempts: 1 },
+    }, { new: true });
+    return claimed;
   }
 }
 
