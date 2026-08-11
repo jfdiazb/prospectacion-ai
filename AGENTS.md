@@ -1,5 +1,12 @@
 # AGENTS.md
 
+## Automatizaciones ejecutables por palabra clave — 2026-08-11
+- Los comentarios y respuestas de YouTube consultan las automatizaciones activas del propietario; una coincidencia puede captar un lead nuevo aunque la palabra no sea `INFO`.
+- La coincidencia exige palabras completas, ignora mayúsculas y tildes y selecciona de forma determinista la regla activa más antigua cuando varias coinciden.
+- ALMA usa la respuesta configurada como salida del mismo flujo de calificación, seguimiento, conversación y reunión; no genera una segunda respuesta IA para el evento.
+- `InboundEvent` y `OutboundMessage` mantienen idempotencia. Cada regla contabiliza ejecuciones totales, exitosas y fallidas, visibles en Automatizaciones.
+- Validación vigente: compilaciones backend/frontend, type-check frontend y 54/54 pruebas backend.
+
 ## Buscador global y alertas funcionales — 2026-08-11
 - La barra superior busca prospectos por usuario, nombre, descripción o canal y abre `/prospectos?buscar=...`; Prospectos aplica el filtro y permite limpiarlo.
 - Alertas consulta las tareas CRM y muestra las pendientes ordenadas por vencimiento, con contador y acceso directo al CRM.

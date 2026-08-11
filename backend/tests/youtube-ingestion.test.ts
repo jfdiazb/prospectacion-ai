@@ -1,6 +1,13 @@
 import { YouTubeIngestionService } from '../src/services/YouTubeIngestionService';
+import { AutomationService } from '../src/services/AutomationService';
 
 describe('YouTubeIngestionService polling cursor', () => {
+  test('matches complete automation keywords without accents or partial words', () => {
+    expect(AutomationService.textMatchesKeyword('Quiero la guia, por favor', 'GUÍA')).toBe(true);
+    expect(AutomationService.textMatchesKeyword('Quiero información', 'INFO')).toBe(false);
+    expect(AutomationService.textMatchesKeyword('INFO ALMA', 'INFO')).toBe(true);
+  });
+
   const originalOverlap = process.env.YOUTUBE_POLL_OVERLAP_MS;
   const originalReplyInterval = process.env.YOUTUBE_REPLY_POLL_INTERVAL_MS;
 

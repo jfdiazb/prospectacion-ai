@@ -55,6 +55,8 @@ const automationFlowSchema = new Schema(
     },
     executionStats: {
       totalExecutions: { type: Number, default: 0 },
+      successfulExecutions: { type: Number, default: 0 },
+      failedExecutions: { type: Number, default: 0 },
       lastExecution: Date,
       nextExecution: Date,
     },

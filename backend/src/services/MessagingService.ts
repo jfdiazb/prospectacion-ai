@@ -4,7 +4,7 @@ import { getMessagingProvider, MessagingProviderError, type MessagingProvider, t
 type SendContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; recipient: MessagingRecipient };
 
 export class MessagingService {
-  static async send(context: SendContext, provider?: MessagingProvider): Promise<void> {
+  static async send(context: SendContext, provider?: MessagingProvider): Promise<'sent' | 'simulated' | 'failed' | 'duplicate'> {
     const channel = context.recipient.type === 'youtube_comment' ? 'youtube' : context.recipient.type === 'whatsapp_user' ? 'whatsapp' : 'instagram';
     const selectedProvider = provider ?? getMessagingProvider(channel);
     const recipientId = context.recipient.type === 'comment' ? context.recipient.commentId
@@ -18,15 +18,17 @@ export class MessagingService {
         text: context.text, deliveryStatus: 'pending', provider: selectedProvider.name, recipientId,
         commentId: context.recipient.type === 'comment' ? context.recipient.commentId : undefined });
     } catch (error: any) {
-      if (error?.code === 11000) return;
+      if (error?.code === 11000) return 'duplicate';
       throw error;
     }
     try {
       const result = await selectedProvider.sendMessage({ userId: context.userId, text: context.text, recipient: context.recipient });
       await OutboundMessage.updateOne({ _id: outbound._id }, { deliveryStatus: result.simulated ? 'simulated' : 'sent', externalMessageId: result.externalMessageId, sentAt: new Date(), simulatedDelivery: result.simulated });
+      return result.simulated ? 'simulated' : 'sent';
     } catch (error) {
       const providerError = error instanceof MessagingProviderError ? error : new MessagingProviderError('Error inesperado de mensajería', 'MESSAGING_UNKNOWN_ERROR');
       await OutboundMessage.updateOne({ _id: outbound._id }, { deliveryStatus: 'failed', failedAt: new Date(), errorCode: providerError.code, errorMessage: providerError.message, simulatedDelivery: false });
+      return 'failed';
     }
   }
 

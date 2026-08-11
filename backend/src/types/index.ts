@@ -100,6 +100,7 @@ export interface IAutomationFlow {
   trigger: {
     type: string;
     keyword?: string;
+    keywords?: string[];
   };
   actions: IAction[];
   schedule?: {
@@ -107,6 +108,13 @@ export interface IAutomationFlow {
     daysOfWeek?: number[];
   };
   isActive: boolean;
+  executionStats?: {
+    totalExecutions?: number;
+    successfulExecutions?: number;
+    failedExecutions?: number;
+    lastExecution?: Date;
+    nextExecution?: Date;
+  };
   createdAt?: Date;
   updatedAt?: Date;
 }

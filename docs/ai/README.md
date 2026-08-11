@@ -1,5 +1,12 @@
 # Documentación AI - Prospectación AI
 
+## Automatizaciones ejecutables de YouTube — 2026-08-11
+- `YouTubeIngestionService` busca una automatización `keyword` activa antes de descartar un comentario de un canal todavía desconocido. Esto permite palabras de captación distintas de `INFO`.
+- `AutomationService.textMatchesKeyword` normaliza mayúsculas y diacríticos, pero exige límites de palabra para evitar que `INFO` coincida accidentalmente con `información`.
+- La acción `send_message` sustituye solo la primera generación IA: `AlmaService` conserva calificación, tareas, actividad, conversación y orquestación de reuniones, y `MessagingService` realiza una única entrega idempotente.
+- Las métricas `totalExecutions`, `successfulExecutions`, `failedExecutions` y `lastExecution` se actualizan según el resultado de entrega y se muestran en `/automatizaciones`.
+- Validación: 54/54 pruebas backend, compilación TypeScript backend, type-check y build frontend correctos.
+
 ## Buscador global y alertas funcionales — 2026-08-11
 - El buscador de la barra superior envía la consulta a `/prospectos?buscar=...`; la vista filtra los leads cargados por usuario, nombre, biografía o plataforma y ofrece limpiar el filtro.
 - El botón Alertas carga `/api/v1/crm/tasks`, contabiliza tareas pendientes, las ordena por vencimiento y abre un panel resumido con navegación al CRM.

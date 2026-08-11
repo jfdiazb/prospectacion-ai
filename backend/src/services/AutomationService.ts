@@ -4,6 +4,32 @@
  * Servicio de Automatizaciones
  */
 export class AutomationService {
+  static normalizeKeyword(value: string): string {
+    return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').trim();
+  }
+
+  static textMatchesKeyword(text: string, keyword: string): boolean {
+    const normalizedText = this.normalizeKeyword(text);
+    const normalizedKeyword = this.normalizeKeyword(keyword);
+    if (!normalizedKeyword) return false;
+    const escaped = normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^\\p{L}\\p{N}_])${escaped}([^\\p{L}\\p{N}_]|$)`, 'u').test(normalizedText);
+  }
+
+  static async findMatchingKeywordFlow(userId: string, text: string): Promise<any | null> {
+    const flows = await AutomationFlow.find({ userId, isActive: true, 'trigger.type': 'keyword' }).sort({ createdAt: 1 });
+    return flows.find(flow => {
+      const keywords = [...(flow.trigger?.keywords ?? []), flow.trigger?.keyword]
+        .filter((keyword: string | undefined): keyword is string => Boolean(keyword));
+      return keywords.some(keyword => this.textMatchesKeyword(text, keyword));
+    }) ?? null;
+  }
+
+  static getReply(flow: any): string | null {
+    const action = flow?.actions?.find((item: any) => item.type === 'send_message' && item.message?.trim());
+    return action?.message?.trim() ?? null;
+  }
+
   /**
    * Crear flujo de automatizaciÃ³n
    */
@@ -72,9 +98,9 @@ export class AutomationService {
   /**
    * Registrar ejecuciÃ³n de flujo
    */
-  static async recordExecution(flowId: string): Promise<void> {
-    await AutomationFlow.findByIdAndUpdate(flowId, {
-      $inc: { 'executionStats.totalExecutions': 1 },
+  static async recordExecution(flowId: string, userId: string, successful: boolean): Promise<void> {
+    await AutomationFlow.findOneAndUpdate({ _id: flowId, userId }, {
+      $inc: { 'executionStats.totalExecutions': 1, [`executionStats.${successful ? 'successfulExecutions' : 'failedExecutions'}`]: 1 },
       $set: { 'executionStats.lastExecution': new Date() },
     });
   }

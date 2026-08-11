@@ -6,6 +6,7 @@ import OutboundMessage from '../models/OutboundMessage';
 import { LeadService } from './LeadService';
 import { ConversationService } from './ConversationService';
 import { AlmaService } from './AlmaService';
+import { AutomationService } from './AutomationService';
 import { YouTubeTokenService } from '../integrations/youtube/YouTubeTokenService';
 
 type TopComment = { id: string; snippet?: { textOriginal?: string; authorDisplayName?: string; authorChannelId?: { value?: string }; videoId?: string; publishedAt?: string } };
@@ -133,22 +134,25 @@ export class YouTubeIngestionService {
     if (!text || !senderId || !comment.id) return 'invalid';
     if (ownChannelId && senderId === ownChannelId) return 'own_channel';
     const hasInfoKeyword = /(^|\s)info(\s|$)/i.test(text);
+    const automation = await AutomationService.findMatchingKeywordFlow(userId, text);
+    const automationReply = AutomationService.getReply(automation);
     const existingLead = await Lead.findOne({ userId, username: senderId, platform: 'youtube' });
-    if (!existingLead && !hasInfoKeyword) return 'not_eligible';
+    if (!existingLead && !hasInfoKeyword && !automationReply) return 'not_eligible';
     const claimed: any = await InboundEvent.findOneAndUpdate({ externalEventId: `youtube:${comment.id}` }, { $setOnInsert: {
-      userId, externalEventId: `youtube:${comment.id}`, channel: 'youtube', eventType: 'comment', senderId, text, mediaId: comment.snippet?.videoId, matchedKeyword: hasInfoKeyword ? 'INFO' : undefined,
+      userId, externalEventId: `youtube:${comment.id}`, channel: 'youtube', eventType: 'comment', senderId, text, mediaId: comment.snippet?.videoId, matchedKeyword: automation?.trigger?.keyword || (hasInfoKeyword ? 'INFO' : undefined),
     } }, { upsert: true, new: true, includeResultMetadata: true });
     if (claimed.lastErrorObject?.updatedExisting || !claimed.value) return 'duplicate';
     let lead = existingLead;
     const isNewLead = !lead;
     if (!lead) {
-      const created = await LeadService.createLead(userId, { username: senderId, fullName: comment.snippet?.authorDisplayName, platform: 'youtube', source: 'youtube_info', status: 'new', tags: ['INFO'] });
+      const keyword = automation?.trigger?.keyword || 'INFO';
+      const created = await LeadService.createLead(userId, { username: senderId, fullName: comment.snippet?.authorDisplayName, platform: 'youtube', source: automation ? 'youtube_automation' : 'youtube_info', status: 'new', tags: [keyword] });
       lead = await Lead.findById(created._id);
     }
     if (!lead) throw new Error('No fue posible crear el lead de YouTube');
     const conversation = await ConversationService.getOrCreateConversation(userId, lead._id.toString());
     await ConversationService.addMessage(conversation._id.toString(), userId, { sender: 'lead', text, platform: 'youtube' });
-    await AlmaService.processMessage({ userId, leadId: lead._id.toString(), conversationId: conversation._id.toString(), text, isNewLead, platform: 'youtube', sourceEventId: `youtube:${comment.id}`, recipient: { type: 'youtube_comment', parentCommentId: responseParentId } });
+    await AlmaService.processMessage({ userId, leadId: lead._id.toString(), conversationId: conversation._id.toString(), text, isNewLead, platform: 'youtube', sourceEventId: `youtube:${comment.id}`, recipient: { type: 'youtube_comment', parentCommentId: responseParentId }, automation: automation && automationReply ? { flowId: automation._id.toString(), response: automationReply } : undefined });
     return 'processed';
   }
 }

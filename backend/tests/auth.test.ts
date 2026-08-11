@@ -15,6 +15,8 @@ import Activity from '../src/models/Activity';
 import Task from '../src/models/Task';
 import OutboundMessage from '../src/models/OutboundMessage';
 import Meeting from '../src/models/Meeting';
+import AutomationFlow from '../src/models/AutomationFlow';
+import { YouTubeIngestionService } from '../src/services/YouTubeIngestionService';
 import { MessagingService } from '../src/services/MessagingService';
 import { MessagingProviderError, type MessagingProvider } from '../src/integrations/messaging';
 
@@ -262,6 +264,34 @@ describe('Auth integration tests', () => {
       entry: [{ changes: [{ field: 'messages', value: { sender: { id: 'instagram-user-1' }, message: { mid: cancellationEventId, text: 'Cancela la reunion anterior' }, platform: 'instagram' } }] }],
     }, { headers: { 'x-alma-mock-event': 'true', 'Content-Type': 'application/json' } });
     expect(await Meeting.findOne({ leadId: lead!._id })).toMatchObject({ status: 'cancelled' });
+  });
+
+  test('executes an active YouTube keyword automation once and continues the ALMA workflow', async () => {
+    await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'automation@example.com', password: 'password123', fullName: 'Automation Owner' });
+    const owner = await User.findOne({ email: 'automation@example.com' });
+    const flow = await AutomationFlow.create({
+      userId: owner!._id,
+      name: 'Guía gratuita',
+      trigger: { type: 'keyword', keyword: 'GUÍA', keywords: ['GUÍA'] },
+      actions: [{ type: 'send_message', message: 'Aquí tienes la información solicitada.' }],
+      isActive: true,
+    });
+
+    const service = new YouTubeIngestionService();
+    const comment = { id: 'youtube-automation-1', snippet: { textOriginal: 'Quiero la guia, por favor', authorDisplayName: 'Prospecto', authorChannelId: { value: 'channel-prospect-1' }, videoId: 'video-1' } };
+    expect(await service.processComment(owner!._id.toString(), comment, comment.id, 'owner-channel')).toBe('processed');
+    expect(await service.processComment(owner!._id.toString(), comment, comment.id, 'owner-channel')).toBe('duplicate');
+
+    const lead = await Lead.findOne({ userId: owner!._id, username: 'channel-prospect-1' });
+    const outbound = await OutboundMessage.findOne({ sourceEventId: 'youtube:youtube-automation-1' });
+    const updatedFlow = await AutomationFlow.findById(flow._id);
+    expect(lead).toMatchObject({ platform: 'youtube', source: 'youtube_automation' });
+    expect(outbound).toMatchObject({ text: 'Aquí tienes la información solicitada.', messageType: 'youtube_reply', deliveryStatus: 'simulated' });
+    expect(updatedFlow?.executionStats?.totalExecutions).toBe(1);
+    expect(updatedFlow?.executionStats?.successfulExecutions).toBe(1);
+    expect(updatedFlow?.executionStats?.failedExecutions).toBe(0);
+    expect(await Activity.findOne({ leadId: lead!._id, 'metadata.automationFlowId': flow._id.toString() })).toBeTruthy();
+    expect(await Task.countDocuments({ leadId: lead!._id, status: 'pending' })).toBe(1);
   });
 
   test('an already claimed comment does not create a lead or outbound message', async () => {

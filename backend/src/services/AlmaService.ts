@@ -6,8 +6,9 @@ import { getAIProvider } from '../integrations/ai';
 import { MessagingService } from './MessagingService';
 import type { MessagingRecipient } from '../integrations/messaging';
 import { MeetingOrchestratorService } from './MeetingOrchestratorService';
+import { AutomationService } from './AutomationService';
 
-type AlmaContext = { userId: string; leadId: string; conversationId: string; text: string; isNewLead: boolean; platform: 'instagram' | 'facebook' | 'youtube'; sourceEventId: string; recipient: MessagingRecipient };
+type AlmaContext = { userId: string; leadId: string; conversationId: string; text: string; isNewLead: boolean; platform: 'instagram' | 'facebook' | 'youtube'; sourceEventId: string; recipient: MessagingRecipient; automation?: { flowId: string; response: string } };
 
 export class AlmaService {
   static async processMessage(context: AlmaContext): Promise<string> {
@@ -44,14 +45,15 @@ export class AlmaService {
       });
     }
 
-    const aiProvider = getAIProvider();
-    const generatedResponse = await aiProvider.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent });
+    const aiProvider = context.automation ? null : getAIProvider();
+    const generatedResponse = context.automation?.response ?? await aiProvider!.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent });
     const meetingOutcome = await MeetingOrchestratorService.process({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: context.text, wantsMeeting, platform: context.platform });
     const response = meetingOutcome.reply ?? generatedResponse;
 
     await ConversationService.addMessage(context.conversationId, context.userId, { sender: 'ai', text: response, platform: context.platform });
-    await MessagingService.send({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: response, recipient: context.recipient });
-    await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'message_generated', description: 'ALMA generó y procesó una respuesta saliente', metadata: { aiProvider: aiProvider.name } });
+    const deliveryStatus = await MessagingService.send({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: response, recipient: context.recipient });
+    if (context.automation && deliveryStatus !== 'duplicate') await AutomationService.recordExecution(context.automation.flowId, context.userId, deliveryStatus !== 'failed');
+    await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'message_generated', description: context.automation ? 'ALMA ejecutó una automatización por palabra clave' : 'ALMA generó y procesó una respuesta saliente', metadata: context.automation ? { automationFlowId: context.automation.flowId, responseSource: 'automation' } : { aiProvider: aiProvider!.name } });
     return response;
   }
 }
