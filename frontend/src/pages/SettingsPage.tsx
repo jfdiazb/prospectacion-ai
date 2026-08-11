@@ -5,8 +5,10 @@ import { useAuth } from '@context/AuthContext';
 import { useEffect, useState } from 'react';
 import { AlertTriangle, CalendarCheck, CheckCircle2, Clock, RefreshCw, Youtube } from 'lucide-react';
 import { youtubeService, type OperationalDiagnostics, type YouTubeStatus } from '@services/youtubeService';
+import { useNavigate } from 'react-router-dom';
 
 export const SettingsPage = () => {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [youtube, setYoutube] = useState<YouTubeStatus>({ connected: false });
   const [youtubeLoading, setYoutubeLoading] = useState(true);
@@ -68,7 +70,7 @@ export const SettingsPage = () => {
                   <p className="text-sm text-dark-400">Seguridad</p>
                   <p className="text-white">Actualiza tu contraseña y controla accesos.</p>
                 </div>
-                <Button variant="secondary">Cambiar contraseña</Button>
+                <Button variant="secondary" onClick={() => navigate('/profile')}>Cambiar contraseña</Button>
               </div>
             </div>
           </motion.div>

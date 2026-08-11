@@ -11,6 +11,7 @@ import metaRoutes from './routes/metaRoutes';
 import crmRoutes from './routes/crmRoutes';
 import youtubeRoutes from './routes/youtubeRoutes';
 import calendlyRoutes from './routes/calendlyRoutes';
+import automationRoutes from './routes/automationRoutes';
 import { errorMiddleware, notFoundMiddleware } from './middlewares/auth';
 import { generalLimiter } from './middlewares/rateLimiter';
 
@@ -54,6 +55,7 @@ app.use(`${apiPrefix}/meta`, metaRoutes);
 app.use(`${apiPrefix}/crm`, crmRoutes);
 app.use(`${apiPrefix}/youtube`, youtubeRoutes);
 app.use(`${apiPrefix}/calendly`, calendlyRoutes);
+app.use(`${apiPrefix}/automations`, automationRoutes);
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 

@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@components/AppLayout';
 import { Card, Button, Badge } from '@components/shared';
 import { Modal } from '@components/advanced';
@@ -17,6 +18,19 @@ export const LeadsPage = () => {
   const [generatedMessage, setGeneratedMessage] = useState<string>('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [form, setForm] = useState({ username: '', fullName: '', bio: '' });
+  const [feedback, setFeedback] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchTerm = searchParams.get('buscar')?.trim() ?? '';
+
+  const visibleLeads = useMemo(() => {
+    if (!searchTerm) return leads;
+    const normalized = searchTerm.toLocaleLowerCase('es');
+    return leads.filter(lead => [lead.username, lead.fullName, lead.bio, lead.platform]
+      .some(value => value?.toLocaleLowerCase('es').includes(normalized)));
+  }, [leads, searchTerm]);
 
   useEffect(() => {
     loadLeads();
@@ -59,6 +73,12 @@ export const LeadsPage = () => {
     setGeneratedMessage('');
   };
 
+  const createLead = async () => {
+    if (!form.username.trim()) { setFeedback('El identificador del prospecto es obligatorio.'); return; }
+    try { const lead = await leadService.createLead({ ...form, platform: 'manual', status: 'new', interestLevel: 'cold', score: 0, tags: ['manual'] }); setLeads(current => [lead, ...current]); setCreateOpen(false); setForm({ username: '', fullName: '', bio: '' }); setFeedback('Prospecto agregado correctamente.'); }
+    catch (error: any) { setFeedback(error?.response?.data?.message || 'No fue posible agregar el prospecto.'); }
+  };
+
   return (
     <AppLayout title="Prospectos" subtitle={`Total de leads activos: ${leads.length}`}>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
@@ -67,11 +87,18 @@ export const LeadsPage = () => {
             <h2 className="text-xl font-semibold text-white">Gestiona tus prospectos en un solo lugar</h2>
             <p className="text-dark-400">Filtra, califica y prioriza leads con rapidez.</p>
           </div>
-          <Button variant="primary">+ Agregar Lead</Button>
+          <Button variant="primary" onClick={() => setCreateOpen(true)}>+ Agregar Lead</Button>
         </div>
+        {feedback && <p className="rounded-2xl border border-primary-500/20 bg-primary-500/10 p-4 text-sm text-primary-200">{feedback}</p>}
+        {searchTerm && (
+          <div className="flex flex-col gap-3 rounded-2xl border border-primary-500/20 bg-primary-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-primary-100">Resultados para <span className="font-semibold">“{searchTerm}”</span>: {visibleLeads.length}</p>
+            <Button variant="secondary" size="sm" onClick={() => setSearchParams({})}>Limpiar búsqueda</Button>
+          </div>
+        )}
 
         <div className="space-y-4">
-          {leads.map((lead, index) => (
+          {visibleLeads.map((lead, index) => (
             <motion.div
               key={lead._id}
               initial={{ opacity: 0, y: 10 }}
@@ -93,7 +120,7 @@ export const LeadsPage = () => {
                   <div className="flex flex-col items-start gap-3 text-left lg:items-end lg:text-right">
                     <div className="text-2xl font-bold text-primary-400 mb-2">{lead.score}</div>
                     <div className="flex flex-wrap gap-2">
-                      <Button variant="secondary" size="sm">
+                      <Button variant="secondary" size="sm" onClick={() => { setSelectedLead(lead); setDetailsOpen(true); }}>
                         Ver detalles
                       </Button>
                       <Button
@@ -110,6 +137,7 @@ export const LeadsPage = () => {
               </Card>
             </motion.div>
           ))}
+          {searchTerm && visibleLeads.length === 0 && <Card><p className="text-center text-dark-300">No encontramos prospectos que coincidan con esa búsqueda.</p></Card>}
         </div>
       </motion.div>
 
@@ -134,6 +162,8 @@ export const LeadsPage = () => {
           </div>
         </div>
       </Modal>
+      <Modal isOpen={detailsOpen} onClose={() => setDetailsOpen(false)} title="Detalles del prospecto" size="lg"><div className="space-y-4 text-dark-200"><p><span className="text-dark-400">Nombre:</span> {selectedLead?.fullName || selectedLead?.username}</p><p><span className="text-dark-400">Canal:</span> {selectedLead?.platform}</p><p><span className="text-dark-400">Score:</span> {selectedLead?.score}</p><p><span className="text-dark-400">Estado:</span> {selectedLead?.status}</p><p><span className="text-dark-400">Descripción:</span> {selectedLead?.bio || 'Sin descripción'}</p><div className="flex justify-end"><Button variant="secondary" onClick={() => setDetailsOpen(false)}>Cerrar</Button></div></div></Modal>
+      <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title="Agregar prospecto" size="lg"><div className="space-y-4"><input value={form.username} onChange={event => setForm({ ...form, username: event.target.value })} placeholder="Identificador o usuario" className="w-full rounded-2xl border border-dark-600 bg-dark-900 px-4 py-3 text-white" /><input value={form.fullName} onChange={event => setForm({ ...form, fullName: event.target.value })} placeholder="Nombre completo" className="w-full rounded-2xl border border-dark-600 bg-dark-900 px-4 py-3 text-white" /><textarea value={form.bio} onChange={event => setForm({ ...form, bio: event.target.value })} placeholder="Notas o descripción" className="min-h-28 w-full rounded-2xl border border-dark-600 bg-dark-900 p-4 text-white" /><div className="flex justify-end gap-3"><Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancelar</Button><Button onClick={() => void createLead()}>Guardar prospecto</Button></div></div></Modal>
     </AppLayout>
   );
 };

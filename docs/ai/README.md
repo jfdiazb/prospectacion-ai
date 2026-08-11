@@ -1,5 +1,10 @@
 # Documentación AI - Prospectación AI
 
+## Buscador global y alertas funcionales — 2026-08-11
+- El buscador de la barra superior envía la consulta a `/prospectos?buscar=...`; la vista filtra los leads cargados por usuario, nombre, biografía o plataforma y ofrece limpiar el filtro.
+- El botón Alertas carga `/api/v1/crm/tasks`, contabiliza tareas pendientes, las ordena por vencimiento y abre un panel resumido con navegación al CRM.
+- Los estados vacíos se muestran explícitamente y no se exponen datos fuera de la sesión autenticada.
+
 ## Calendly gratuito sincronizado por API — 2026-08-09
 - Calendly Free permite consultas API pero no webhooks. ALMA usa `CalendlyPollingService` para consultar eventos e invitados cada 120 segundos sin cambiar de plan.
 - El servicio obtiene el usuario autenticado, recorre eventos entre las últimas 24 horas y los próximos 90 días, sigue paginación y relaciona `tracking.utm_content` con `Meeting.bookingToken`.
@@ -318,3 +323,8 @@
 # Activación de Lead Hunter en producción — 2026-08-11
 - `render.yaml` declara `YOUTUBE_HUNTER_MODE=live` con autorización del propietario. La integración reutiliza OAuth cifrado, caché y límites 25/100; no ejecuta búsquedas hasta una acción explícita del usuario autenticado.
 - Pendiente operativo: esperar el despliegue de Render y ejecutar una búsqueda controlada desde `/lead-hunter` para confirmar respuesta oficial y contador de cuota.
+# Acciones reales de interfaz — 2026-08-11
+- `/prospectos` conecta Agregar Lead con `POST /api/v1/leads`, abre una ficha segura con los datos disponibles y conserva Mensaje AI como acción autenticada.
+- `/automatizaciones` deja de usar tarjetas estáticas. El nuevo router JWT `/api/v1/automations` lista y crea flujos, y permite `PATCH /:id/toggle` y `DELETE /:id`; todas las operaciones filtran por `userId`.
+- El formulario inicial de automatización define nombre, palabra clave y mensaje `send_message`. Guardar un flujo no lo ejecuta retroactivamente ni publica mensajes; solamente persiste la configuración activa.
+- Configuración dirige el cambio de contraseña a `/profile`, donde ya existen validación y endpoint funcionales.

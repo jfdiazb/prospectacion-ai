@@ -1,5 +1,16 @@
 # AGENTS.md
 
+## Buscador global y alertas funcionales — 2026-08-11
+- La barra superior busca prospectos por usuario, nombre, descripción o canal y abre `/prospectos?buscar=...`; Prospectos aplica el filtro y permite limpiarlo.
+- Alertas consulta las tareas CRM y muestra las pendientes ordenadas por vencimiento, con contador y acceso directo al CRM.
+- Ambos controles dejaron de ser elementos decorativos y conservan navegación accesible.
+
+## Acciones funcionales en Prospectos, Automatizaciones y Configuración — 2026-08-11
+- Prospectos permite crear un lead manual, abrir sus detalles y conservar la generación de mensaje IA; las acciones dejaron de ser botones decorativos.
+- Automatizaciones reemplaza datos ficticios por flujos persistidos y aislados por usuario: listar, crear una respuesta por palabra clave, pausar/reactivar y eliminar mediante `/api/v1/automations`.
+- Configuración enlaza Cambiar contraseña con el formulario funcional de Perfil. Las conexiones YouTube, diagnóstico y cierre de sesión se conservan.
+- Validación vigente: compilaciones backend/frontend y type-check frontend correctos.
+
 ## Lead Hunter live declarado — 2026-08-11
 - Con autorización del propietario, el Blueprint cambia `YOUTUBE_HUNTER_MODE=live`; Render recibe la activación junto con el código versionado, conservando 25 búsquedas por operador y 100 por proyecto.
 - La primera búsqueda real aún debe validarse desde una sesión autenticada del CRM después de que Render complete el despliegue.
