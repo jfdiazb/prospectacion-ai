@@ -35,6 +35,15 @@ const conversationSchema = new Schema(
       enum: ['active', 'paused', 'closed'],
       default: 'active',
     },
+    controlMode: {
+      type: String,
+      enum: ['automated', 'handoff_requested', 'human_controlled'],
+      default: 'automated',
+    },
+    handoffReason: String,
+    handoffRequestedAt: Date,
+    humanControlStartedAt: Date,
+    automationResumedAt: Date,
     aiAnalysis: {
       sentiment: String,
       intent: String,
@@ -52,6 +61,7 @@ const conversationSchema = new Schema(
 conversationSchema.index({ userId: 1, leadId: 1 });
 conversationSchema.index({ createdAt: -1 });
 conversationSchema.index({ status: 1 });
+conversationSchema.index({ userId: 1, controlMode: 1, lastMessage: -1 });
 
 export default mongoose.model<IConversation & mongoose.Document>('Conversation', conversationSchema);
 

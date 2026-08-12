@@ -32,4 +32,9 @@ describe('YouTubeMonitorService', () => {
     const alerts = YouTubeMonitorService.buildAlerts(1, 8, new Date(), 2, 0);
     expect(alerts).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'alma_unanswered', severity: 'error' })]));
   });
+
+  test('reports isolated thread polling failures', () => {
+    const alerts = YouTubeMonitorService.buildAlerts(8, 8, new Date(), 0, 0, 2);
+    expect(alerts).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'thread_polling_failures', severity: 'warning' })]));
+  });
 });

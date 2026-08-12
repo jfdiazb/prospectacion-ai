@@ -14,7 +14,7 @@ export interface OperationalDiagnostics {
       processed?: number; processing_failed?: number; invalid?: number; own_channel?: number; not_eligible?: number; duplicate?: number;
       recordedAt?: string;
     };
-    replies?: { activeThreads?: number; replies?: number; processed?: number; not_eligible?: number; duplicate?: number };
+    replies?: { activeThreads?: number; polledThreads?: number; coverageCycleCount?: number; urgentThreads?: number; threadFailures?: number; replies?: number; processed?: number; not_eligible?: number; duplicate?: number };
   };
   calendly: {
     configured: boolean; schedulingMode: string; pendingBooking: number; futureScheduled: number;
@@ -26,8 +26,8 @@ export interface OperationalDiagnostics {
 export interface YouTubeMonitor {
   checkedAt: string; connected: boolean; channelTitle?: string; lastPolledAt?: string; lastRepliesPolledAt?: string;
   config: { activeDays: number; maxThreads: number; intervalMs: number; dailyQuota: number; responseAlertMinutes: number };
-  activeThreadCount: number; monitoredThreadCount: number; uncoveredThreadCount: number;
-  lastReplySummary?: { replies?: number; processed?: number; own_channel?: number; not_eligible?: number; duplicate?: number };
+  activeThreadCount: number; monitoredThreadCount: number; uncoveredThreadCount: number; coverageCycleCount?: number; maxCoverageDelayMinutes?: number;
+  lastReplySummary?: { activeThreads?: number; polledThreads?: number; coverageCycleCount?: number; urgentThreads?: number; threadFailures?: number; replies?: number; processed?: number; own_channel?: number; not_eligible?: number; duplicate?: number };
   lastProcessedCommentAt?: string;
   delivery: { sent: number; failed: number; pending: number; simulated: number };
   quota: { estimatedUnitsToday: number; dailyLimit: number; estimatedPercent: number; note: string };

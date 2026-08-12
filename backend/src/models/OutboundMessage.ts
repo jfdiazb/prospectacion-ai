@@ -24,4 +24,5 @@ const outboundMessageSchema = new Schema({
 
 outboundMessageSchema.index({ conversationId: 1, createdAt: -1 });
 outboundMessageSchema.index({ userId: 1, deliveryStatus: 1, createdAt: -1 });
+outboundMessageSchema.index({ userId: 1, channel: 1, messageType: 1, createdAt: -1, recipientId: 1 });
 export default mongoose.model('OutboundMessage', outboundMessageSchema);

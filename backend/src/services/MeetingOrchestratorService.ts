@@ -4,7 +4,7 @@ import { TaskService } from './TaskService';
 import { getMeetingProvider, MeetingProviderError } from '../integrations/meetings';
 import crypto from 'crypto';
 
-type MeetingContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; wantsMeeting: boolean; platform?: 'instagram' | 'facebook' | 'youtube' };
+type MeetingContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; wantsMeeting: boolean; platform?: 'instagram' | 'facebook' | 'youtube' | 'whatsapp' };
 type MeetingOutcome = { handled: boolean; reply?: string };
 
 const TIMEZONE_ALIASES: Record<string, string> = {

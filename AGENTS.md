@@ -1,5 +1,39 @@
 # AGENTS.md
 
+## Preparación de activación oficial de WhatsApp — 2026-08-11
+- El Blueprint declara `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET` y `VERIFY_TOKEN` como secretos externos de Render; ningún valor real se almacena en el repositorio.
+- La inspección segura confirmó que esas cuatro credenciales aún no están disponibles localmente. Producción conserva mensajería mock y auto-respuesta apagada para evitar un arranque inválido o tráfico accidental.
+- `docs/DEPLOYMENT.md` documenta la secuencia mock firmado → live controlado → handoff humano y la reversión inmediata mediante `WHATSAPP_AUTO_REPLY_ENABLED=false`.
+- Pendiente operativo: crear/configurar la aplicación oficial de Meta, guardar los secretos en Render, registrar el callback y ejecutar la prueba controlada. Instagram/Facebook continúan sin activar.
+
+## WhatsApp autónomo y transferencia humana — 2026-08-11
+- El webhook firmado de WhatsApp delega ahora en `AlmaService`: conserva idempotencia, crea/reutiliza lead y conversación, aplica automatizaciones opcionales y usa la misma memoria, calificación, agenda y seguimiento que ALMA.
+- `Conversation.controlMode` separa `automated`, `handoff_requested` y `human_controlled`. ALMA solicita intervención ante una petición humana explícita o temas sensibles/reclamos, envía una confirmación, crea una tarea prioritaria y detiene nuevas respuestas automáticas.
+- El CRM permite pausar ALMA manualmente, tomar una transferencia, responder por WhatsApp desde el hilo y devolver el control. El envío humano exige control humano, propiedad autenticada y un lead WhatsApp; al reanudar se completan las tareas de transferencia pendientes.
+- Endpoints JWT: `PATCH /api/v1/crm/conversations/:conversationId/control` con `take|resume` y `POST /api/v1/crm/conversations/:conversationId/messages` para respuestas humanas de hasta 1.000 caracteres.
+- Producción conserva `WHATSAPP_MESSAGING_MODE=mock` y `WHATSAPP_AUTO_REPLY_ENABLED=false`; no se activó tráfico real ni Instagram/Facebook. La activación oficial requiere credenciales Meta externas y una prueba controlada posterior al despliegue.
+- Validación vigente: 62/62 pruebas backend, compilaciones backend/frontend y type-check frontend correctos.
+
+## Memoria conversacional y preguntas no repetidas — 2026-08-11
+- ALMA carga hasta diez intervenciones anteriores de la conversación antes de generar una respuesta IA; el comentario actual se excluye del historial duplicado.
+- Gemini recibe instrucciones para usar esa memoria, no repetir preguntas ya formuladas, no solicitar datos ya entregados y hacer como máximo una pregunta breve en YouTube.
+- El historial enviado se limita a mensajes de lead/ALMA y a 1.000 caracteres por intervención. Las automatizaciones fijas dejan de repetirse dentro de la misma conversación: si su respuesta exacta ya fue enviada, el flujo continúa mediante IA contextual.
+- El proveedor mock también avanza entre preguntas de descubrimiento para mantener pruebas y desarrollo coherentes con el comportamiento live.
+- Validación vigente: 60/60 pruebas backend y compilación TypeScript correcta.
+
+## Priorización durable de hilos YouTube — 2026-08-11
+- `YouTubeThreadCheckpoint` conserva por propietario e hilo la última revisión, último éxito, último fallo y fallos consecutivos; la rotación continúa desde MongoDB después de reinicios o despliegues.
+- El poller atiende primero conversaciones cuyo último mensaje pertenece al prospecto. Dentro de cada nivel de urgencia prioriza hilos nunca revisados y luego los revisados hace más tiempo.
+- Un error de lectura en un hilo ya no cancela el lote completo: se registra en su checkpoint, incrementa `threadFailures` y permite continuar con las demás conversaciones.
+- La telemetría incorpora `urgentThreads` y `threadFailures`; YouTube Monitor muestra una alerta segura cuando hubo fallos aislados, sin exponer mensajes ni IDs externos.
+- Validación vigente: 59/59 pruebas backend y compilaciones backend/frontend correctas; type-check frontend correcto.
+
+## Cobertura rotativa completa de conversaciones YouTube — 2026-08-11
+- El poller de respuestas construye ahora un inventario único de todos los hilos con actividad dentro de `YOUTUBE_REPLY_ACTIVE_DAYS`; se eliminó el recorte previo de `YOUTUBE_REPLY_MAX_THREADS * 3` que podía excluir conversaciones indefinidamente.
+- Cada ciclo mantiene el límite de cuota `YOUTUBE_REPLY_MAX_THREADS`, pero rota por el inventario completo. La telemetría distingue hilos activos totales, hilos consultados en el ciclo y ciclos necesarios para completar una vuelta.
+- YouTube Monitor también cuenta el inventario completo y conserva la estimación del retraso máximo de cobertura; un índice compuesto acelera la selección por propietario, canal, tipo y actividad.
+- Validación vigente: 57/57 pruebas backend y compilación backend correcta; type-check y compilación frontend correctos.
+
 ## Recuperación de eventos YouTube interrumpidos — 2026-08-11
 - `InboundEvent` registra ahora estado, intentos y ventana de reintento para comentarios de YouTube; una reclamación ya no equivale automáticamente a procesamiento completo.
 - Si ALMA falla antes de crear el mensaje saliente, el evento queda `failed` y puede retomarse después de un minuto. Los eventos heredados sin salida también pueden recuperarse cuando vuelven a aparecer dentro de la ventana del poller.

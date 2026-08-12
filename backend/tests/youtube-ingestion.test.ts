@@ -41,6 +41,26 @@ describe('YouTubeIngestionService polling cursor', () => {
     expect(YouTubeIngestionService.shouldPollReplies({ lastRepliesPolledAt: new Date('2026-08-08T18:00:00.000Z') }, now)).toBe(true);
   });
 
+  test('rotates reply coverage so excess threads are not excluded indefinitely', () => {
+    const threads = Array.from({ length: 25 }, (_, index) => `thread-${index + 1}`);
+    const cycles = Array.from({ length: 4 }, (_, index) =>
+      YouTubeIngestionService.selectReplyThreads(threads, 8, index * 120000, 120000));
+
+    expect(cycles.every(cycle => cycle.length === 8)).toBe(true);
+    expect(new Set(cycles.flat())).toEqual(new Set(threads));
+  });
+
+  test('prioritizes unanswered threads and then the least recently checked', () => {
+    const ordered = YouTubeIngestionService.prioritizeReplyThreads([
+      { threadId: 'regular-never', lastOutboundAt: new Date('2026-08-11T12:00:00Z') },
+      { threadId: 'urgent-recent', urgent: true, lastCheckedAt: new Date('2026-08-11T11:00:00Z') },
+      { threadId: 'urgent-never', urgent: true, lastOutboundAt: new Date('2026-08-11T10:00:00Z') },
+      { threadId: 'regular-old', lastCheckedAt: new Date('2026-08-10T10:00:00Z') },
+    ]);
+
+    expect(ordered).toEqual(['urgent-never', 'urgent-recent', 'regular-never', 'regular-old']);
+  });
+
   test('reads every reply page and keeps responses attached to the root thread', async () => {
     const http = { get: jest.fn()
       .mockResolvedValueOnce({ data: { items: [{ id: 'reply-2', snippet: { textOriginal: 'Segundo', authorChannelId: { value: 'lead-1' }, publishedAt: '2026-08-08T18:02:00.000Z' } }], nextPageToken: 'page-2' } })

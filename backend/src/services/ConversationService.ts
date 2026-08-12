@@ -58,6 +58,19 @@ export class ConversationService {
     return await Conversation.findOne({ _id: conversationId, userId });
   }
 
+  static async getRecentMessages(conversationId: string, userId: string, limit = 12): Promise<any[]> {
+    const conversation: any = await Conversation.findOne({ _id: conversationId, userId })
+      .slice('messages', -Math.max(1, Math.min(20, limit)))
+      .select('messages')
+      .lean();
+    return conversation?.messages ?? [];
+  }
+
+  static async getControlMode(conversationId: string, userId: string): Promise<'automated' | 'handoff_requested' | 'human_controlled'> {
+    const conversation: any = await Conversation.findOne({ _id: conversationId, userId }).select('controlMode').lean();
+    return conversation?.controlMode ?? 'automated';
+  }
+
   /**
    * Obtener todas las conversaciones del usuario
    */

@@ -20,7 +20,7 @@ export const YouTubeMonitorPage = () => {
       {monitor && <>
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           <Metric icon={Youtube} label="Hilos activos" value={monitor.activeThreadCount} detail={`${monitor.config.activeDays} días de actividad`} />
-          <Metric icon={ShieldCheck} label="Con cobertura" value={monitor.monitoredThreadCount} detail={`Capacidad actual: ${monitor.config.maxThreads}`} />
+          <Metric icon={ShieldCheck} label="Con cobertura" value={monitor.monitoredThreadCount} detail={monitor.uncoveredThreadCount > 0 ? `RotaciÃ³n completa: hasta ${monitor.maxCoverageDelayMinutes ?? '-'} min` : `Capacidad actual: ${monitor.config.maxThreads}`} />
           <Metric icon={Activity} label="Último ciclo" value={monitor.lastReplySummary?.replies ?? 0} detail={`${monitor.lastReplySummary?.processed ?? 0} respuestas nuevas`} />
           <Metric icon={Send} label="Entregas de hoy" value={monitor.delivery.sent} detail={`${monitor.delivery.failed} fallidas · ${monitor.delivery.pending} pendientes`} />
         </div>

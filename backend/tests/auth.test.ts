@@ -363,4 +363,33 @@ describe('Auth integration tests', () => {
     expect(await InboundEvent.countDocuments({ externalEventId: eventId })).toBe(1);
     expect(await OutboundMessage.countDocuments({ sourceEventId: eventId })).toBe(0);
   });
+
+  test('runs WhatsApp through ALMA and supports authenticated human handoff control', async () => {
+    const register = await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'handoff@example.com', password: 'password123', fullName: 'Handoff Owner' });
+    const owner = await User.findOne({ email: 'handoff@example.com' });
+    process.env.CRM_OWNER_ID = owner!._id.toString();
+    process.env.WHATSAPP_APP_SECRET = 'whatsapp-handoff-secret';
+    process.env.WHATSAPP_AUTO_REPLY_ENABLED = 'true';
+    process.env.WHATSAPP_MESSAGING_MODE = 'mock';
+    const eventId = 'wamid.handoff-1';
+    const rawPayload = JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ id: eventId, from: '573009998877', type: 'text', text: { body: 'Quiero hablar con un asesor humano' } }] } }] }] });
+    const signature = `sha256=${crypto.createHmac('sha256', process.env.WHATSAPP_APP_SECRET).update(Buffer.from(rawPayload)).digest('hex')}`;
+    await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, { headers: { 'Content-Type': 'application/json', 'x-hub-signature-256': signature } });
+
+    const lead = await Lead.findOne({ userId: owner!._id, phone: '573009998877' });
+    const conversation: any = await Conversation.findOne({ leadId: lead!._id });
+    expect(conversation).toMatchObject({ controlMode: 'handoff_requested', handoffReason: 'explicit_human_request' });
+    expect(await OutboundMessage.findOne({ sourceEventId: eventId })).toMatchObject({ channel: 'whatsapp', deliveryStatus: 'simulated' });
+    expect(await Task.findOne({ conversationId: conversation._id, type: 'other' })).toMatchObject({ status: 'pending', priority: 'high' });
+
+    const auth = { headers: { Authorization: `Bearer ${register.data.data.token}` } };
+    const taken = await axios.patch(`${baseURL}/api/v1/crm/conversations/${conversation._id}/control`, { action: 'take' }, auth);
+    expect(taken.data.data.controlMode).toBe('human_controlled');
+    const humanReply = await axios.post(`${baseURL}/api/v1/crm/conversations/${conversation._id}/messages`, { text: 'Hola, soy José. Continúo personalmente contigo.' }, auth);
+    expect(humanReply.status).toBe(201);
+    expect(humanReply.data.data.messages.at(-1)).toMatchObject({ sender: 'user', platform: 'whatsapp' });
+    const resumed = await axios.patch(`${baseURL}/api/v1/crm/conversations/${conversation._id}/control`, { action: 'resume' }, auth);
+    expect(resumed.data.data.controlMode).toBe('automated');
+    expect(await Task.findOne({ conversationId: conversation._id, type: 'other' })).toMatchObject({ status: 'completed' });
+  });
 });

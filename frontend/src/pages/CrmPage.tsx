@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AppLayout } from '@components/AppLayout';
-import { Card } from '@components/shared';
+import { Button, Card } from '@components/shared';
 import { crmService, type CrmActivity, type CrmConversation, type CrmMeeting, type CrmTask } from '@services/crmService';
 
 export const CrmPage = () => {
@@ -9,6 +9,27 @@ export const CrmPage = () => {
   const [conversations, setConversations] = useState<CrmConversation[]>([]);
   const [tasks, setTasks] = useState<CrmTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [changingControl, setChangingControl] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+
+  const changeControl = async (conversationId: string, action: 'take' | 'resume') => {
+    setChangingControl(conversationId);
+    try {
+      const updated = await crmService.setConversationControl(conversationId, action);
+      setConversations(current => current.map(item => item._id === conversationId ? updated : item));
+    } finally { setChangingControl(null); }
+  };
+
+  const sendHumanMessage = async (conversationId: string) => {
+    const text = drafts[conversationId]?.trim();
+    if (!text) return;
+    setChangingControl(conversationId);
+    try {
+      const updated = await crmService.sendHumanMessage(conversationId, text);
+      setConversations(current => current.map(item => item._id === conversationId ? { ...item, messages: updated.messages, lastMessage: updated.lastMessage } : item));
+      setDrafts(current => ({ ...current, [conversationId]: '' }));
+    } finally { setChangingControl(null); }
+  };
 
   useEffect(() => {
     Promise.all([crmService.activities(), crmService.meetings(), crmService.conversations(), crmService.tasks()])
@@ -84,9 +105,21 @@ export const CrmPage = () => {
                 <div key={conversation._id} className="rounded-2xl bg-dark-900 p-4">
                   <p className="font-medium text-white">{conversation.leadId?.fullName || conversation.leadId?.username || 'Prospecto'}</p>
                   <p className="text-sm text-dark-400">Estado: {conversation.status}</p>
+                  <p className={`mt-1 text-xs font-semibold ${conversation.controlMode === 'handoff_requested' ? 'text-amber-300' : conversation.controlMode === 'human_controlled' ? 'text-blue-300' : 'text-emerald-300'}`}>
+                    {conversation.controlMode === 'handoff_requested' ? 'ALMA solicita intervención' : conversation.controlMode === 'human_controlled' ? 'Control humano' : 'ALMA activa'}
+                  </p>
                   {lastMessage && (
                     <p className="text-sm text-dark-400 truncate">{lastMessage.sender === 'ai' ? 'ALMA:' : lastMessage.sender === 'lead' ? 'Lead:' : 'Usuario:'} {lastMessage.text}</p>
                   )}
+                  <div className="mt-3">
+                    {(!conversation.controlMode || conversation.controlMode === 'automated') && <Button size="sm" variant="secondary" loading={changingControl === conversation._id} onClick={() => void changeControl(conversation._id, 'take')}>Pausar ALMA</Button>}
+                    {conversation.controlMode === 'handoff_requested' && <Button size="sm" loading={changingControl === conversation._id} onClick={() => void changeControl(conversation._id, 'take')}>Tomar conversación</Button>}
+                    {conversation.controlMode === 'human_controlled' && <Button size="sm" variant="secondary" loading={changingControl === conversation._id} onClick={() => void changeControl(conversation._id, 'resume')}>Devolver a ALMA</Button>}
+                  </div>
+                  {conversation.controlMode === 'human_controlled' && lastMessage?.platform === 'whatsapp' && <div className="mt-3 space-y-2">
+                    <textarea value={drafts[conversation._id] || ''} maxLength={1000} onChange={event => setDrafts(current => ({ ...current, [conversation._id]: event.target.value }))} placeholder="Responder por WhatsApp..." className="min-h-20 w-full rounded-xl border border-white/10 bg-dark-800 px-3 py-2 text-sm text-white outline-none focus:border-primary-500" />
+                    <Button size="sm" loading={changingControl === conversation._id} disabled={!drafts[conversation._id]?.trim()} onClick={() => void sendHumanMessage(conversation._id)}>Enviar respuesta</Button>
+                  </div>}
                 </div>
               );
             })}

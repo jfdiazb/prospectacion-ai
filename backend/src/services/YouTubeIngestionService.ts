@@ -3,6 +3,8 @@ import YouTubeCredential from '../models/YouTubeCredential';
 import InboundEvent from '../models/InboundEvent';
 import Lead from '../models/Lead';
 import OutboundMessage from '../models/OutboundMessage';
+import Conversation from '../models/Conversation';
+import YouTubeThreadCheckpoint from '../models/YouTubeThreadCheckpoint';
 import { LeadService } from './LeadService';
 import { ConversationService } from './ConversationService';
 import { AlmaService } from './AlmaService';
@@ -16,6 +18,10 @@ type CommentProcessingResult = 'processed' | 'processing_failed' | 'invalid' | '
 type ReplyPollingSummary = Record<CommentProcessingResult, number> & {
   outboundCandidates: number;
   activeThreads: number;
+  polledThreads: number;
+  coverageCycleCount: number;
+  urgentThreads: number;
+  threadFailures: number;
   pages: number;
   replies: number;
 };
@@ -73,20 +79,56 @@ export class YouTubeIngestionService {
   async pollRecentReplies(credential: any, token: string): Promise<ReplyPollingSummary> {
     const activeDays = Math.max(1, Number(process.env.YOUTUBE_REPLY_ACTIVE_DAYS || 7));
     const maxThreads = Math.max(8, Number(process.env.YOUTUBE_REPLY_MAX_THREADS || 8));
-    const recent = await OutboundMessage.find({
-      userId: credential.userId,
-      channel: 'youtube',
-      messageType: 'youtube_reply',
-      recipientId: { $exists: true },
-      createdAt: { $gte: new Date(Date.now() - activeDays * 24 * 60 * 60 * 1000) },
-    }).sort({ createdAt: -1 }).limit(maxThreads * 3).select('recipientId').lean();
-    const threadIds = [...new Set(recent.map((item: any) => item.recipientId).filter(Boolean))].slice(0, maxThreads);
+    const inventory = await OutboundMessage.aggregate([
+      { $match: {
+        userId: credential.userId,
+        channel: 'youtube',
+        messageType: 'youtube_reply',
+        recipientId: { $exists: true, $ne: '' },
+        createdAt: { $gte: new Date(Date.now() - activeDays * 24 * 60 * 60 * 1000) },
+      } },
+      { $sort: { createdAt: -1 } },
+      { $group: { _id: '$recipientId', lastOutboundAt: { $first: '$createdAt' }, conversationId: { $first: '$conversationId' }, outboundCount: { $sum: 1 } } },
+      { $sort: { lastOutboundAt: -1 } },
+    ]);
+    const conversationIds = inventory.map((item: any) => item.conversationId).filter(Boolean);
+    const [conversations, checkpoints] = await Promise.all([
+      Conversation.find({ _id: { $in: conversationIds } }).slice('messages', -1).select('messages').lean(),
+      YouTubeThreadCheckpoint.find({ userId: credential.userId, threadId: { $in: inventory.map((item: any) => item._id) } }).select('threadId lastCheckedAt').lean(),
+    ]);
+    const lastSenderByConversation = new Map(conversations.map((item: any) => [item._id.toString(), item.messages?.[0]?.sender]));
+    const lastCheckedByThread = new Map(checkpoints.map((item: any) => [item.threadId, item.lastCheckedAt]));
+    const candidates = YouTubeIngestionService.prioritizeReplyThreads(inventory.map((item: any) => ({
+      threadId: item._id,
+      urgent: lastSenderByConversation.get(item.conversationId?.toString()) === 'lead',
+      lastCheckedAt: lastCheckedByThread.get(item._id),
+      lastOutboundAt: item.lastOutboundAt,
+    })));
+    const outboundCandidates = inventory.reduce((total: number, item: any) => total + Number(item.outboundCount || 0), 0);
+    const threadIds = candidates.slice(0, maxThreads);
     const summary: ReplyPollingSummary = {
-      outboundCandidates: recent.length, activeThreads: threadIds.length, pages: 0, replies: 0,
+      outboundCandidates, activeThreads: candidates.length, polledThreads: threadIds.length,
+      coverageCycleCount: Math.max(1, Math.ceil(candidates.length / maxThreads)),
+      urgentThreads: inventory.filter((item: any) => lastSenderByConversation.get(item.conversationId?.toString()) === 'lead').length,
+      threadFailures: 0, pages: 0, replies: 0,
       processed: 0, processing_failed: 0, invalid: 0, own_channel: 0, not_eligible: 0, duplicate: 0,
     };
     for (const threadId of threadIds) {
-      const threadSummary = await this.pollThreadReplies(credential, token, threadId);
+      let threadSummary;
+      try {
+        threadSummary = await this.pollThreadReplies(credential, token, threadId);
+        await YouTubeThreadCheckpoint.findOneAndUpdate({ userId: credential.userId, threadId }, {
+          $set: { lastCheckedAt: new Date(), lastSucceededAt: new Date(), consecutiveFailures: 0 },
+          $unset: { lastFailedAt: 1 },
+        }, { upsert: true });
+      } catch (error) {
+        summary.threadFailures += 1;
+        await YouTubeThreadCheckpoint.findOneAndUpdate({ userId: credential.userId, threadId }, {
+          $set: { lastCheckedAt: new Date(), lastFailedAt: new Date() }, $inc: { consecutiveFailures: 1 },
+        }, { upsert: true });
+        console.error('YouTube thread polling failed', { message: error instanceof Error ? error.message : 'unknown' });
+        continue;
+      }
       summary.pages += threadSummary.pages;
       summary.replies += threadSummary.replies;
       summary.processed += threadSummary.processed;
@@ -99,7 +141,22 @@ export class YouTubeIngestionService {
     return summary;
   }
 
-  async pollThreadReplies(credential: any, token: string, threadId: string): Promise<Omit<ReplyPollingSummary, 'outboundCandidates' | 'activeThreads'>> {
+  static prioritizeReplyThreads(candidates: Array<{ threadId: string; urgent?: boolean; lastCheckedAt?: Date; lastOutboundAt?: Date }>): string[] {
+    return [...candidates].sort((a, b) => {
+      if (Boolean(a.urgent) !== Boolean(b.urgent)) return a.urgent ? -1 : 1;
+      const checkedDifference = (a.lastCheckedAt?.getTime() ?? 0) - (b.lastCheckedAt?.getTime() ?? 0);
+      if (checkedDifference !== 0) return checkedDifference;
+      return (b.lastOutboundAt?.getTime() ?? 0) - (a.lastOutboundAt?.getTime() ?? 0);
+    }).map(item => item.threadId);
+  }
+
+  static selectReplyThreads(threadIds: string[], maxThreads: number, now = Date.now(), intervalMs = 120000): string[] {
+    if (threadIds.length <= maxThreads) return threadIds;
+    const start = (Math.floor(now / intervalMs) * maxThreads) % threadIds.length;
+    return Array.from({ length: maxThreads }, (_, index) => threadIds[(start + index) % threadIds.length]);
+  }
+
+  async pollThreadReplies(credential: any, token: string, threadId: string): Promise<Omit<ReplyPollingSummary, 'outboundCandidates' | 'activeThreads' | 'polledThreads' | 'coverageCycleCount' | 'urgentThreads' | 'threadFailures'>> {
     let pageToken: string | undefined;
     const summary = { pages: 0, replies: 0, processed: 0, processing_failed: 0, invalid: 0, own_channel: 0, not_eligible: 0, duplicate: 0 };
     do {

@@ -23,7 +23,7 @@ export class YouTubeMonitorService {
     const [credential, outbound, delivery, failed, lastInbound, conversations]: any[] = await Promise.all([
       YouTubeCredential.findOne({ userId }).select('channelTitle lastPolledAt lastRepliesPolledAt lastReplyPollingSummary').lean(),
       OutboundMessage.find({ userId, channel: 'youtube', messageType: 'youtube_reply', recipientId: { $exists: true }, createdAt: { $gte: since } })
-        .sort({ createdAt: -1 }).limit(200).select('recipientId leadId conversationId deliveryStatus createdAt sentAt').populate('leadId', 'fullName status interestLevel score').populate('conversationId', 'status lastMessage').lean(),
+        .sort({ createdAt: -1 }).select('recipientId leadId conversationId deliveryStatus createdAt sentAt').populate('leadId', 'fullName status interestLevel score').populate('conversationId', 'status lastMessage').lean(),
       OutboundMessage.aggregate([
         { $match: { userId: objectUserId, channel: 'youtube', createdAt: { $gte: dayStart } } },
         { $group: { _id: '$deliveryStatus', count: { $sum: 1 } } },
@@ -44,12 +44,15 @@ export class YouTubeMonitorService {
     const sentCount = Number(deliveryCounts.sent || 0);
     const estimatedQuotaUnits = sentCount * 50;
     const errorSummary = this.summarizeErrors(failed);
+    const coverageCycleCount = Math.max(1, Math.ceil(threads.length / config.maxThreads));
+    const maxCoverageDelayMinutes = Math.ceil(coverageCycleCount * config.intervalMs / 60000);
 
     return {
       checkedAt: new Date(), connected: Boolean(credential), channelTitle: credential?.channelTitle,
       lastPolledAt: credential?.lastPolledAt, lastRepliesPolledAt: credential?.lastRepliesPolledAt,
       config, activeThreadCount: threads.length, monitoredThreadCount: monitored.length,
       uncoveredThreadCount: Math.max(0, threads.length - monitored.length),
+      coverageCycleCount, maxCoverageDelayMinutes,
       lastProcessedCommentAt: lastInbound?.processedAt,
       delivery: { sent: sentCount, failed: Number(deliveryCounts.failed || 0), pending: Number(deliveryCounts.pending || 0), simulated: Number(deliveryCounts.simulated || 0) },
       quota: { estimatedUnitsToday: estimatedQuotaUnits, dailyLimit: config.dailyQuota, estimatedPercent: Math.min(100, Math.round(estimatedQuotaUnits / config.dailyQuota * 100)), note: 'Estimación mínima basada en respuestas publicadas; Google Cloud es la fuente definitiva.' },
@@ -64,7 +67,7 @@ export class YouTubeMonitorService {
         lastActivityAt: item.conversationId?.lastMessage || item.sentAt || item.createdAt,
         deliveryStatus: item.deliveryStatus,
       })),
-      alerts: this.buildAlerts(threads.length, config.maxThreads, credential?.lastRepliesPolledAt, unanswered.length, errorSummary.quota),
+      alerts: this.buildAlerts(threads.length, config.maxThreads, credential?.lastRepliesPolledAt, unanswered.length, errorSummary.quota, Number(credential?.lastReplyPollingSummary?.threadFailures || 0)),
     };
   }
 
@@ -82,7 +85,7 @@ export class YouTubeMonitorService {
     return summary;
   }
 
-  static buildAlerts(activeThreads: number, maxThreads: number, lastRepliesPolledAt?: Date, unanswered = 0, quotaErrors = 0) {
+  static buildAlerts(activeThreads: number, maxThreads: number, lastRepliesPolledAt?: Date, unanswered = 0, quotaErrors = 0, threadFailures = 0) {
     const alerts: Array<{ severity: 'healthy' | 'warning' | 'error'; code: string; message: string }> = [];
     if (!lastRepliesPolledAt || Date.now() - new Date(lastRepliesPolledAt).getTime() > 360000) alerts.push({ severity: 'error', code: 'reply_poller_stale', message: 'El monitor de respuestas lleva más de seis minutos sin actualizarse.' });
     else alerts.push({ severity: 'healthy', code: 'reply_poller_healthy', message: 'El monitor de respuestas está activo.' });
@@ -90,6 +93,7 @@ export class YouTubeMonitorService {
     else alerts.push({ severity: 'healthy', code: 'thread_capacity_ok', message: 'Todos los hilos activos están cubiertos.' });
     if (unanswered > 0) alerts.push({ severity: 'error', code: 'alma_unanswered', message: `${unanswered} conversaciones llevan más tiempo del permitido esperando respuesta de ALMA.` });
     if (quotaErrors > 0) alerts.push({ severity: 'error', code: 'youtube_quota', message: 'YouTube rechazó al menos una operación por cuota; revisa Google Cloud antes de reintentar.' });
+    if (threadFailures > 0) alerts.push({ severity: 'warning', code: 'thread_polling_failures', message: `${threadFailures} hilos fallaron en el último ciclo; los demás continuaron procesándose.` });
     return alerts;
   }
 }

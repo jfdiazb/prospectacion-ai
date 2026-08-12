@@ -345,3 +345,34 @@
 - Un fallo anterior a `OutboundMessage` se reintenta después de un minuto; si ya existe una salida para `sourceEventId`, el evento permanece idempotente y se clasifica como duplicado.
 - Los eventos heredados sin estado ni salida pueden ser retomados si el solapamiento del poller vuelve a entregarlos. El resumen del ciclo muestra `processing_failed` sin exponer contenido ni IDs.
 - Validación: suite backend 55/55 y builds backend/frontend correctos.
+# Cobertura rotativa completa de YouTube — 2026-08-11
+- `YouTubeIngestionService.pollRecentReplies` agrupa todos los `OutboundMessage` activos por `recipientId`, ordena cada hilo por su salida más reciente y aplica el lote rotativo únicamente después de construir el inventario completo.
+- `YOUTUBE_REPLY_MAX_THREADS` limita las lecturas por ciclo, no la cantidad total de conversaciones cubiertas. En un máximo de `ceil(hilos activos / límite)` ciclos se completa una vuelta del inventario vigente.
+- `lastReplyPollingSummary` expone únicamente contadores seguros: `activeThreads`, `polledThreads`, `coverageCycleCount`, páginas, respuestas y desenlaces. No persiste textos ni IDs externos.
+- YouTube Monitor dejó de recortar su conteo a 200 salidas y refleja todos los hilos únicos de la ventana activa; la lista visible continúa limitada a 30 elementos.
+- Validación: 57/57 pruebas backend, build backend, type-check y build frontend correctos.
+# Priorización durable de hilos YouTube — 2026-08-11
+- El modelo `YouTubeThreadCheckpoint` persiste `lastCheckedAt`, `lastSucceededAt`, `lastFailedAt` y `consecutiveFailures` con clave única `userId + threadId`.
+- El inventario enlaza cada comentario raíz con su conversación más reciente. Los hilos cuyo último mensaje es del lead se ordenan primero; después se aplica antigüedad de revisión y, como desempate, actividad saliente reciente.
+- Cada consulta exitosa actualiza el checkpoint y restablece sus fallos. Los errores se aíslan por hilo, actualizan el checkpoint y no detienen el resto del lote.
+- `lastReplyPollingSummary` añade únicamente los contadores seguros `urgentThreads` y `threadFailures`; el monitor genera `thread_polling_failures` cuando corresponde.
+- Validación: 59/59 pruebas backend, build backend, type-check y build frontend correctos.
+# Memoria conversacional de ALMA — 2026-08-11
+- `ConversationService.getRecentMessages` recupera como máximo 12 mensajes desde MongoDB; `AlmaService` elimina de esa ventana el comentario entrante recién persistido y entrega al proveedor las últimas diez intervenciones anteriores.
+- `AIReplyContext.history` contiene únicamente `{ sender, text }` para lead y ALMA, con un máximo de 1.000 caracteres por mensaje. Gemini recibe el historial serializado como JSON y reglas explícitas contra preguntas o solicitudes de datos repetidas.
+- Si una automatización vuelve a coincidir y su respuesta exacta ya figura como mensaje de ALMA en la conversación, no vuelve a publicar el texto fijo ni incrementa su ejecución; la respuesta se genera con el contexto acumulado.
+- `MockAIProvider` usa el historial para avanzar por preguntas deterministas de descubrimiento en desarrollo y pruebas.
+- Validación: 60/60 pruebas backend y build backend correcto.
+# WhatsApp conversacional y handoff humano — 2026-08-11
+- `WhatsAppController` valida HMAC, reclama cada `message.id`, persiste el mensaje entrante y, si `WHATSAPP_AUTO_REPLY_ENABLED=true`, llama a `AlmaService` en vez de invocar Gemini directamente.
+- El canal comparte memoria conversacional, automatizaciones por palabra clave, calificación del lead, tareas, agenda y `MessagingService`. Una conversación en `handoff_requested` o `human_controlled` sigue registrando entradas, pero ALMA no responde.
+- `Conversation` persiste `controlMode`, motivo y fechas de solicitud, toma y reanudación. Las reglas iniciales transfieren solicitudes explícitas de una persona y asuntos sensibles como quejas, fraude o temas legales; los casos comerciales normales continúan automatizados.
+- El CRM expone controles para pausar/tomar y reanudar. Durante `human_controlled`, `POST /api/v1/crm/conversations/:conversationId/messages` publica mediante el proveedor oficial o mock de WhatsApp, registra el mensaje como `sender=user` y mantiene ALMA pausada ante fallos.
+- Seguridad: los endpoints filtran por `userId`, solo permiten envío humano a leads WhatsApp con teléfono persistido, limitan el texto a 1.000 caracteres y reutilizan la auditoría de `OutboundMessage`.
+- Estado operativo: Render mantiene WhatsApp en mock y auto-respuesta apagada. Instagram/Facebook permanecen sin activar; el motor central queda reutilizable cuando el propietario lo autorice.
+- Validación: 62/62 pruebas backend, build backend/frontend y type-check frontend correctos.
+# Preparación operativa de WhatsApp oficial — 2026-08-11
+- `render.yaml` solicita como secretos externos `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET` y `VERIFY_TOKEN`; los modos siguen en `mock/false` hasta completar Meta.
+- La ruta pública para verificación y eventos es `/api/v1/whatsapp/webhook`. La activación requiere que el token de verificación coincida y que Meta firme los POST con el App Secret configurado.
+- El despliegue debe validarse primero con entrega simulada y después con un único número autorizado en live. La prueba final incluye respuesta autónoma y transferencia humana desde el CRM.
+- Estado: faltan las cuatro credenciales externas; no se realizó activación real ni se modificaron Instagram/Facebook.

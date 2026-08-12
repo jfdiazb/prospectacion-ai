@@ -30,6 +30,11 @@ export interface ILead {
   following?: number;
   engagement?: number;
   status: string;
+  controlMode?: 'automated' | 'handoff_requested' | 'human_controlled';
+  handoffReason?: string;
+  handoffRequestedAt?: Date;
+  humanControlStartedAt?: Date;
+  automationResumedAt?: Date;
   interestLevel: string;
   score: number;
   tags: string[];

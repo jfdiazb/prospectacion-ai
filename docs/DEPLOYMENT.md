@@ -67,3 +67,16 @@ La base OAuth e ingesta ya está implementada, pero conserva ambos modos en `moc
 - `VITE_API_URL`
 
 Las credenciales de YouTube, Gemini y Zoom no son necesarias para este primer despliegue en mock.
+
+## 6. Activación controlada de WhatsApp
+
+El Blueprint declara las credenciales como valores externos y mantiene `WHATSAPP_MESSAGING_MODE=mock` y `WHATSAPP_AUTO_REPLY_ENABLED=false` hasta terminar esta secuencia:
+
+1. En una aplicación oficial de Meta con WhatsApp, obtiene el token de sistema, Phone Number ID y App Secret. No copies esos valores al repositorio ni a archivos versionados.
+2. En Render configura `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET` y un `VERIFY_TOKEN` aleatorio exclusivo.
+3. En Meta registra como callback `https://alma-backend-9eo1.onrender.com/api/v1/whatsapp/webhook`, usa el mismo `VERIFY_TOKEN` y suscribe los eventos de mensajes.
+4. Conserva primero `WHATSAPP_MESSAGING_MODE=mock`, cambia temporalmente `WHATSAPP_AUTO_REPLY_ENABLED=true` y verifica con un payload firmado controlado que el CRM registra una entrega `simulated`.
+5. Cambia `WHATSAPP_MESSAGING_MODE=live`, reinicia y envía un único mensaje desde un número autorizado. Confirma lead, conversación, `InboundEvent`, `OutboundMessage` y respuesta recibida.
+6. Prueba una solicitud como `quiero hablar con una persona`: el CRM debe mostrar `handoff_requested`; toma el control, responde manualmente y luego usa `Devolver a ALMA`.
+
+Ante cualquier error de firma, OAuth o entrega, vuelve a `WHATSAPP_AUTO_REPLY_ENABLED=false` antes de diagnosticar. Instagram y Facebook permanecen en `mock` durante esta activación.
