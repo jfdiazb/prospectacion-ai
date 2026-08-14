@@ -14,6 +14,8 @@ import { HunterPage } from '@pages/HunterPage';
 import { ScraperPage } from '@pages/ScraperPage';
 import { NotFoundPage } from '@pages/NotFoundPage';
 import { YouTubeMonitorPage } from '@pages/YouTubeMonitorPage';
+import { PrivacyPolicyPage } from '@pages/PrivacyPolicyPage';
+import { DataDeletionPage } from '@pages/DataDeletionPage';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -33,6 +35,8 @@ function App() {
         <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/privacidad" element={<PrivacyPolicyPage />} />
+        <Route path="/eliminacion-datos" element={<DataDeletionPage />} />
         <Route
           path="/dashboard"
           element={
