@@ -19,7 +19,9 @@ services:
       - key: CORS_ORIGIN
         sync: false
       - key: AI_MODE
-        value: mock
+        value: live
+      - key: GEMINI_API_KEY
+        sync: false
       - key: YOUTUBE_MESSAGING_MODE
         value: live
       - key: YOUTUBE_INGESTION_MODE

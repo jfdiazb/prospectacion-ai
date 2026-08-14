@@ -61,7 +61,7 @@ export class AlmaService {
       message.sender === 'ai' && message.text.trim() === context.automation!.response.trim()));
     if (automationAlreadySent) context.automation = undefined;
     const aiProvider = context.automation ? null : getAIProvider();
-    const generatedResponse = context.automation?.response ?? await aiProvider!.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent, history });
+    const generatedResponse = context.automation?.response ?? await aiProvider!.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent, platform: context.platform, history });
     const meetingOutcome = await MeetingOrchestratorService.process({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: context.text, wantsMeeting, platform: context.platform });
     const response = meetingOutcome.reply ?? generatedResponse;
 
