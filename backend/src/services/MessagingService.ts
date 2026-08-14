@@ -24,10 +24,21 @@ export class MessagingService {
     try {
       const result = await selectedProvider.sendMessage({ userId: context.userId, text: context.text, recipient: context.recipient });
       await OutboundMessage.updateOne({ _id: outbound._id }, { deliveryStatus: result.simulated ? 'simulated' : 'sent', externalMessageId: result.externalMessageId, sentAt: new Date(), simulatedDelivery: result.simulated });
+      console.info('Outbound messaging delivery completed', {
+        channel,
+        provider: selectedProvider.name,
+        deliveryStatus: result.simulated ? 'simulated' : 'sent',
+      });
       return result.simulated ? 'simulated' : 'sent';
     } catch (error) {
       const providerError = error instanceof MessagingProviderError ? error : new MessagingProviderError('Error inesperado de mensajería', 'MESSAGING_UNKNOWN_ERROR');
       await OutboundMessage.updateOne({ _id: outbound._id }, { deliveryStatus: 'failed', failedAt: new Date(), errorCode: providerError.code, errorMessage: providerError.message, simulatedDelivery: false });
+      console.warn('Outbound messaging delivery failed', {
+        channel,
+        provider: selectedProvider.name,
+        errorCode: providerError.code,
+        httpStatus: providerError.status,
+      });
       return 'failed';
     }
   }
