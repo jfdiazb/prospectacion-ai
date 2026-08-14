@@ -355,6 +355,11 @@ describe('Auth integration tests', () => {
     const rawPayload = JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ id: eventId, from: '573001234567', type: 'text', text: { body: 'Hola ALMA' } }] } }] }] });
     const signature = `sha256=${crypto.createHmac('sha256', process.env.WHATSAPP_APP_SECRET).update(Buffer.from(rawPayload)).digest('hex')}`;
     const config = { headers: { 'Content-Type': 'application/json', 'x-hub-signature-256': signature } };
+    const rejected = await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, {
+      headers: { 'Content-Type': 'application/json', 'x-hub-signature-256': 'sha256=invalid' },
+      validateStatus: () => true,
+    });
+    expect(rejected.status).toBe(401);
     expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(200);
     expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(200);
     const lead = await Lead.findOne({ userId: owner!._id, phone: '573001234567' });
