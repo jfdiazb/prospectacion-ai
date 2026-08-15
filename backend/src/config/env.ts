@@ -39,6 +39,8 @@ export const validateServerEnvironment = (): void => {
   }
   const whatsappMessagingMode = process.env.WHATSAPP_MESSAGING_MODE || 'live';
   if (!['mock', 'live'].includes(whatsappMessagingMode)) throw new Error('WHATSAPP_MESSAGING_MODE debe ser mock o live');
+  const whatsappInboundMaxAgeMs = Number(process.env.WHATSAPP_INBOUND_MAX_AGE_MS || 600000);
+  if (!Number.isFinite(whatsappInboundMaxAgeMs) || whatsappInboundMaxAgeMs < 60000) throw new Error('WHATSAPP_INBOUND_MAX_AGE_MS debe ser un número de al menos 60000');
   if (process.env.WHATSAPP_AUTO_REPLY_ENABLED === 'true' && whatsappMessagingMode === 'live') {
     const whatsappMissing = ['WHATSAPP_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_APP_SECRET'].filter(key => !process.env[key]?.trim());
     if (whatsappMissing.length) throw new Error(`Faltan variables para WhatsApp live: ${whatsappMissing.join(', ')}`);

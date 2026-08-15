@@ -14,6 +14,7 @@ const inboundEventSchema = new Schema({
   processingAttempts: { type: Number, default: 0 },
   retryAfter: Date,
   processingFailedAt: Date,
+  conversationRecordedAt: Date,
   processedAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 

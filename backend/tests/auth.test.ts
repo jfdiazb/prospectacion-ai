@@ -56,6 +56,7 @@ describe('Auth integration tests', () => {
 
   beforeEach(async () => {
     process.env.SCHEDULING_MODE = 'zoom';
+    delete process.env.WHATSAPP_ACTIVATION_ALLOWLIST;
     delete process.env.CALENDLY_BOOKING_URL;
     delete process.env.CALENDLY_WEBHOOK_SIGNING_KEY;
     const collections = Object.keys(mongoose.connection.collections);
@@ -355,9 +356,10 @@ describe('Auth integration tests', () => {
     const owner = await User.findOne({ email: 'whatsapp@example.com' });
     process.env.CRM_OWNER_ID = owner!._id.toString();
     process.env.WHATSAPP_APP_SECRET = 'whatsapp-test-secret';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = 'phone-number-id';
     process.env.WHATSAPP_AUTO_REPLY_ENABLED = 'false';
     const eventId = 'wamid.webhook-compatible-1';
-    const rawPayload = JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ id: eventId, from: '573001234567', type: 'text', text: { body: 'Hola ALMA' } }] } }] }] });
+    const rawPayload = JSON.stringify({ entry: [{ changes: [{ value: { metadata: { phone_number_id: 'phone-number-id', display_phone_number: '15550000000' }, messages: [{ id: eventId, from: '573001234567', timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: 'Hola ALMA' } }] } }] }] });
     const signature = `sha256=${crypto.createHmac('sha256', process.env.WHATSAPP_APP_SECRET).update(Buffer.from(rawPayload)).digest('hex')}`;
     const config = { headers: { 'Content-Type': 'application/json', 'x-hub-signature-256': signature } };
     const rejected = await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, {
@@ -374,15 +376,69 @@ describe('Auth integration tests', () => {
     expect(await OutboundMessage.countDocuments({ sourceEventId: eventId })).toBe(0);
   });
 
+  test('filters unsafe WhatsApp deliveries and processes every valid message in a batch', async () => {
+    await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'whatsapp-safety@example.com', password: 'password123', fullName: 'WhatsApp Safety Owner' });
+    const owner = await User.findOne({ email: 'whatsapp-safety@example.com' });
+    process.env.CRM_OWNER_ID = owner!._id.toString();
+    process.env.WHATSAPP_APP_SECRET = 'whatsapp-safety-secret';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = 'expected-phone-number-id';
+    process.env.WHATSAPP_AUTO_REPLY_ENABLED = 'false';
+    process.env.WHATSAPP_ACTIVATION_ALLOWLIST = '573001111111,573002222222';
+    const postSigned = async (payload: object) => {
+      const raw = JSON.stringify(payload);
+      const signature = `sha256=${crypto.createHmac('sha256', process.env.WHATSAPP_APP_SECRET!).update(Buffer.from(raw)).digest('hex')}`;
+      return axios.post(`${baseURL}/api/v1/whatsapp/webhook`, raw, { headers: { 'Content-Type': 'application/json', 'x-hub-signature-256': signature } });
+    };
+    const currentTimestamp = String(Math.floor(Date.now() / 1000));
+    const value = (phoneNumberId: string, messages: any[]) => ({ metadata: { phone_number_id: phoneNumberId, display_phone_number: '15550000000' }, messages });
+
+    await postSigned({ entry: [{ changes: [{ value: value('wrong-phone-number-id', [{ id: 'wamid.wrong-recipient', from: '573001111111', timestamp: currentTimestamp, type: 'text', text: { body: 'Hola' } }]) }] }] });
+    await postSigned({ entry: [{ changes: [{ value: value('expected-phone-number-id', [{ id: 'wamid.stale', from: '573001111111', timestamp: String(Math.floor((Date.now() - 3600000) / 1000)), type: 'text', text: { body: 'Hola' } }]) }] }] });
+    await postSigned({ entry: [{ changes: [{ value: value('expected-phone-number-id', [{ id: 'wamid.not-allowed', from: '573009999999', timestamp: currentTimestamp, type: 'text', text: { body: 'Hola' } }]) }] }] });
+    expect(await InboundEvent.countDocuments({ userId: owner!._id })).toBe(0);
+
+    await postSigned({ entry: [{ changes: [{ value: value('expected-phone-number-id', [
+      { id: 'wamid.batch-1', from: '573001111111', timestamp: currentTimestamp, type: 'text', text: { body: 'Primer mensaje' } },
+      { id: 'wamid.batch-2', from: '573002222222', timestamp: currentTimestamp, type: 'text', text: { body: 'Segundo mensaje' } },
+    ]) }] }] });
+    expect(await InboundEvent.countDocuments({ userId: owner!._id, channel: 'whatsapp', processingState: 'completed' })).toBe(2);
+    expect(await Lead.countDocuments({ userId: owner!._id, platform: 'whatsapp' })).toBe(2);
+    expect(await OutboundMessage.countDocuments({ userId: owner!._id, channel: 'whatsapp' })).toBe(0);
+  });
+
+  test('recovers a failed WhatsApp event without accepting concurrent redelivery', async () => {
+    await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'whatsapp-retry@example.com', password: 'password123', fullName: 'WhatsApp Retry Owner' });
+    const owner = await User.findOne({ email: 'whatsapp-retry@example.com' });
+    process.env.CRM_OWNER_ID = owner!._id.toString();
+    process.env.WHATSAPP_APP_SECRET = 'whatsapp-retry-secret';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = 'retry-phone-number-id';
+    process.env.WHATSAPP_AUTO_REPLY_ENABLED = 'true';
+    process.env.WHATSAPP_MESSAGING_MODE = 'mock';
+    const eventId = 'wamid.retry-1';
+    const rawPayload = JSON.stringify({ entry: [{ changes: [{ value: { metadata: { phone_number_id: 'retry-phone-number-id', display_phone_number: '15550000000' }, messages: [{ id: eventId, from: '573003333333', timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: 'Hola ALMA' } }] } }] }] });
+    const signature = `sha256=${crypto.createHmac('sha256', process.env.WHATSAPP_APP_SECRET).update(Buffer.from(rawPayload)).digest('hex')}`;
+    const config = { headers: { 'Content-Type': 'application/json', 'x-hub-signature-256': signature }, validateStatus: () => true };
+    const processMessage = jest.spyOn(AlmaService, 'processMessage').mockRejectedValueOnce(new Error('simulated interruption')).mockResolvedValueOnce('ok');
+
+    expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(500);
+    expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(500);
+    await InboundEvent.updateOne({ externalEventId: eventId }, { $set: { retryAfter: new Date(Date.now() - 1000) } });
+    expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(200);
+    expect(await InboundEvent.findOne({ externalEventId: eventId })).toMatchObject({ processingState: 'completed', processingAttempts: 2 });
+    expect(processMessage).toHaveBeenCalledTimes(2);
+    processMessage.mockRestore();
+  });
+
   test('runs WhatsApp through ALMA and supports authenticated human handoff control', async () => {
     const register = await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'handoff@example.com', password: 'password123', fullName: 'Handoff Owner' });
     const owner = await User.findOne({ email: 'handoff@example.com' });
     process.env.CRM_OWNER_ID = owner!._id.toString();
     process.env.WHATSAPP_APP_SECRET = 'whatsapp-handoff-secret';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = 'phone-number-id';
     process.env.WHATSAPP_AUTO_REPLY_ENABLED = 'true';
     process.env.WHATSAPP_MESSAGING_MODE = 'mock';
     const eventId = 'wamid.handoff-1';
-    const rawPayload = JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ id: eventId, from: '573009998877', type: 'text', text: { body: 'Quiero hablar con un asesor humano' } }] } }] }] });
+    const rawPayload = JSON.stringify({ entry: [{ changes: [{ value: { metadata: { phone_number_id: 'phone-number-id', display_phone_number: '15550000000' }, messages: [{ id: eventId, from: '573009998877', timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: 'Quiero hablar con un asesor humano' } }] } }] }] });
     const signature = `sha256=${crypto.createHmac('sha256', process.env.WHATSAPP_APP_SECRET).update(Buffer.from(rawPayload)).digest('hex')}`;
     await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, { headers: { 'Content-Type': 'application/json', 'x-hub-signature-256': signature } });
 

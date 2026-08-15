@@ -62,6 +62,10 @@ services:
         value: mock
       - key: WHATSAPP_AUTO_REPLY_ENABLED
         value: "false"
+      - key: WHATSAPP_INBOUND_MAX_AGE_MS
+        value: "600000"
+      - key: WHATSAPP_ACTIVATION_ALLOWLIST
+        sync: false
       - key: WHATSAPP_TOKEN
         sync: false
       - key: WHATSAPP_PHONE_NUMBER_ID
