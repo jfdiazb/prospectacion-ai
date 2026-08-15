@@ -71,6 +71,11 @@ describe('Auth integration tests', () => {
     );
 
     expect(responses.every(response => response.status === 200)).toBe(true);
+    expect(responses[0].data.runtime.ai).toEqual({
+      mode: 'mock',
+      provider: 'mock',
+      fallbackProvider: null,
+    });
   });
 
   test('register then login should work', async () => {

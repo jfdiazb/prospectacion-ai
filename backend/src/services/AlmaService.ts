@@ -61,14 +61,21 @@ export class AlmaService {
       message.sender === 'ai' && message.text.trim() === context.automation!.response.trim()));
     if (automationAlreadySent) context.automation = undefined;
     const aiProvider = context.automation ? null : getAIProvider();
-    const generatedResponse = context.automation?.response ?? await aiProvider!.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent, platform: context.platform, history });
+    const aiResult = context.automation ? null : await aiProvider!.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent, platform: context.platform, history });
+    const generatedResponse = context.automation?.response ?? aiResult!.text;
     const meetingOutcome = await MeetingOrchestratorService.process({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: context.text, wantsMeeting, platform: context.platform });
     const response = meetingOutcome.reply ?? generatedResponse;
+    const aiProviderUsed = meetingOutcome.reply ? undefined : aiResult?.aiProviderUsed;
+    if (aiProviderUsed) console.info('ALMA AI response generated', {
+      event: 'alma_ai_response_generated',
+      aiProviderConfigured: aiProvider!.name,
+      aiProviderUsed,
+    });
 
     await ConversationService.addMessage(context.conversationId, context.userId, { sender: 'ai', text: response, platform: context.platform });
     const deliveryStatus = await MessagingService.send({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: response, recipient: context.recipient });
     if (context.automation && deliveryStatus !== 'duplicate') await AutomationService.recordExecution(context.automation.flowId, context.userId, deliveryStatus !== 'failed');
-    await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'message_generated', description: context.automation ? 'ALMA ejecutó una automatización por palabra clave' : 'ALMA generó y procesó una respuesta saliente', metadata: context.automation ? { automationFlowId: context.automation.flowId, responseSource: 'automation' } : { aiProvider: aiProvider!.name } });
+    await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'message_generated', description: context.automation ? 'ALMA ejecutó una automatización por palabra clave' : 'ALMA generó y procesó una respuesta saliente', metadata: context.automation ? { automationFlowId: context.automation.flowId, responseSource: 'automation' } : aiProviderUsed ? { aiProvider: aiProvider!.name, aiProviderUsed } : { responseSource: 'meeting_orchestrator' } });
     return response;
   }
 

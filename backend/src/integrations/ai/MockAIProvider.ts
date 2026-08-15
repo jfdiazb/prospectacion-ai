@@ -1,9 +1,13 @@
-import type { AIProvider, AIReplyContext } from './AIProvider';
+import type { AIProvider, AIReplyContext, AIReplyResult } from './AIProvider';
 
 export class MockAIProvider implements AIProvider {
   readonly name = 'mock';
 
-  async generateReply(context: AIReplyContext): Promise<string> {
+  async generateReply(context: AIReplyContext): Promise<AIReplyResult> {
+    return { text: this.generateText(context), aiProviderUsed: 'mock' };
+  }
+
+  private generateText(context: AIReplyContext): string {
     if (context.intent === 'rejection') return 'Entendido. No te enviaré más seguimientos. Gracias por avisarme.';
     if (context.intent === 'meeting') return 'Perfecto. Para programar la reunión necesito tu correo, fecha y hora preferidas.';
     if (context.isNewLead) return '¡Hola! Soy ALMA. Gracias por escribir INFO. Para orientarte mejor, ¿qué resultado buscas conseguir?';

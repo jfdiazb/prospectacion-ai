@@ -28,7 +28,7 @@ describe('AI provider selection', () => {
   test('Gemini receives conversation history and an anti-repetition instruction', async () => {
     const generate = jest.spyOn(GeminiService, 'generateResponse').mockResolvedValue('Respuesta distinta');
     const provider = new GeminiAIProvider();
-    await provider.generateReply({
+    const result = await provider.generateReply({
       incomingText: 'Ya te dije que quiero conseguir clientes', isNewLead: false, intent: 'discovery', platform: 'whatsapp',
       history: [{ sender: 'ai', text: '¿Qué resultado buscas conseguir?' }, { sender: 'lead', text: 'Quiero conseguir clientes' }],
     });
@@ -36,16 +36,18 @@ describe('AI provider selection', () => {
     expect(generate).toHaveBeenCalledWith(expect.stringContaining('No repitas preguntas'));
     expect(generate).toHaveBeenCalledWith(expect.stringContaining('Quiero conseguir clientes'));
     expect(generate).toHaveBeenCalledWith(expect.stringContaining('WhatsApp privado'));
+    expect(result).toEqual({ text: 'Respuesta distinta', aiProviderUsed: 'gemini' });
     generate.mockRestore();
   });
 
   test('Gemini failure falls back without breaking the conversation', async () => {
     const generate = jest.spyOn(GeminiService, 'generateResponse').mockRejectedValue(new Error('provider unavailable'));
     const provider = new GeminiAIProvider();
-    const reply = await provider.generateReply({
+    const result = await provider.generateReply({
       incomingText: 'Quiero informacion', isNewLead: false, intent: 'discovery', platform: 'whatsapp', history: [],
     });
-    expect(reply).toContain('principal dificultad');
+    expect(result.text).toContain('principal dificultad');
+    expect(result.aiProviderUsed).toBe('mock');
     generate.mockRestore();
   });
 

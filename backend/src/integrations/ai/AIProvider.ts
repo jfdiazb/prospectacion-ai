@@ -6,7 +6,14 @@ export interface AIReplyContext {
   history: Array<{ sender: 'lead' | 'ai'; text: string }>;
 }
 
+export type AIProviderUsed = 'gemini' | 'mock';
+
+export interface AIReplyResult {
+  text: string;
+  aiProviderUsed: AIProviderUsed;
+}
+
 export interface AIProvider {
   readonly name: string;
-  generateReply(context: AIReplyContext): Promise<string>;
+  generateReply(context: AIReplyContext): Promise<AIReplyResult>;
 }

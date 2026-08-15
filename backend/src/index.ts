@@ -4,6 +4,7 @@ import { connectDB } from './config/database';
 import { validateDatabaseEnvironment, validateServerEnvironment } from './config/env';
 import { startYouTubePolling } from './services/YouTubeIngestionService';
 import { startCalendlyPolling } from './services/CalendlyPollingService';
+import { getAIRuntimeStatus } from './integrations/ai';
 
 const port = Number(process.env.PORT ?? 5001);
 
@@ -13,7 +14,10 @@ export const startServer = async () => {
   await validateDatabaseEnvironment();
   startYouTubePolling();
   startCalendlyPolling();
-  return app.listen(port, () => console.info(`API ALMA iniciada en el puerto ${port}`));
+  return app.listen(port, () => {
+    console.info(`API ALMA iniciada en el puerto ${port}`);
+    console.info('ALMA AI runtime', getAIRuntimeStatus());
+  });
 };
 
 if (process.env.NODE_ENV !== 'test') {

@@ -14,6 +14,7 @@ import calendlyRoutes from './routes/calendlyRoutes';
 import automationRoutes from './routes/automationRoutes';
 import { errorMiddleware, notFoundMiddleware } from './middlewares/auth';
 import { generalLimiter } from './middlewares/rateLimiter';
+import { getAIRuntimeStatus } from './integrations/ai';
 
 const apiPrefix = '/api/v1';
 const configuredOrigins = (process.env.CORS_ORIGIN ?? '')
@@ -40,7 +41,11 @@ app.use(`${apiPrefix}/calendly/webhook`, express.raw({ type: 'application/json',
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/health', (_req, res) => {
-  res.status(200).json({ success: true, status: 'ok' });
+  res.status(200).json({
+    success: true,
+    status: 'ok',
+    runtime: { ai: getAIRuntimeStatus() },
+  });
 });
 
 app.use(generalLimiter);
