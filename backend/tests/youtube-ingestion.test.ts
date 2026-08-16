@@ -51,6 +51,13 @@ describe('YouTubeIngestionService polling cursor', () => {
     expect(JSON.stringify(failure)).not.toContain('sensitive detail');
   });
 
+  test('extracts OAuth refresh failures returned as a string', () => {
+    expect(YouTubeIngestionService.getApiFailure({
+      isAxiosError: true,
+      response: { status: 400, data: { error: 'invalid_grant', error_description: 'sensitive detail' } },
+    })).toEqual({ httpStatus: 400, reason: 'invalid_grant' });
+  });
+
   test('rotates reply coverage so excess threads are not excluded indefinitely', () => {
     const threads = Array.from({ length: 25 }, (_, index) => `thread-${index + 1}`);
     const cycles = Array.from({ length: 4 }, (_, index) =>

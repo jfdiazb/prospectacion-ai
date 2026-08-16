@@ -42,6 +42,10 @@ export class OperationalDiagnosticsService {
   static buildAlerts(input: { now: Date; youtube: any; meetings: { pendingBooking: number; futureScheduled: number; expiredScheduled: number; failed: number } }): DiagnosticAlert[] {
     const alerts: DiagnosticAlert[] = [];
     if (!input.youtube.connected) alerts.push({ severity: 'error', code: 'youtube_disconnected', message: 'YouTube no está conectado.' });
+    else if (input.youtube.pollingFailure?.operation === 'oauth_refresh') alerts.push({
+      severity: 'error', code: 'youtube_reconnect_required',
+      message: 'La autorización de YouTube dejó de ser válida; vuelve a conectar el canal.',
+    });
     else if (input.youtube.pollingFailure) alerts.push({
       severity: 'error', code: 'youtube_poll_failed',
       message: `YouTube rechazó el sondeo (${input.youtube.pollingFailure.reason || 'api_error'}).`,

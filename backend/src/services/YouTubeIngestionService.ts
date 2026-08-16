@@ -32,7 +32,12 @@ export class YouTubeIngestionService {
   static getApiFailure(error: unknown): { httpStatus?: number; reason: string } {
     if (!axios.isAxiosError(error)) return { reason: error instanceof Error ? error.name : 'unknown' };
     const data = error.response?.data as any;
-    const reason = data?.error?.errors?.[0]?.reason || data?.error?.status || error.code || 'api_error';
+    const reason = (typeof data?.error === 'string' ? data.error : undefined)
+      || data?.error?.errors?.[0]?.reason
+      || data?.error?.details?.[0]?.reason
+      || data?.error?.status
+      || error.code
+      || 'api_error';
     return { httpStatus: error.response?.status, reason: String(reason).slice(0, 80) };
   }
 
@@ -42,7 +47,9 @@ export class YouTubeIngestionService {
       try {
         await this.pollCredential(credential);
       } catch (error) {
-        const failure = { ...YouTubeIngestionService.getApiFailure(error), operation: 'comment_threads_list', recordedAt: new Date() };
+        const apiFailure = YouTubeIngestionService.getApiFailure(error);
+        const operation = ['invalid_grant', 'invalid_client'].includes(apiFailure.reason) ? 'oauth_refresh' : 'comment_threads_list';
+        const failure = { ...apiFailure, operation, recordedAt: new Date() };
         credential.lastPollingFailure = failure;
         await credential.save().catch(() => undefined);
         console.error('YouTube polling error', { userId: credential.userId.toString(), httpStatus: failure.httpStatus, reason: failure.reason, operation: failure.operation });
