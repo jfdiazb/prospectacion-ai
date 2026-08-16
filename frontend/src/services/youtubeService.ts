@@ -14,6 +14,7 @@ export interface OperationalDiagnostics {
       processed?: number; processing_failed?: number; invalid?: number; own_channel?: number; not_eligible?: number; duplicate?: number;
       recordedAt?: string;
     };
+    pollingFailure?: { httpStatus?: number; reason?: string; operation?: string; recordedAt?: string };
     replies?: { activeThreads?: number; polledThreads?: number; coverageCycleCount?: number; urgentThreads?: number; threadFailures?: number; replies?: number; processed?: number; not_eligible?: number; duplicate?: number };
   };
   calendly: {

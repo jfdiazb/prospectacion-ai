@@ -47,9 +47,15 @@ export class YouTubeTokenService {
     });
     const item = channel.data.items?.[0];
     if (!item?.id) throw new Error('No se encontró un canal de YouTube asociado');
-    await YouTubeCredential.findOneAndUpdate({ userId }, { userId, channelId: item.id, channelTitle: item.snippet?.title,
-      refreshToken: this.encrypt(payload.refresh_token), accessToken: this.encrypt(payload.access_token),
-      accessTokenExpiresAt: new Date(Date.now() + payload.expires_in * 1000), scope: payload.scope?.split(' ') ?? [], connectedAt: new Date(), lastPolledAt: new Date(),
+    const existing: any = await YouTubeCredential.findOne({ userId }).select('connectedAt lastPolledAt').lean();
+    const now = new Date();
+    await YouTubeCredential.findOneAndUpdate({ userId }, {
+      $set: { userId, channelId: item.id, channelTitle: item.snippet?.title,
+        refreshToken: this.encrypt(payload.refresh_token), accessToken: this.encrypt(payload.access_token),
+        accessTokenExpiresAt: new Date(Date.now() + payload.expires_in * 1000), scope: payload.scope?.split(' ') ?? [],
+        connectedAt: existing?.connectedAt || now, lastPolledAt: existing?.lastPolledAt || now,
+      },
+      $unset: { lastPollingFailure: 1 },
     }, { upsert: true });
   }
 

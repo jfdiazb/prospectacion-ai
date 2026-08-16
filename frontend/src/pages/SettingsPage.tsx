@@ -43,6 +43,8 @@ export const SettingsPage = () => {
     finally { setYoutubeLoading(false); }
   };
 
+  const youtubeRequiresReconnect = diagnostics?.alerts.some(alert => alert.code === 'youtube_reconnect_required') ?? false;
+
   return (
     <AppLayout title="Configuración" subtitle="Ajusta tu cuenta, notificaciones y preferencias del sistema.">
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
@@ -120,7 +122,10 @@ export const SettingsPage = () => {
               </div>
             </div>
             {youtube.connected
-              ? <Button variant="secondary" loading={youtubeLoading} onClick={disconnectYouTube}>Desconectar</Button>
+              ? <div className="flex flex-wrap gap-3">
+                  {youtubeRequiresReconnect && <Button loading={youtubeLoading} onClick={connectYouTube}>Reconectar YouTube</Button>}
+                  <Button variant="secondary" loading={youtubeLoading} onClick={disconnectYouTube}>Desconectar</Button>
+                </div>
               : <Button loading={youtubeLoading} onClick={connectYouTube}>Conectar YouTube</Button>}
           </motion.div>
         </Card>
