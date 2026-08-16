@@ -37,7 +37,7 @@ export const validateServerEnvironment = (): void => {
     const metaMissing = ['META_ACCESS_TOKEN', 'META_IG_USER_ID'].filter(key => !process.env[key]?.trim());
     if (metaMissing.length) throw new Error(`Faltan variables para mensajería Meta live: ${metaMissing.join(', ')}`);
   }
-  const whatsappMessagingMode = process.env.WHATSAPP_MESSAGING_MODE || 'live';
+  const whatsappMessagingMode = process.env.WHATSAPP_MESSAGING_MODE || 'mock';
   if (!['mock', 'live'].includes(whatsappMessagingMode)) throw new Error('WHATSAPP_MESSAGING_MODE debe ser mock o live');
   const whatsappInboundMaxAgeMs = Number(process.env.WHATSAPP_INBOUND_MAX_AGE_MS || 600000);
   if (!Number.isFinite(whatsappInboundMaxAgeMs) || whatsappInboundMaxAgeMs < 60000) throw new Error('WHATSAPP_INBOUND_MAX_AGE_MS debe ser un número de al menos 60000');

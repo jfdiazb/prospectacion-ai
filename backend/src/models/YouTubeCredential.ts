@@ -17,6 +17,7 @@ const youtubeCredentialSchema = new Schema({
   lastPolledAt: Date,
   lastRepliesPolledAt: Date,
   lastPollingSummary: { type: Schema.Types.Mixed },
+  lastPollingFailure: { type: Schema.Types.Mixed },
   lastReplyPollingSummary: { type: Schema.Types.Mixed },
   connectedAt: { type: Date, default: Date.now },
 }, { timestamps: true });

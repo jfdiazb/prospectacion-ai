@@ -8,7 +8,7 @@ export class OperationalDiagnosticsService {
   static async getForUser(userId: string) {
     const now = new Date();
     const credential: any = await YouTubeCredential.findOne({ userId }).select(
-      'channelTitle connectedAt lastPolledAt lastRepliesPolledAt lastPollingSummary lastReplyPollingSummary',
+      'channelTitle connectedAt lastPolledAt lastRepliesPolledAt lastPollingSummary lastPollingFailure lastReplyPollingSummary',
     ).lean();
     const [pendingBooking, futureScheduled, expiredScheduled, failedMeetings, latestCalendly] = await Promise.all([
       Meeting.countDocuments({ userId, status: 'pending_booking' }),
@@ -23,6 +23,7 @@ export class OperationalDiagnosticsService {
       lastPolledAt: credential?.lastPolledAt,
       lastRepliesPolledAt: credential?.lastRepliesPolledAt,
       polling: credential?.lastPollingSummary,
+      pollingFailure: credential?.lastPollingFailure,
       replies: credential?.lastReplyPollingSummary,
     };
     const meetings = { pendingBooking, futureScheduled, expiredScheduled, failed: failedMeetings, latestCalendly };
@@ -41,6 +42,10 @@ export class OperationalDiagnosticsService {
   static buildAlerts(input: { now: Date; youtube: any; meetings: { pendingBooking: number; futureScheduled: number; expiredScheduled: number; failed: number } }): DiagnosticAlert[] {
     const alerts: DiagnosticAlert[] = [];
     if (!input.youtube.connected) alerts.push({ severity: 'error', code: 'youtube_disconnected', message: 'YouTube no está conectado.' });
+    else if (input.youtube.pollingFailure) alerts.push({
+      severity: 'error', code: 'youtube_poll_failed',
+      message: `YouTube rechazó el sondeo (${input.youtube.pollingFailure.reason || 'api_error'}).`,
+    });
     else if (!input.youtube.lastPolledAt) alerts.push({ severity: 'warning', code: 'youtube_never_polled', message: 'YouTube está conectado, pero aún no registra un sondeo.' });
     else if (input.now.getTime() - new Date(input.youtube.lastPolledAt).getTime() > 5 * 60 * 1000) alerts.push({ severity: 'error', code: 'youtube_poll_stale', message: 'El sondeo de YouTube lleva más de cinco minutos sin actualizarse.' });
     else alerts.push({ severity: 'healthy', code: 'youtube_healthy', message: 'YouTube está conectado y el sondeo está activo.' });

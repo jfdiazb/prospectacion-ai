@@ -29,10 +29,24 @@ type ReplyPollingSummary = Record<CommentProcessingResult, number> & {
 export class YouTubeIngestionService {
   constructor(private readonly http: AxiosInstance = axios, private readonly tokens = new YouTubeTokenService(http)) {}
 
+  static getApiFailure(error: unknown): { httpStatus?: number; reason: string } {
+    if (!axios.isAxiosError(error)) return { reason: error instanceof Error ? error.name : 'unknown' };
+    const data = error.response?.data as any;
+    const reason = data?.error?.errors?.[0]?.reason || data?.error?.status || error.code || 'api_error';
+    return { httpStatus: error.response?.status, reason: String(reason).slice(0, 80) };
+  }
+
   async pollAll(): Promise<number> {
     const credentials: any[] = await YouTubeCredential.find({});
     for (const credential of credentials) {
-      try { await this.pollCredential(credential); } catch (error) { console.error('YouTube polling error', { userId: credential.userId.toString(), message: error instanceof Error ? error.message : 'unknown' }); }
+      try {
+        await this.pollCredential(credential);
+      } catch (error) {
+        const failure = { ...YouTubeIngestionService.getApiFailure(error), operation: 'comment_threads_list', recordedAt: new Date() };
+        credential.lastPollingFailure = failure;
+        await credential.save().catch(() => undefined);
+        console.error('YouTube polling error', { userId: credential.userId.toString(), httpStatus: failure.httpStatus, reason: failure.reason, operation: failure.operation });
+      }
     }
     return credentials.length;
   }
@@ -67,6 +81,7 @@ export class YouTubeIngestionService {
       ...summary,
     };
     credential.lastPollingSummary = { ...credentialSummary, recordedAt: new Date() };
+    credential.lastPollingFailure = undefined;
     await credential.save();
     console.info('YouTube credential polling summary', credentialSummary);
   }

@@ -41,6 +41,16 @@ describe('YouTubeIngestionService polling cursor', () => {
     expect(YouTubeIngestionService.shouldPollReplies({ lastRepliesPolledAt: new Date('2026-08-08T18:00:00.000Z') }, now)).toBe(true);
   });
 
+  test('extracts a privacy-safe Google API failure reason', () => {
+    const failure = YouTubeIngestionService.getApiFailure({
+      isAxiosError: true,
+      response: { status: 400, data: { error: { errors: [{ reason: 'invalidFilters', message: 'sensitive detail' }] } } },
+    });
+
+    expect(failure).toEqual({ httpStatus: 400, reason: 'invalidFilters' });
+    expect(JSON.stringify(failure)).not.toContain('sensitive detail');
+  });
+
   test('rotates reply coverage so excess threads are not excluded indefinitely', () => {
     const threads = Array.from({ length: 25 }, (_, index) => `thread-${index + 1}`);
     const cycles = Array.from({ length: 4 }, (_, index) =>
