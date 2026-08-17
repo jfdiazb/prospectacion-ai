@@ -106,6 +106,7 @@ describe('AI provider selection', () => {
     expect(fingerprint).not.toContain('resultado');
     expect(ConversationService.classifyQuestionTopic('¿Qué resultado buscas conseguir?')).toBe('desired_outcome');
     expect(ConversationService.classifyQuestionTopic('¿Qué has intentado hasta ahora?')).toBe('previous_attempts');
+    expect(ConversationService.classifyQuestionTopic('Define qué resultado ofreces a tu cliente.')).toBeUndefined();
   });
 
   test('Gemini failure falls back without breaking the conversation', async () => {

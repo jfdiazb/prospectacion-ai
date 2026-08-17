@@ -15,6 +15,7 @@ export class ConversationService {
   }
 
   static classifyQuestionTopic(value: string): string | undefined {
+    if (!/[?¿]/.test(value)) return undefined;
     const text = this.normalizeAIText(value);
     if (/que (resultado|cambio)|resultado (buscas|quieres|concreto)|gustaria conseguir/.test(text)) return 'desired_outcome';
     if (/(principal )?(dificultad|obstaculo)|que te esta frenando/.test(text)) return 'main_obstacle';
