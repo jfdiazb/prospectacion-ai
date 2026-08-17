@@ -65,6 +65,23 @@ describe('AI provider selection', () => {
     expect(result.text).not.toMatch(/obstáculo|frenando/i);
   });
 
+  test('advances after discovery questions are exhausted instead of leaving the lead unanswered', () => {
+    const exhaustedResponses = [
+      'Gracias por contármelo. ¿Qué obstáculo te está frenando más en este momento?',
+      'Entiendo. ¿Qué tipo de apoyo consideras que te ayudaría más?',
+      'Perfecto. ¿Qué cambio concreto te gustaría conseguir primero?',
+      'Gracias por explicarlo. Puedo orientarte sobre el siguiente paso cuando quieras.',
+    ];
+    const result = AlmaService.avoidRepeatedResponse('¿Qué tipo de apoyo consideras que te ayudaría más?', [], {
+      askedTopics: ['desired_outcome', 'main_obstacle', 'previous_attempts', 'support_needed'],
+      responseFingerprints: exhaustedResponses.map(response => ConversationService.fingerprintAIText(response)),
+    });
+
+    expect(result.deduplicated).toBe(true);
+    expect(result.text).toMatch(/suficiente contexto|siguiente paso|acción concreta/i);
+    expect(result.text).not.toContain('?');
+  });
+
   test('uses stable hashes without storing response text in conversational memory', () => {
     const fingerprint = ConversationService.fingerprintAIText('¿Qué resultado buscas?');
     expect(fingerprint).toMatch(/^[a-f0-9]{64}$/);

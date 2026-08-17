@@ -22,6 +22,10 @@ export const crmService = {
     const response = await apiClient.get('/crm/tasks');
     return response.data.data;
   },
+  async setTaskStatus(taskId: string, status: 'pending' | 'completed'): Promise<CrmTask> {
+    const response = await apiClient.patch(`/crm/tasks/${taskId}/status`, { status });
+    return response.data.data;
+  },
   async setConversationControl(conversationId: string, action: 'take' | 'resume'): Promise<CrmConversation> {
     const response = await apiClient.patch(`/crm/conversations/${conversationId}/control`, { action });
     return response.data.data;

@@ -319,6 +319,8 @@ describe('Auth integration tests', () => {
     expect(await service.processComment(owner!._id.toString(), comment, comment.id, 'owner-channel')).toBe('duplicate');
     expect(await InboundEvent.findById(failedEvent!._id)).toMatchObject({ processingState: 'completed', processingAttempts: 2 });
     expect(await OutboundMessage.countDocuments({ sourceEventId: 'youtube:youtube-recovery-1' })).toBe(1);
+    const recoveredConversation: any = await Conversation.findOne({ userId: owner!._id });
+    expect(recoveredConversation.messages.filter((message: any) => message.sender === 'lead')).toHaveLength(1);
   });
 
   test('an already claimed comment does not create a lead or outbound message', async () => {
@@ -456,6 +458,11 @@ describe('Auth integration tests', () => {
     expect(humanReply.data.data.messages.at(-1)).toMatchObject({ sender: 'user', platform: 'whatsapp' });
     const resumed = await axios.patch(`${baseURL}/api/v1/crm/conversations/${conversation._id}/control`, { action: 'resume' }, auth);
     expect(resumed.data.data.controlMode).toBe('automated');
-    expect(await Task.findOne({ conversationId: conversation._id, type: 'other' })).toMatchObject({ status: 'completed' });
+    const handoffTask = await Task.findOne({ conversationId: conversation._id, type: 'other' });
+    expect(handoffTask).toMatchObject({ status: 'completed' });
+    const reopenedTask = await axios.patch(`${baseURL}/api/v1/crm/tasks/${handoffTask!._id}/status`, { status: 'pending' }, auth);
+    expect(reopenedTask.data.data.status).toBe('pending');
+    const completedTask = await axios.patch(`${baseURL}/api/v1/crm/tasks/${handoffTask!._id}/status`, { status: 'completed' }, auth);
+    expect(completedTask.data.data.status).toBe('completed');
   });
 });

@@ -31,7 +31,7 @@ export class YouTubeMonitorService {
       OutboundMessage.find({ userId, channel: 'youtube', deliveryStatus: 'failed', createdAt: { $gte: since } })
         .sort({ failedAt: -1 }).limit(10).select('errorCode failedAt retryCount lastRetryAt').lean(),
       InboundEvent.findOne({ userId, channel: 'youtube' }).sort({ processedAt: -1 }).select('processedAt').lean(),
-      Conversation.find({ userId, status: 'active', lastMessage: { $gte: since } }).sort({ lastMessage: -1 }).slice('messages', -1).select('lastMessage messages').lean(),
+      Conversation.find({ userId, status: 'active', lastMessage: { $gte: since } }).sort({ lastMessage: -1 }).slice('messages', -1).select('lastMessage messages controlMode').lean(),
     ]);
 
     const unique = new Map<string, any>();
@@ -39,7 +39,8 @@ export class YouTubeMonitorService {
     const threads = [...unique.values()];
     const monitored = threads.slice(0, config.maxThreads);
     const deliveryCounts = Object.fromEntries(delivery.map((item: any) => [item._id, item.count]));
-    const unanswered = conversations.filter((conversation: any) => conversation.messages?.[0]?.sender === 'lead'
+    const unanswered = conversations.filter((conversation: any) => (!conversation.controlMode || conversation.controlMode === 'automated')
+      && conversation.messages?.[0]?.sender === 'lead'
       && Date.now() - new Date(conversation.lastMessage).getTime() > config.responseAlertMinutes * 60000);
     const sentCount = Number(deliveryCounts.sent || 0);
     const estimatedQuotaUnits = sentCount * 50;

@@ -85,4 +85,18 @@ router.get('/tasks', async (req: AuthRequest, res, next) => {
   } catch (error) { next(error); }
 });
 
+router.patch('/tasks/:taskId/status', async (req: AuthRequest, res, next) => {
+  try {
+    const status = req.body?.status;
+    if (!['pending', 'completed'].includes(status)) return res.status(400).json({ success: false, message: 'El estado debe ser pending o completed' });
+    const task = await Task.findOneAndUpdate(
+      { _id: req.params.taskId, userId: req.userId },
+      { $set: { status } },
+      { new: true },
+    ).populate('leadId');
+    if (!task) return res.status(404).json({ success: false, message: 'Tarea no encontrada' });
+    return res.json({ success: true, data: task });
+  } catch (error) { next(error); }
+});
+
 export default router;

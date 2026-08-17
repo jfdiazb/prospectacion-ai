@@ -26,13 +26,21 @@ export class AlmaService {
       'Entiendo. ¿Qué tipo de apoyo consideras que te ayudaría más?',
       'Perfecto. ¿Qué cambio concreto te gustaría conseguir primero?',
       'Gracias por explicarlo. Puedo orientarte sobre el siguiente paso cuando quieras.',
+      'Gracias por confirmarlo. Ya tengo suficiente contexto para avanzar sin repetirte preguntas.',
+      'Entendido. Con lo que me has contado, podemos pasar al siguiente paso.',
+      'Perfecto, tomo en cuenta tu respuesta. Ahora corresponde definir una acción concreta.',
+      'Muy bien. He registrado lo que necesitas y podemos continuar con una orientación más precisa.',
+      'Gracias. El contexto está claro; no necesito volver a preguntarte lo mismo.',
+      'De acuerdo. Podemos dejar atrás el diagnóstico y avanzar hacia una solución.',
+      'Comprendido. Tu respuesta completa esta etapa y nos permite continuar.',
+      'Excelente. Ya contamos con la información necesaria para decidir el siguiente paso.',
     ];
     const replacement = continuations.find(candidate => {
       const candidateTopic = ConversationService.classifyQuestionTopic(candidate);
       return !previousAI.has(normalize(candidate))
         && !memory.responseFingerprints.includes(ConversationService.fingerprintAIText(candidate))
         && !(candidateTopic && memory.askedTopics.includes(candidateTopic));
-    }) || 'Gracias por compartirlo. Continuemos con el siguiente paso cuando estés listo.';
+    }) || `Gracias por responder. He registrado este avance de la conversación (${memory.responseFingerprints.length + 1}) y podemos continuar sin repetir preguntas.`;
     return { text: replacement, deduplicated: true };
   }
 

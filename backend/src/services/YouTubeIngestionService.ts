@@ -231,7 +231,10 @@ export class YouTubeIngestionService {
     }
     if (!lead) throw new Error('No fue posible crear el lead de YouTube');
     const conversation = await ConversationService.getOrCreateConversation(userId, lead._id.toString());
-    await ConversationService.addMessage(conversation._id.toString(), userId, { sender: 'lead', text, platform: 'youtube' });
+    if (!claimed.conversationRecordedAt) {
+      await ConversationService.addMessage(conversation._id.toString(), userId, { sender: 'lead', text, platform: 'youtube' });
+      await InboundEvent.updateOne({ _id: claimed._id }, { $set: { conversationRecordedAt: new Date() } });
+    }
     await AlmaService.processMessage({ userId, leadId: lead._id.toString(), conversationId: conversation._id.toString(), text, isNewLead, platform: 'youtube', sourceEventId, recipient: { type: 'youtube_comment', parentCommentId: responseParentId }, automation: automation && automationReply ? { flowId: automation._id.toString(), response: automationReply } : undefined });
     await InboundEvent.updateOne({ _id: claimed._id }, { $set: { processingState: 'completed', processedAt: new Date() }, $unset: { retryAfter: 1, processingFailedAt: 1 } });
     return 'processed';

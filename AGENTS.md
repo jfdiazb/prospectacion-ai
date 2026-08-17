@@ -1,5 +1,12 @@
 # AGENTS.md
 
+## Conversaciones CRM operativas y continuidad sin bloqueo — 2026-08-16
+- ALMA dispone de continuaciones no interrogativas cuando ya agotó las preguntas de descubrimiento; una conversación larga deja de fallar por no poder reservar otra pregunta única y avanza al siguiente paso.
+- Los reintentos de eventos YouTube conservan `conversationRecordedAt` y no vuelven a insertar el mismo mensaje del prospecto en el historial.
+- YouTube Monitor excluye de la alerta de espera los hilos bajo transferencia o control humano; solo alerta conversaciones automatizadas cuyo último mensaje pertenece al lead.
+- CRM permite abrir/cerrar el historial completo de cada conversación y marcar tareas como terminadas o reabrirlas mediante una ruta autenticada y aislada por propietario.
+- Validación vigente: 72/72 pruebas backend, compilación backend, type-check y compilación frontend correctos.
+
 ## Preparación de activación oficial de WhatsApp — 2026-08-11
 - El Blueprint declara `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET` y `VERIFY_TOKEN` como secretos externos de Render; ningún valor real se almacena en el repositorio.
 - La inspección segura confirmó que esas cuatro credenciales aún no están disponibles localmente. Producción conserva mensajería mock y auto-respuesta apagada para evitar un arranque inválido o tráfico accidental.
