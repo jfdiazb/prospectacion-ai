@@ -78,7 +78,25 @@ describe('AI provider selection', () => {
     });
 
     expect(result.deduplicated).toBe(true);
-    expect(result.text).toMatch(/suficiente contexto|siguiente paso|acción concreta/i);
+    expect(result.text).toMatch(/primer paso/i);
+    expect(result.text).not.toContain('?');
+  });
+
+  test('gives a concrete first step when the lead explicitly asks how to continue', () => {
+    const history = [
+      { sender: 'lead' as const, text: 'Quiero conseguir más clientes' },
+      { sender: 'lead' as const, text: 'Me cuesta manejar la tecnología y las redes sociales' },
+      { sender: 'ai' as const, text: 'Entendido. Podemos pasar al siguiente paso.' },
+    ];
+    const result = AlmaService.avoidRepeatedResponse('Entendido. Podemos pasar al siguiente paso.', history, {
+      askedTopics: ['desired_outcome', 'main_obstacle', 'previous_attempts', 'support_needed'],
+      responseFingerprints: [ConversationService.fingerprintAIText('Entendido. Podemos pasar al siguiente paso.')],
+    }, 'OK, indícame cuál sería el primer paso');
+
+    expect(result).toEqual(expect.objectContaining({ deduplicated: true }));
+    expect(result.text).toMatch(/primer paso: define/i);
+    expect(result.text).toMatch(/cliente|problema|resultado/i);
+    expect(result.text).not.toMatch(/podemos pasar|cuando quieras/i);
     expect(result.text).not.toContain('?');
   });
 

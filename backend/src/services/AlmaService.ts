@@ -12,7 +12,16 @@ import Conversation from '../models/Conversation';
 type AlmaContext = { userId: string; leadId: string; conversationId: string; text: string; isNewLead: boolean; platform: 'instagram' | 'facebook' | 'youtube' | 'whatsapp'; sourceEventId: string; recipient: MessagingRecipient; automation?: { flowId: string; response: string } };
 
 export class AlmaService {
-  static avoidRepeatedResponse(response: string, history: Array<{ sender: 'lead' | 'ai'; text: string }>, memory: { askedTopics: string[]; responseFingerprints: string[] } = { askedTopics: [], responseFingerprints: [] }): { text: string; deduplicated: boolean } {
+  static buildActionableNextStep(incomingText: string, history: Array<{ sender: 'lead' | 'ai'; text: string }>): string {
+    const context = [...history.filter(message => message.sender === 'lead').map(message => message.text), incomingText]
+      .join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
+    if (/tecnologia|redes sociales|seguidores|clientes/.test(context)) {
+      return 'Primer paso: define en una frase a qué tipo de cliente ayudas, qué problema concreto resuelves y qué resultado ofreces. Usa esa frase como base de tu perfil y de tu próxima publicación.';
+    }
+    return 'Primer paso: escribe en una frase el resultado concreto que quieres lograr esta semana y elige una acción pequeña que puedas completar hoy para acercarte a él.';
+  }
+
+  static avoidRepeatedResponse(response: string, history: Array<{ sender: 'lead' | 'ai'; text: string }>, memory: { askedTopics: string[]; responseFingerprints: string[] } = { askedTopics: [], responseFingerprints: [] }, incomingText = ''): { text: string; deduplicated: boolean } {
     const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es')
       .replace(/[^a-z0-9]+/g, ' ').trim();
     const previousAI = new Set(history.filter(message => message.sender === 'ai').map(message => normalize(message.text)));
@@ -21,6 +30,12 @@ export class AlmaService {
     const repeated = previousAI.has(normalize(response)) || memory.responseFingerprints.includes(fingerprint)
       || Boolean(topic && memory.askedTopics.includes(topic));
     if (!repeated) return { text: response, deduplicated: false };
+    const discoveryComplete = ['desired_outcome', 'main_obstacle', 'previous_attempts', 'support_needed']
+      .every(askedTopic => memory.askedTopics.includes(askedTopic));
+    const explicitlyRequestsAction = /\b(primer paso|siguiente paso|paso a paso|c[oó]mo hacerlo|ind[ií]came|expl[ií]came)\b/i.test(incomingText);
+    if (discoveryComplete || explicitlyRequestsAction) {
+      return { text: this.buildActionableNextStep(incomingText, history), deduplicated: true };
+    }
     const continuations = [
       'Gracias por contármelo. ¿Qué obstáculo te está frenando más en este momento?',
       'Entiendo. ¿Qué tipo de apoyo consideras que te ayudaría más?',
@@ -98,10 +113,10 @@ export class AlmaService {
     const generatedResponse = context.automation?.response ?? aiResult!.text;
     const meetingOutcome = await MeetingOrchestratorService.process({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: context.text, wantsMeeting, platform: context.platform });
     let deduplication = meetingOutcome.reply ? { text: meetingOutcome.reply, deduplicated: false }
-      : this.avoidRepeatedResponse(generatedResponse, history, aiMemory);
+      : this.avoidRepeatedResponse(generatedResponse, history, aiMemory, context.text);
     if (!meetingOutcome.reply && !await ConversationService.reserveAIResponse(context.conversationId, context.userId, deduplication.text)) {
       aiMemory = await ConversationService.getOrInitializeAIMemory(context.conversationId, context.userId);
-      deduplication = this.avoidRepeatedResponse(generatedResponse, history, aiMemory);
+      deduplication = this.avoidRepeatedResponse(generatedResponse, history, aiMemory, context.text);
       if (!await ConversationService.reserveAIResponse(context.conversationId, context.userId, deduplication.text)) {
         throw new Error('No fue posible reservar una respuesta conversacional única');
       }
