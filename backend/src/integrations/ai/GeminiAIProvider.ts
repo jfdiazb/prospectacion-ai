@@ -22,6 +22,7 @@ export class GeminiAIProvider implements AIProvider {
         `Canal: ${context.platform}.`,
         `Intención detectada: ${context.intent}.`,
         `Historial anterior (JSON): ${history}`,
+        `Temas que ALMA ya preguntó y no debe volver a preguntar: ${JSON.stringify(context.askedTopics ?? [])}`,
         `Mensaje actual: ${JSON.stringify(context.incomingText)}`,
       ].join('\n'));
       return { text, aiProviderUsed: 'gemini' };

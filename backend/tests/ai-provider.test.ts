@@ -2,6 +2,7 @@ import { getAIProvider } from '../src/integrations/ai';
 import { GeminiAIProvider } from '../src/integrations/ai/GeminiAIProvider';
 import { GeminiService } from '../src/services/GeminiService';
 import { AlmaService } from '../src/services/AlmaService';
+import { ConversationService } from '../src/services/ConversationService';
 
 describe('AI provider selection', () => {
   const originalEnv = process.env;
@@ -53,6 +54,23 @@ describe('AI provider selection', () => {
   test('keeps a new response unchanged', () => {
     expect(AlmaService.avoidRepeatedResponse('Una respuesta nueva', [{ sender: 'ai', text: 'Respuesta anterior' }]))
       .toEqual({ text: 'Una respuesta nueva', deduplicated: false });
+  });
+
+  test('blocks a semantically repeated question stored outside the recent history', () => {
+    const result = AlmaService.avoidRepeatedResponse('¿Cuál es el obstáculo que te está frenando?', [], {
+      askedTopics: ['main_obstacle'], responseFingerprints: [],
+    });
+
+    expect(result.deduplicated).toBe(true);
+    expect(result.text).not.toMatch(/obstáculo|frenando/i);
+  });
+
+  test('uses stable hashes without storing response text in conversational memory', () => {
+    const fingerprint = ConversationService.fingerprintAIText('¿Qué resultado buscas?');
+    expect(fingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(fingerprint).not.toContain('resultado');
+    expect(ConversationService.classifyQuestionTopic('¿Qué resultado buscas conseguir?')).toBe('desired_outcome');
+    expect(ConversationService.classifyQuestionTopic('¿Qué has intentado hasta ahora?')).toBe('previous_attempts');
   });
 
   test('Gemini failure falls back without breaking the conversation', async () => {

@@ -4,6 +4,7 @@ export interface AIReplyContext {
   intent: string;
   platform: 'youtube' | 'whatsapp' | 'instagram' | 'facebook';
   history: Array<{ sender: 'lead' | 'ai'; text: string }>;
+  askedTopics?: string[];
 }
 
 export type AIProviderUsed = 'gemini' | 'mock';

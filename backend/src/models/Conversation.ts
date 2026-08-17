@@ -44,6 +44,9 @@ const conversationSchema = new Schema(
     handoffRequestedAt: Date,
     humanControlStartedAt: Date,
     automationResumedAt: Date,
+    aiAskedTopics: [{ type: String }],
+    aiResponseFingerprints: [{ type: String }],
+    aiMemoryInitializedAt: Date,
     aiAnalysis: {
       sentiment: String,
       intent: String,
