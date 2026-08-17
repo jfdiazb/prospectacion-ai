@@ -40,6 +40,21 @@ describe('AI provider selection', () => {
     generate.mockRestore();
   });
 
+  test('replaces an exact repeated ALMA response before delivery', () => {
+    const result = AlmaService.avoidRepeatedResponse('¿Que has intentado hasta ahora para resolverlo?', [
+      { sender: 'ai', text: '¿Qué has intentado hasta ahora para resolverlo?' },
+      { sender: 'lead', text: 'He publicado contenido' },
+    ]);
+
+    expect(result.deduplicated).toBe(true);
+    expect(result.text).not.toMatch(/has intentado hasta ahora/i);
+  });
+
+  test('keeps a new response unchanged', () => {
+    expect(AlmaService.avoidRepeatedResponse('Una respuesta nueva', [{ sender: 'ai', text: 'Respuesta anterior' }]))
+      .toEqual({ text: 'Una respuesta nueva', deduplicated: false });
+  });
+
   test('Gemini failure falls back without breaking the conversation', async () => {
     const generate = jest.spyOn(GeminiService, 'generateResponse').mockRejectedValue(new Error('provider unavailable'));
     const provider = new GeminiAIProvider();

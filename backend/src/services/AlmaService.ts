@@ -12,6 +12,20 @@ import Conversation from '../models/Conversation';
 type AlmaContext = { userId: string; leadId: string; conversationId: string; text: string; isNewLead: boolean; platform: 'instagram' | 'facebook' | 'youtube' | 'whatsapp'; sourceEventId: string; recipient: MessagingRecipient; automation?: { flowId: string; response: string } };
 
 export class AlmaService {
+  static avoidRepeatedResponse(response: string, history: Array<{ sender: 'lead' | 'ai'; text: string }>): { text: string; deduplicated: boolean } {
+    const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es')
+      .replace(/[^a-z0-9]+/g, ' ').trim();
+    const previousAI = new Set(history.filter(message => message.sender === 'ai').map(message => normalize(message.text)));
+    if (!previousAI.has(normalize(response))) return { text: response, deduplicated: false };
+    const continuations = [
+      'Gracias por contármelo. ¿Qué obstáculo te está frenando más en este momento?',
+      'Entiendo. ¿Qué tipo de apoyo consideras que te ayudaría más?',
+      'Perfecto. ¿Qué cambio concreto te gustaría conseguir primero?',
+      'Gracias por explicarlo. Puedo orientarte sobre el siguiente paso cuando quieras.',
+    ];
+    return { text: continuations.find(candidate => !previousAI.has(normalize(candidate))) || continuations.at(-1)!, deduplicated: true };
+  }
+
   static async processMessage(context: AlmaContext): Promise<string> {
     const normalized = context.text.toLocaleLowerCase('es');
     const controlMode = await ConversationService.getControlMode(context.conversationId, context.userId);
@@ -64,12 +78,15 @@ export class AlmaService {
     const aiResult = context.automation ? null : await aiProvider!.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent, platform: context.platform, history });
     const generatedResponse = context.automation?.response ?? aiResult!.text;
     const meetingOutcome = await MeetingOrchestratorService.process({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: context.text, wantsMeeting, platform: context.platform });
-    const response = meetingOutcome.reply ?? generatedResponse;
+    const deduplication = meetingOutcome.reply ? { text: meetingOutcome.reply, deduplicated: false }
+      : this.avoidRepeatedResponse(generatedResponse, history);
+    const response = deduplication.text;
     const aiProviderUsed = meetingOutcome.reply ? undefined : aiResult?.aiProviderUsed;
     if (aiProviderUsed) console.info('ALMA AI response generated', {
       event: 'alma_ai_response_generated',
       aiProviderConfigured: aiProvider!.name,
       aiProviderUsed,
+      deduplicated: deduplication.deduplicated,
     });
 
     await ConversationService.addMessage(context.conversationId, context.userId, { sender: 'ai', text: response, platform: context.platform });
