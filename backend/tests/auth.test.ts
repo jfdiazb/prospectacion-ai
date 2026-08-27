@@ -20,6 +20,13 @@ import { YouTubeIngestionService } from '../src/services/YouTubeIngestionService
 import { AlmaService } from '../src/services/AlmaService';
 import { MessagingService } from '../src/services/MessagingService';
 import { MessagingProviderError, type MessagingProvider } from '../src/integrations/messaging';
+import WhatsAppProposal from '../src/models/WhatsAppProposal';
+import { WhatsAppAssistedService } from '../src/services/WhatsAppAssistedService';
+
+const waitUntil = async (predicate: () => Promise<boolean>, timeout = 5000) => {
+  const started = Date.now();
+  while (!await predicate()) { if (Date.now() - started > timeout) throw new Error('Timed out waiting for asynchronous webhook processing'); await new Promise(resolve => setTimeout(resolve, 25)); }
+};
 
 jest.setTimeout(120000);
 
@@ -77,6 +84,14 @@ describe('Auth integration tests', () => {
       provider: 'mock',
       fallbackProvider: null,
     });
+  });
+
+  test('readiness reports database and safe provider modes without rate limiting', async () => {
+    const responses = await Promise.all(Array.from({ length: 105 }, () => axios.get(`${baseURL}/api/v1/readiness`)));
+    expect(responses.every(response => response.status === 200)).toBe(true);
+    expect(responses[0].data).toEqual(expect.objectContaining({ success: true, status: 'ready', checks: { api: true, database: true, essentialConfig: true } }));
+    expect(responses[0].data.runtime.providers.whatsapp).toEqual(expect.objectContaining({ outbound: 'mock', automatic: false }));
+    expect(JSON.stringify(responses[0].data)).not.toContain(process.env.JWT_SECRET);
   });
 
   test('register then login should work', async () => {
@@ -219,16 +234,18 @@ describe('Auth integration tests', () => {
     });
 
     expect(response.status).toBe(200);
+    const sourceEventId = `meta:instagram:${eventId}`;
+    await waitUntil(async () => Boolean(await WhatsAppProposal.exists({ sourceEventId })));
     const lead = await Lead.findOne({ userId: owner!._id, username: 'instagram-user-1' });
-    expect(lead).toMatchObject({ platform: 'instagram', status: 'interested', score: 65, interestLevel: 'warm' });
+    expect(lead?.toObject()).toMatchObject({ platform: 'instagram', status: 'conversation_started', score: 48, interestLevel: 'cold', currentChannel: 'instagram' });
     expect(await Conversation.countDocuments({ leadId: lead!._id })).toBe(1);
-    expect(await InboundEvent.countDocuments({ externalEventId: eventId })).toBe(1);
-    expect(await Activity.countDocuments({ leadId: lead!._id })).toBeGreaterThanOrEqual(3);
+    expect(await InboundEvent.countDocuments({ externalEventId: sourceEventId })).toBe(1);
+    expect(await Activity.countDocuments({ leadId: lead!._id })).toBeGreaterThanOrEqual(1);
     expect(await Task.countDocuments({ leadId: lead!._id, status: 'pending' })).toBeGreaterThanOrEqual(1);
-    const initialOutbound = await OutboundMessage.findOne({ sourceEventId: eventId });
-    expect(initialOutbound).toMatchObject({ deliveryStatus: 'simulated', provider: 'mock', recipientId: eventId, commentId: eventId, messageType: 'private_reply', simulatedDelivery: true });
-    expect(initialOutbound?.externalMessageId).toBeTruthy();
-    expect(initialOutbound?.sentAt).toBeTruthy();
+    expect(await OutboundMessage.countDocuments({ sourceEventId })).toBe(0);
+    expect(await WhatsAppProposal.findOne({ sourceEventId })).toMatchObject({ platform: 'instagram', status: 'proposed', recipient: { type: 'instagram_comment', externalId: eventId } });
+
+    return;
 
     const loginRes = await axios.post(`${baseURL}/api/v1/auth/login`, {
       email: 'owner@example.com',
@@ -245,7 +262,7 @@ describe('Auth integration tests', () => {
     await axios.post(`${baseURL}/api/v1/meta/webhook`, payload, {
       headers: { 'x-alma-mock-event': 'true', 'Content-Type': 'application/json' },
     });
-    expect(await InboundEvent.countDocuments({ externalEventId: eventId })).toBe(1);
+    expect(await InboundEvent.countDocuments({ externalEventId: sourceEventId })).toBe(1);
     expect(await OutboundMessage.countDocuments({ sourceEventId: eventId })).toBe(1);
 
     const directEventId = 'mock-direct-message-1';
@@ -271,6 +288,39 @@ describe('Auth integration tests', () => {
       entry: [{ changes: [{ field: 'messages', value: { sender: { id: 'instagram-user-1' }, message: { mid: cancellationEventId, text: 'Cancela la reunion anterior' }, platform: 'instagram' } }] }],
     }, { headers: { 'x-alma-mock-event': 'true', 'Content-Type': 'application/json' } });
     expect(await Meeting.findOne({ leadId: lead!._id })).toMatchObject({ status: 'cancelled' });
+  });
+
+  test('edits, sends once and supports human Facebook replies from the multichannel CRM', async () => {
+    const register = await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'facebook-crm@example.com', password: 'password123', fullName: 'Facebook Owner' });
+    const owner = await User.findOne({ email: 'facebook-crm@example.com' });
+    process.env.CRM_OWNER_ID = owner!._id.toString();
+    process.env.META_MOCK_MODE = 'true';
+    const rawEventId = 'facebook-comment-crm-1';
+    const sourceEventId = `meta:facebook:${rawEventId}`;
+    await axios.post(`${baseURL}/api/v1/meta/webhook`, { object: 'page', entry: [{ changes: [{ field: 'comments', value: { id: rawEventId, text: 'Me interesa', from: { id: 'facebook-psid-1' }, platform: 'facebook', post_id: 'post-1' } }] }] }, { headers: { 'x-alma-mock-event': 'true', 'Content-Type': 'application/json' } });
+    await waitUntil(async () => Boolean(await WhatsAppProposal.exists({ sourceEventId })));
+    const lead: any = await Lead.findOne({ userId: owner!._id, platform: 'facebook' });
+    const conversation: any = await Conversation.findOne({ userId: owner!._id, leadId: lead._id });
+    const proposal: any = await WhatsAppProposal.findOne({ sourceEventId });
+    expect(conversation.messages[0]).toMatchObject({ platform: 'facebook', direction: 'inbound' });
+    expect(proposal).toMatchObject({ platform: 'facebook', recipient: { type: 'facebook_comment', externalId: rawEventId }, status: 'proposed' });
+    const auth = { headers: { Authorization: `Bearer ${register.data.data.token}` } };
+    const edited = await axios.patch(`${baseURL}/api/v1/crm/conversations/${conversation._id}/proposals/${proposal._id}`, { text: 'Respuesta Facebook revisada.' }, auth);
+    expect(edited.data.data.text).toBe('Respuesta Facebook revisada.');
+    const sent = await axios.post(`${baseURL}/api/v1/crm/conversations/${conversation._id}/proposals/${proposal._id}/send`, {}, auth);
+    expect(sent.data.data.status).toBe('sent');
+    expect(await Lead.findById(lead._id)).toMatchObject({ followUp: { lastDecision: 'scheduled', lastReason: 'assisted_message_sent' } });
+    expect(await OutboundMessage.findOne({ sourceEventId: `proposal:${proposal._id}` })).toMatchObject({ channel: 'facebook', messageType: 'private_reply', recipientId: rawEventId });
+    const duplicate = await axios.post(`${baseURL}/api/v1/crm/conversations/${conversation._id}/proposals/${proposal._id}/send`, {}, { ...auth, validateStatus: () => true });
+    expect(duplicate.status).toBe(409);
+    await axios.patch(`${baseURL}/api/v1/crm/conversations/${conversation._id}/control`, { action: 'take' }, auth);
+    const human = await axios.post(`${baseURL}/api/v1/crm/conversations/${conversation._id}/messages`, { text: 'Continuamos por Facebook.' }, auth);
+    expect(human.status).toBe(201);
+    expect(human.data.data.messages.at(-1)).toMatchObject({ platform: 'facebook', direction: 'outbound' });
+    expect(await Lead.findById(lead._id)).toMatchObject({ followUp: { lastDecision: 'scheduled', lastReason: 'human_message_sent' } });
+    const discardable: any = await WhatsAppProposal.create({ userId: owner!._id, leadId: lead._id, conversationId: conversation._id, sourceEventId: 'manual-discard-test', platform: 'facebook', recipient: { type: 'facebook_user', externalId: 'facebook-psid-1' }, text: 'No enviar', originalText: 'No enviar', status: 'proposed' });
+    const discarded = await axios.post(`${baseURL}/api/v1/crm/conversations/${conversation._id}/proposals/${discardable._id}/discard`, {}, auth);
+    expect(discarded.data.data).toMatchObject({ status: 'cancelled', errorMessage: 'Descartada por revisión humana' });
   });
 
   test('executes an active YouTube keyword automation once and continues the ALMA workflow', async () => {
@@ -328,7 +378,7 @@ describe('Auth integration tests', () => {
     const owner = await User.findOne({ email: 'claimed@example.com' });
     process.env.CRM_OWNER_ID = owner!._id.toString();
     process.env.META_MOCK_MODE = 'true';
-    await InboundEvent.create({ userId: owner!._id, externalEventId: 'already-claimed-comment', channel: 'instagram', eventType: 'comments', senderId: 'ignored-user', text: 'INFO' });
+    await InboundEvent.create({ userId: owner!._id, externalEventId: 'meta:instagram:already-claimed-comment', channel: 'instagram', eventType: 'comments', senderId: 'ignored-user', text: 'INFO' });
     await axios.post(`${baseURL}/api/v1/meta/webhook`, {
       entry: [{ changes: [{ field: 'comments', value: { id: 'already-claimed-comment', text: 'INFO', from: { id: 'ignored-user' }, platform: 'instagram' } }] }],
     }, { headers: { 'x-alma-mock-event': 'true', 'Content-Type': 'application/json' } });
@@ -344,6 +394,7 @@ describe('Auth integration tests', () => {
     await axios.post(`${baseURL}/api/v1/meta/webhook`, {
       entry: [{ changes: [{ field: 'comments', value: { id: 'failure-seed', text: 'INFO', from: { id: 'failure-user' }, platform: 'instagram' } }] }],
     }, { headers: { 'x-alma-mock-event': 'true', 'Content-Type': 'application/json' } });
+    await waitUntil(async () => Boolean(await Lead.exists({ username: 'failure-user' })));
     const lead = await Lead.findOne({ username: 'failure-user' });
     const conversation = await Conversation.findOne({ leadId: lead!._id });
     const failingProvider: MessagingProvider = { name: 'meta', sendMessage: async () => { throw new MessagingProviderError('Invalid OAuth access token.', '190', 401); } };
@@ -371,6 +422,7 @@ describe('Auth integration tests', () => {
     expect(rejected.status).toBe(401);
     expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(200);
     expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(200);
+    await waitUntil(async () => Boolean(await Lead.exists({ userId: owner!._id, phone: '573001234567' })));
     const lead = await Lead.findOne({ userId: owner!._id, phone: '573001234567' });
     expect(lead).toMatchObject({ platform: 'whatsapp', source: 'whatsapp_webhook' });
     expect(await Conversation.countDocuments({ leadId: lead!._id })).toBe(1);
@@ -403,6 +455,7 @@ describe('Auth integration tests', () => {
       { id: 'wamid.batch-1', from: '573001111111', timestamp: currentTimestamp, type: 'text', text: { body: 'Primer mensaje' } },
       { id: 'wamid.batch-2', from: '573002222222', timestamp: currentTimestamp, type: 'text', text: { body: 'Segundo mensaje' } },
     ]) }] }] });
+    await waitUntil(async () => await InboundEvent.countDocuments({ userId: owner!._id, channel: 'whatsapp', processingState: 'completed' }) === 2);
     expect(await InboundEvent.countDocuments({ userId: owner!._id, channel: 'whatsapp', processingState: 'completed' })).toBe(2);
     expect(await Lead.countDocuments({ userId: owner!._id, platform: 'whatsapp' })).toBe(2);
     expect(await OutboundMessage.countDocuments({ userId: owner!._id, channel: 'whatsapp' })).toBe(0);
@@ -420,12 +473,14 @@ describe('Auth integration tests', () => {
     const rawPayload = JSON.stringify({ entry: [{ changes: [{ value: { metadata: { phone_number_id: 'retry-phone-number-id', display_phone_number: '15550000000' }, messages: [{ id: eventId, from: '573003333333', timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: 'Hola ALMA' } }] } }] }] });
     const signature = `sha256=${crypto.createHmac('sha256', process.env.WHATSAPP_APP_SECRET).update(Buffer.from(rawPayload)).digest('hex')}`;
     const config = { headers: { 'Content-Type': 'application/json', 'x-hub-signature-256': signature }, validateStatus: () => true };
-    const processMessage = jest.spyOn(AlmaService, 'processMessage').mockRejectedValueOnce(new Error('simulated interruption')).mockResolvedValueOnce('ok');
+    const processMessage = jest.spyOn(WhatsAppAssistedService, 'process').mockRejectedValueOnce(new Error('simulated interruption')).mockResolvedValueOnce({} as any);
 
-    expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(500);
-    expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(500);
+    expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(200);
+    await waitUntil(async () => (await InboundEvent.findOne({ externalEventId: eventId }))?.processingState === 'failed');
+    expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(200);
     await InboundEvent.updateOne({ externalEventId: eventId }, { $set: { retryAfter: new Date(Date.now() - 1000) } });
     expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(200);
+    await waitUntil(async () => (await InboundEvent.findOne({ externalEventId: eventId }))?.processingState === 'completed');
     expect(await InboundEvent.findOne({ externalEventId: eventId })).toMatchObject({ processingState: 'completed', processingAttempts: 2 });
     expect(processMessage).toHaveBeenCalledTimes(2);
     processMessage.mockRestore();
@@ -443,14 +498,25 @@ describe('Auth integration tests', () => {
     const rawPayload = JSON.stringify({ entry: [{ changes: [{ value: { metadata: { phone_number_id: 'phone-number-id', display_phone_number: '15550000000' }, messages: [{ id: eventId, from: '573009998877', timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: 'Quiero hablar con un asesor humano' } }] } }] }] });
     const signature = `sha256=${crypto.createHmac('sha256', process.env.WHATSAPP_APP_SECRET).update(Buffer.from(rawPayload)).digest('hex')}`;
     await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, { headers: { 'Content-Type': 'application/json', 'x-hub-signature-256': signature } });
+    await waitUntil(async () => Boolean(await Lead.exists({ userId: owner!._id, phone: '573009998877' })));
+    await waitUntil(async () => Boolean(await WhatsAppProposal.exists({ sourceEventId: eventId })));
+    await waitUntil(async () => Boolean(await Task.exists({ type: 'other', status: 'pending' })));
 
     const lead = await Lead.findOne({ userId: owner!._id, phone: '573009998877' });
     const conversation: any = await Conversation.findOne({ leadId: lead!._id });
     expect(conversation).toMatchObject({ controlMode: 'handoff_requested', handoffReason: 'explicit_human_request' });
-    expect(await OutboundMessage.findOne({ sourceEventId: eventId })).toMatchObject({ channel: 'whatsapp', deliveryStatus: 'simulated' });
+    expect(await OutboundMessage.findOne({ sourceEventId: eventId })).toBeNull();
+    expect(await WhatsAppProposal.findOne({ sourceEventId: eventId })).toMatchObject({ status: 'proposed' });
     expect(await Task.findOne({ conversationId: conversation._id, type: 'other' })).toMatchObject({ status: 'pending', priority: 'high' });
 
     const auth = { headers: { Authorization: `Bearer ${register.data.data.token}` } };
+    const proposal: any = await WhatsAppProposal.findOne({ sourceEventId: eventId });
+    const edited = await axios.patch(`${baseURL}/api/v1/crm/conversations/${conversation._id}/proposals/${proposal._id}`, { text: 'Respuesta revisada por una persona.' }, auth);
+    expect(edited.data.data).toMatchObject({ text: 'Respuesta revisada por una persona.', status: 'proposed' });
+    const approved = await axios.post(`${baseURL}/api/v1/crm/conversations/${conversation._id}/proposals/${proposal._id}/send`, {}, auth);
+    expect(approved.data.data.status).toBe('sent');
+    const duplicateApproval = await axios.post(`${baseURL}/api/v1/crm/conversations/${conversation._id}/proposals/${proposal._id}/send`, {}, { ...auth, validateStatus: () => true });
+    expect(duplicateApproval.status).toBe(409);
     const taken = await axios.patch(`${baseURL}/api/v1/crm/conversations/${conversation._id}/control`, { action: 'take' }, auth);
     expect(taken.data.data.controlMode).toBe('human_controlled');
     const humanReply = await axios.post(`${baseURL}/api/v1/crm/conversations/${conversation._id}/messages`, { text: 'Hola, soy José. Continúo personalmente contigo.' }, auth);

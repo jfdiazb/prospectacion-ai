@@ -5,18 +5,21 @@ type SendContext = { userId: string; leadId: string; conversationId: string; sou
 
 export class MessagingService {
   static async send(context: SendContext, provider?: MessagingProvider): Promise<'sent' | 'simulated' | 'failed' | 'duplicate'> {
-    const channel = context.recipient.type === 'youtube_comment' ? 'youtube' : context.recipient.type === 'whatsapp_user' ? 'whatsapp' : 'instagram';
+    const channel = context.recipient.type === 'youtube_comment' ? 'youtube' : context.recipient.type === 'whatsapp_user' ? 'whatsapp'
+      : context.recipient.type === 'facebook_user' || context.recipient.type === 'facebook_comment' ? 'facebook' : 'instagram';
     const selectedProvider = provider ?? getMessagingProvider(channel);
     const recipientId = context.recipient.type === 'comment' ? context.recipient.commentId
       : context.recipient.type === 'instagram_user' ? context.recipient.instagramScopedId
-        : context.recipient.type === 'whatsapp_user' ? context.recipient.phoneNumber : context.recipient.parentCommentId;
+        : context.recipient.type === 'facebook_user' ? context.recipient.pageScopedId
+          : context.recipient.type === 'instagram_comment' || context.recipient.type === 'facebook_comment' ? context.recipient.commentId
+            : context.recipient.type === 'whatsapp_user' ? context.recipient.phoneNumber : context.recipient.parentCommentId;
     let outbound;
     try {
       outbound = await OutboundMessage.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId,
-        sourceEventId: context.sourceEventId, channel, messageType: context.recipient.type === 'comment' ? 'private_reply'
+        sourceEventId: context.sourceEventId, channel, messageType: ['comment', 'instagram_comment', 'facebook_comment'].includes(context.recipient.type) ? 'private_reply'
           : context.recipient.type === 'whatsapp_user' ? 'whatsapp_message' : context.recipient.type === 'youtube_comment' ? 'youtube_reply' : 'direct_message',
         text: context.text, deliveryStatus: 'pending', provider: selectedProvider.name, recipientId,
-        commentId: context.recipient.type === 'comment' ? context.recipient.commentId : undefined });
+        commentId: context.recipient.type === 'comment' || context.recipient.type === 'instagram_comment' || context.recipient.type === 'facebook_comment' ? context.recipient.commentId : undefined });
     } catch (error: any) {
       if (error?.code === 11000) return 'duplicate';
       throw error;

@@ -1,5 +1,9 @@
 ﻿import Conversation from '../models/Conversation';
 import crypto from 'crypto';
+import AssistedProposal from '../models/AssistedProposal';
+import Task from '../models/Task';
+import Lead from '../models/Lead';
+import { MultichannelIdentityService } from './MultichannelIdentityService';
 import type { IMessage } from '../types/index';
 
 /**
@@ -99,6 +103,18 @@ export class ConversationService {
       },
       { new: true }
     );
+
+    if (conversation && message.sender === 'lead') {
+      const now = new Date();
+      const proposals: any[] = await AssistedProposal.find({ userId, conversationId, purpose: 'reactivation', status: { $in: ['proposed', 'failed'] } }).select('_id').lean();
+      const proposalIds = proposals.map(item => item._id);
+      await Promise.all([
+        proposalIds.length ? AssistedProposal.updateMany({ _id: { $in: proposalIds } }, { $set: { status: 'cancelled', invalidatedAt: now, invalidationReason: 'prospect_replied', errorMessage: 'Reactivación caducada: el prospecto respondió' } }) : Promise.resolve(),
+        proposalIds.length ? Task.updateMany({ userId, conversationId, 'metadata.proposalId': { $in: proposalIds }, status: 'pending' }, { $set: { status: 'cancelled', 'metadata.cancelReason': 'prospect_replied', 'metadata.cancelledAt': now } }) : Promise.resolve(),
+        Lead.updateOne({ _id: conversation.leadId, userId }, { $set: { 'reactivation.lastResult': 'prospect_replied', 'reactivation.lastDecisionAt': now }, $unset: { 'reactivation.nextEligibleAt': 1 } }),
+      ]);
+      await MultichannelIdentityService.invalidateForInbound(userId, conversation.leadId, conversationId, now);
+    }
 
     return conversation;
   }

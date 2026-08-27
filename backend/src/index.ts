@@ -5,6 +5,7 @@ import { validateDatabaseEnvironment, validateServerEnvironment } from './config
 import { startYouTubePolling } from './services/YouTubeIngestionService';
 import { startCalendlyPolling } from './services/CalendlyPollingService';
 import { getAIRuntimeStatus } from './integrations/ai';
+import { startAutomationWorker } from './services/AutomationEngineService';
 
 const port = Number(process.env.PORT ?? 5001);
 
@@ -14,6 +15,7 @@ export const startServer = async () => {
   await validateDatabaseEnvironment();
   startYouTubePolling();
   startCalendlyPolling();
+  startAutomationWorker();
   return app.listen(port, () => {
     console.info(`API ALMA iniciada en el puerto ${port}`);
     console.info('ALMA AI runtime', getAIRuntimeStatus());

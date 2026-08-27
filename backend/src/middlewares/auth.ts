@@ -81,8 +81,9 @@ export const errorMiddleware = (
 ): void => {
   console.error('Error de aplicación', { message: err.message, path: req.path });
 
-  const status = err.status || HTTP_STATUS.INTERNAL_ERROR;
-  const message = err.message || MESSAGES.ERROR.SERVER_ERROR;
+  const requestedStatus = Number(err.status);
+  const status = requestedStatus >= 400 && requestedStatus < 600 ? requestedStatus : HTTP_STATUS.INTERNAL_ERROR;
+  const message = status >= 500 && process.env.NODE_ENV !== 'development' ? MESSAGES.ERROR.SERVER_ERROR : (err.message || MESSAGES.ERROR.SERVER_ERROR);
 
   res.status(status).json({
     success: false,

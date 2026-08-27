@@ -7,8 +7,7 @@ import type { IApiResponse, IHunterProfile } from '../types/index';
 export class HunterController {
   static async searchProfiles(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { keyword, type, minFollowers, maxFollowers, regionCode, publishedAfter, pageToken } = req.body;
-      const profiles = await HunterService.searchProfiles({ keyword, type, minFollowers, maxFollowers, regionCode, publishedAfter, pageToken }, req.userId!);
+      const profiles = await HunterService.searchProfiles(req.body, req.userId!);
       res.status(HTTP_STATUS.OK).json({
         success: true,
         message: 'Perfiles encontrados',
@@ -17,6 +16,10 @@ export class HunterController {
     } catch (error: any) {
       res.status(HTTP_STATUS.BAD_REQUEST).json({ success: false, message: error.message });
     }
+  }
+
+  static async profiles(_req: AuthRequest, res: Response): Promise<void> {
+    res.json({ success: true, message: 'Perfiles configurables', data: HunterService.profiles() });
   }
 
   static async saveOpportunity(req: AuthRequest, res: Response): Promise<void> {

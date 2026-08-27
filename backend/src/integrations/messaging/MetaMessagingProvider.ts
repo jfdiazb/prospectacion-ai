@@ -10,17 +10,25 @@ export class MetaMessagingProvider implements MessagingProvider {
   async sendMessage(request: MessagingRequest): Promise<MessagingResult> {
     if (request.recipient.type === 'whatsapp_user') return this.sendWhatsAppMessage(request);
     if (request.recipient.type === 'youtube_comment') throw new MessagingProviderError('YouTube requiere YouTubeMessagingProvider', 'META_INVALID_RECIPIENT');
-    const accessToken = process.env.META_ACCESS_TOKEN;
-    const igUserId = process.env.META_IG_USER_ID;
     const version = process.env.META_GRAPH_API_VERSION || 'v23.0';
-    if (!accessToken || !igUserId) throw new MessagingProviderError('Credenciales de Meta no configuradas', 'META_CONFIGURATION_ERROR');
-    const recipient = request.recipient.type === 'comment'
-      ? { comment_id: request.recipient.commentId }
-      : { id: request.recipient.instagramScopedId };
+    const isFacebook = request.recipient.type === 'facebook_user' || request.recipient.type === 'facebook_comment';
+    const accessToken = isFacebook ? process.env.META_PAGE_ACCESS_TOKEN : process.env.META_ACCESS_TOKEN;
+    const accountId = isFacebook ? process.env.META_PAGE_ID : process.env.META_IG_USER_ID;
+    if (!accessToken || (!accountId && request.recipient.type !== 'facebook_comment')) throw new MessagingProviderError('Credenciales del canal Meta no configuradas', 'META_CONFIGURATION_ERROR');
+    const metaRecipient = request.recipient;
+    const endpoint = request.recipient.type === 'facebook_comment'
+      ? `https://graph.facebook.com/${version}/${encodeURIComponent(request.recipient.commentId)}/private_replies`
+      : `https://graph.facebook.com/${version}/${encodeURIComponent(accountId!)}/messages`;
+    let destination: { comment_id: string } | { id: string } | undefined;
+    if (metaRecipient.type === 'comment' || metaRecipient.type === 'instagram_comment') destination = { comment_id: metaRecipient.commentId };
+    else if (metaRecipient.type === 'facebook_user') destination = { id: metaRecipient.pageScopedId };
+    else if (metaRecipient.type === 'instagram_user') destination = { id: metaRecipient.instagramScopedId };
+    const body = metaRecipient.type === 'facebook_comment'
+      ? { message: request.text }
+      : { recipient: destination, message: { text: request.text } };
     try {
       const response = await this.http.post<MetaResponse>(
-        `https://graph.facebook.com/${version}/${encodeURIComponent(igUserId)}/messages`,
-        { recipient, message: { text: request.text } },
+        endpoint, body,
         { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, timeout: Number(process.env.META_MESSAGING_TIMEOUT_MS || 10000) },
       );
       const externalMessageId = response.data?.message_id ?? response.data?.id;

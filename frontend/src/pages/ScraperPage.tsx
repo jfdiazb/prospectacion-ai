@@ -9,14 +9,17 @@ export const ScraperPage = () => {
   const [hashtag, setHashtag] = useState('ventas');
   const [result, setResult] = useState<IScraperResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleScrape = async () => {
     try {
       setLoading(true);
+      setError('');
       const response = await scraperService.scrapeHashtag(hashtag.replace('#', ''));
       setResult(response.data || null);
     } catch (error) {
       console.error('Error scrapeando hashtag:', error);
+      setError('No fue posible ejecutar la demostración del analizador.');
     } finally {
       setLoading(false);
     }
@@ -27,10 +30,14 @@ export const ScraperPage = () => {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
         <Card>
           <div className="space-y-4">
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+              Modo demostración: los resultados de esta pantalla son datos simulados y no provienen de redes sociales reales.
+            </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Análisis rápido de hashtag</h2>
               <p className="text-dark-400">Ingresa un hashtag y obtén datos de rendimiento que te ayuden a priorizar contenido.</p>
             </div>
+            {error && <p className="text-sm text-red-300">{error}</p>}
             <div className="grid gap-3 md:grid-cols-[1fr_auto]">
               <input
                 type="text"
@@ -53,7 +60,7 @@ export const ScraperPage = () => {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <h3 className="text-lg font-semibold text-white">#{result.hashtag}</h3>
-                    <p className="text-dark-400">Datos de tendencia, engagement y ejemplos de contenido top.</p>
+                    <p className="text-dark-400">Datos demostrativos de tendencia, engagement y contenido.</p>
                   </div>
                   <div className="flex flex-wrap gap-2 text-sm text-dark-300">
                     <Badge variant="secondary">Posts: {result.totalPosts}</Badge>

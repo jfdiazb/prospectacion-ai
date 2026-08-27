@@ -35,12 +35,16 @@ export const DashboardPage = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<any>(null);
   const [hotLeads, setHotLeads] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     loadDashboardData();
   }, []);
 
   const loadDashboardData = async () => {
+    setLoading(true);
+    setError('');
     try {
       const [statsData, leadsData] = await Promise.all([
         leadService.getLeadStats(),
@@ -50,39 +54,29 @@ export const DashboardPage = () => {
       setHotLeads(leadsData);
     } catch (error) {
       console.error('Error cargando dashboard:', error);
+      setError('No fue posible cargar las métricas reales del Dashboard.');
+    } finally {
+      setLoading(false);
     }
   };
 
   const weeklyData = useMemo(
     () =>
-      stats?.weeklyLeads ?? [
-        { name: 'Lun', leads: 24, conversions: 6, hot: 12 },
-        { name: 'Mar', leads: 30, conversions: 8, hot: 16 },
-        { name: 'Mié', leads: 28, conversions: 7, hot: 15 },
-        { name: 'Jue', leads: 35, conversions: 11, hot: 18 },
-        { name: 'Vie', leads: 40, conversions: 14, hot: 20 },
-        { name: 'Sáb', leads: 20, conversions: 5, hot: 10 },
-        { name: 'Dom', leads: 18, conversions: 4, hot: 9 },
-      ],
+      stats?.weeklyLeads ?? [],
     [stats],
   );
 
   const channelData = useMemo(
     () =>
-      stats?.channelPerformance ?? [
-        { name: 'YouTube', value: 58 },
-        { name: 'Referidos', value: 20 },
-        { name: 'Email', value: 14 },
-        { name: 'Manual', value: 8 },
-      ],
+      stats?.channelPerformance ?? [],
     [stats],
   );
 
   const funnelData = useMemo(
     () => [
-      { name: 'Nuevos', value: stats?.newLeads ?? 38, color: chartColors.secondary },
-      { name: 'Calientes', value: stats?.hotLeads ?? 18, color: chartColors.accent },
-      { name: 'Convertidos', value: stats?.registeredLeads ?? 12, color: chartColors.green },
+      { name: 'Nuevos', value: stats?.newLeads ?? 0, color: chartColors.secondary },
+      { name: 'Calientes', value: stats?.hotLeads ?? 0, color: chartColors.accent },
+      { name: 'Convertidos', value: stats?.registeredLeads ?? 0, color: chartColors.green },
     ],
     [stats],
   );
@@ -99,6 +93,8 @@ export const DashboardPage = () => {
           <Button variant="secondary" onClick={() => navigate('/youtube-monitor')}><Activity size={17} /> Ver YouTube Monitor</Button>
           <Button variant="secondary" onClick={() => navigate('/crm')}>Abrir CRM</Button>
         </div>
+        {loading && <Card hover={false}><p className="text-dark-300">Cargando métricas reales…</p></Card>}
+        {error && <Card hover={false}><p className="text-red-300">{error}</p><Button className="mt-3" variant="secondary" onClick={() => void loadDashboardData()}>Reintentar</Button></Card>}
         {stats && (
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
             <Card onClick={() => navigate('/prospectos')} className="bg-gradient-to-br from-primary-600/15 to-purple-700/15 border-white/10">
@@ -113,7 +109,7 @@ export const DashboardPage = () => {
                 </div>
               </div>
               <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full rounded-full bg-gradient-to-r from-primary-500 to-purple-500" style={{ width: '80%' }} />
+                <div className="h-full rounded-full bg-gradient-to-r from-primary-500 to-purple-500" style={{ width: stats.totalLeads ? '100%' : '0%' }} />
               </div>
             </Card>
 
@@ -129,7 +125,7 @@ export const DashboardPage = () => {
                 </div>
               </div>
               <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full rounded-full bg-gradient-to-r from-sky-400 to-cyan-500" style={{ width: '64%' }} />
+                <div className="h-full rounded-full bg-gradient-to-r from-sky-400 to-cyan-500" style={{ width: `${Math.min(100, Math.round((stats.newLeads / Math.max(stats.totalLeads, 1)) * 100))}%` }} />
               </div>
             </Card>
 

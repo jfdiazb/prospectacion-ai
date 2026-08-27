@@ -96,6 +96,16 @@ export interface IHunterProfile {
   thumbnailUrl?: string;
   views?: number;
   publishedAt?: string;
+  profileId?: string;
+  entityType?: 'person' | 'organization' | 'unknown';
+  entityConfidence?: number;
+  jobEvidenceType?: 'explicit' | 'indirect' | 'insufficient';
+  scores?: { commercial: number; jobAvailability: number; nutritionWellness: number; productSales: number; overall: number };
+  matchStatus?: 'high_priority' | 'good_candidate' | 'review' | 'low_match';
+  evidence?: Array<{ category: 'commercial' | 'jobAvailability' | 'nutritionWellness' | 'productSales'; type: 'explicit' | 'indirect' | 'insufficient'; signal: string; sourceField: string; publicUrl: string; publishedAt?: string; observedAt: string; confidence: number; context: string; possibleNegation: boolean }>;
+  publicLocation?: string;
+  locationSource?: string;
+  channelUrl?: string;
 }
 
 export interface IScraperResult {

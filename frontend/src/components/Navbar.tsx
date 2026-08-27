@@ -8,7 +8,7 @@ const mobileRoutes = [
   { label: 'Dashboard', path: '/dashboard' },
   { label: 'Prospectos', path: '/prospectos' },
   { label: 'Lead Hunter', path: '/lead-hunter' },
-  { label: 'Social Scraper', path: '/social-scraper' },
+  { label: 'Social Scraper (demo)', path: '/social-scraper' },
   { label: 'Automatizaciones', path: '/automatizaciones' },
 ];
 

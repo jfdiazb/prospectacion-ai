@@ -8,6 +8,7 @@ const router = express.Router();
 router.use(authMiddleware, apiLimiter);
 
 router.post('/search', HunterController.searchProfiles);
+router.get('/profiles', HunterController.profiles);
 router.post('/enrich', HunterController.enrichProfile);
 router.get('/opportunities', HunterController.listOpportunities);
 router.post('/opportunities', HunterController.saveOpportunity);

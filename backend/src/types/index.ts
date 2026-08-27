@@ -44,6 +44,18 @@ export interface ILead {
   email?: string;
   phone?: string;
   source?: string;
+  currentChannel?: string;
+  commercialContextId?: string;
+  normalizedIntent?: string;
+  normalizedIntents?: string[];
+  origin?: {
+    platform?: string;
+    source?: string;
+    externalContentId?: string;
+    initialContent?: string;
+    occurredAt?: Date;
+    publicUrl?: string;
+  };
 
 aiAnalysis?: {
   [key: string]: any;
@@ -79,6 +91,11 @@ export interface IMessage {
   platform?: string;
   timestamp: Date;
   isRead?: boolean;
+  direction?: 'inbound' | 'outbound';
+  status?: 'received' | 'proposed' | 'pending' | 'sent' | 'failed';
+  externalMessageId?: string;
+  relatedMessageId?: string;
+  processingError?: string;
 }
 
 export interface ITask {
@@ -102,12 +119,17 @@ export interface IAutomationFlow {
   userId: string;
   name: string;
   description?: string;
+  status?: 'draft' | 'active' | 'paused' | 'disabled' | 'error';
   trigger: {
     type: string;
     keyword?: string;
     keywords?: string[];
   };
   actions: IAction[];
+  conditions?: ICondition[];
+  conditionLogic?: 'AND' | 'OR';
+  version?: number;
+  lastRunAt?: Date;
   schedule?: {
     frequency: string;
     daysOfWeek?: number[];
@@ -129,13 +151,14 @@ export interface IAction {
   type: string;
   message?: string;
   delay?: number;
+  config?: Record<string, any>;
   conditions?: ICondition[];
 }
 
 export interface ICondition {
   field: string;
   operator: string;
-  value: string | number;
+  value: any;
 }
 
 export interface IDashboardMetrics {
@@ -186,6 +209,16 @@ export interface IHunterProfile {
   thumbnailUrl?: string;
   views?: number;
   publishedAt?: string;
+  profileId?: string;
+  entityType?: 'person' | 'organization' | 'unknown';
+  entityConfidence?: number;
+  jobEvidenceType?: 'explicit' | 'indirect' | 'insufficient';
+  scores?: { commercial: number; jobAvailability: number; nutritionWellness: number; productSales: number; overall: number };
+  matchStatus?: 'high_priority' | 'good_candidate' | 'review' | 'low_match';
+  evidence?: Array<{ category: 'commercial' | 'jobAvailability' | 'nutritionWellness' | 'productSales'; type: 'explicit' | 'indirect' | 'insufficient'; signal: string; sourceField: string; publicUrl: string; publishedAt?: string; observedAt: string; confidence: number; context: string; possibleNegation: boolean }>;
+  publicLocation?: string;
+  locationSource?: string;
+  channelUrl?: string;
 }
 
 export interface IScraperResult {

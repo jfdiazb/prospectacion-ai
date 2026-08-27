@@ -28,6 +28,11 @@ const conversationSchema = new Schema(
         platform: String,
         timestamp: { type: Date, default: Date.now },
         isRead: { type: Boolean, default: false },
+        direction: { type: String, enum: ['inbound', 'outbound'] },
+        status: { type: String, enum: ['received', 'proposed', 'pending', 'sent', 'failed'] },
+        externalMessageId: String,
+        relatedMessageId: String,
+        processingError: String,
       },
     ],
     status: {
@@ -62,6 +67,7 @@ const conversationSchema = new Schema(
  * Indices
  */
 conversationSchema.index({ userId: 1, leadId: 1 });
+conversationSchema.index({ userId: 1, status: 1, lastMessage: -1 });
 conversationSchema.index({ createdAt: -1 });
 conversationSchema.index({ status: 1 });
 conversationSchema.index({ userId: 1, controlMode: 1, lastMessage: -1 });

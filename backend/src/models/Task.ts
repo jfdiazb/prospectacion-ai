@@ -32,5 +32,6 @@ const taskSchema = new Schema(
 );
 
 taskSchema.index({ userId: 1, leadId: 1, status: 1, dueDate: 1 });
+taskSchema.index({ userId: 1, 'metadata.globalTaskKey': 1 }, { unique: true, partialFilterExpression: { status: 'pending', 'metadata.globalTaskKey': { $type: 'string' } } });
 
 export default mongoose.model<ITask & mongoose.Document>('Task', taskSchema);

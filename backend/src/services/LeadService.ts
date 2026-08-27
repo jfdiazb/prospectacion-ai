@@ -1,5 +1,6 @@
 ﻿import Lead from '../models/Lead';
 import type { ILead, IPaginatedResponse, IPaginationParams } from '../types/index';
+import mongoose from 'mongoose';
 import { calculateLeadScore } from '../utils/helpers';
 
 /**
@@ -68,7 +69,9 @@ export class LeadService {
    * Actualizar lead
    */
   static async updateLead(leadId: string, userId: string, updateData: Partial<ILead>): Promise<ILead | null> {
-    const scoreInputsChanged = ['followers', 'engagement', 'bio'].some(key => key in updateData);
+    const immutableFields = new Set(['_id', 'userId', 'createdAt', 'updatedAt']);
+    const safeUpdate = Object.fromEntries(Object.entries(updateData).filter(([key]) => !immutableFields.has(key))) as Partial<ILead>;
+    const scoreInputsChanged = ['followers', 'engagement', 'bio'].some(key => key in safeUpdate);
     const currentLead = scoreInputsChanged
       ? await Lead.findOne({ _id: leadId, userId })
       : null;
@@ -76,9 +79,9 @@ export class LeadService {
     if (scoreInputsChanged && !currentLead) return null;
 
     const mergedData = {
-      followers: updateData.followers ?? currentLead?.followers,
-      engagement: updateData.engagement ?? currentLead?.engagement,
-      bio: updateData.bio ?? currentLead?.bio,
+      followers: safeUpdate.followers ?? currentLead?.followers,
+      engagement: safeUpdate.engagement ?? currentLead?.engagement,
+      bio: safeUpdate.bio ?? currentLead?.bio,
     };
     const score = scoreInputsChanged ? calculateLeadScore(mergedData) : undefined;
     const interestLevel = score === undefined
@@ -87,7 +90,7 @@ export class LeadService {
 
     return await Lead.findOneAndUpdate(
       { _id: leadId, userId },
-      { ...updateData, ...(score === undefined ? {} : { score, interestLevel }) },
+      { ...safeUpdate, ...(score === undefined ? {} : { score, interestLevel }) },
       { new: true, runValidators: true }
     );
   }
@@ -157,12 +160,28 @@ export class LeadService {
    * Obtener estadÃ­sticas de leads
    */
   static async getLeadStats(userId: string) {
-    const [totalLeads, newLeads, hotLeads, registeredLeads] = await Promise.all([
-      Lead.countDocuments({ userId }),
-      Lead.countDocuments({ userId, status: 'new' }),
-      Lead.countDocuments({ userId, interestLevel: 'hot' }),
-      Lead.countDocuments({ userId, status: 'registered' }),
+    const since = new Date();
+    since.setUTCHours(0, 0, 0, 0);
+    since.setUTCDate(since.getUTCDate() - 6);
+    const [result] = await Lead.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+      { $facet: {
+        totals: [{ $group: { _id: null, totalLeads: { $sum: 1 }, newLeads: { $sum: { $cond: [{ $eq: ['$status', 'new'] }, 1, 0] } }, hotLeads: { $sum: { $cond: [{ $eq: ['$interestLevel', 'hot'] }, 1, 0] } }, registeredLeads: { $sum: { $cond: [{ $eq: ['$status', 'registered'] }, 1, 0] } } } }],
+        weekly: [{ $match: { createdAt: { $gte: since } } }, { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'UTC' } }, leads: { $sum: 1 }, conversions: { $sum: { $cond: [{ $eq: ['$status', 'registered'] }, 1, 0] } }, hot: { $sum: { $cond: [{ $eq: ['$interestLevel', 'hot'] }, 1, 0] } } } }, { $sort: { _id: 1 } }],
+        channels: [{ $group: { _id: { $ifNull: ['$platform', 'unknown'] }, value: { $sum: 1 } } }, { $sort: { value: -1 } }],
+      } },
     ]);
+    const totals = result?.totals?.[0] || {};
+    const totalLeads = totals.totalLeads || 0;
+    const newLeads = totals.newLeads || 0;
+    const hotLeads = totals.hotLeads || 0;
+    const registeredLeads = totals.registeredLeads || 0;
+    const weeklyByDate = new Map((result?.weekly || []).map((item: any) => [item._id, item]));
+    const weeklyLeads = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(since); date.setUTCDate(since.getUTCDate() + index);
+      const key = date.toISOString().slice(0, 10); const item: any = weeklyByDate.get(key);
+      return { name: new Intl.DateTimeFormat('es-CO', { weekday: 'short', timeZone: 'UTC' }).format(date), leads: item?.leads || 0, conversions: item?.conversions || 0, hot: item?.hot || 0 };
+    });
 
     return {
       totalLeads,
@@ -170,6 +189,8 @@ export class LeadService {
       hotLeads,
       registeredLeads,
       conversionRate: totalLeads > 0 ? (registeredLeads / totalLeads) * 100 : 0,
+      weeklyLeads,
+      channelPerformance: (result?.channels || []).map((item: any) => ({ name: item._id, value: item.value })),
     };
   }
 

@@ -2,10 +2,17 @@ import mongoose, { Schema } from 'mongoose';
 
 const inboundEventSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  externalEventId: { type: String, required: true, unique: true },
-  channel: { type: String, enum: ['youtube', 'instagram', 'facebook', 'whatsapp'], required: true },
+  externalEventId: { type: String, required: true },
+  channel: { type: String, enum: ['youtube', 'instagram', 'facebook', 'whatsapp', 'tiktok'], required: true },
   eventType: { type: String, required: true },
   senderId: { type: String, required: true },
+  recipientId: String,
+  messageId: String,
+  commentId: String,
+  parentId: String,
+  accountId: String,
+  eventTimestamp: Date,
+  rawPayload: Schema.Types.Mixed,
   text: String,
   mediaId: String,
   matchedKeyword: String,
@@ -19,5 +26,7 @@ const inboundEventSchema = new Schema({
 }, { timestamps: true });
 
 inboundEventSchema.index({ userId: 1, createdAt: -1 });
+inboundEventSchema.index({ userId: 1, externalEventId: 1 }, { unique: true });
+inboundEventSchema.index({ userId: 1, channel: 1, processingState: 1, retryAfter: 1 });
 
 export default mongoose.model('InboundEvent', inboundEventSchema);

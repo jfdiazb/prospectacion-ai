@@ -1,5 +1,17 @@
 ﻿import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, User, Users, Repeat, PhoneCall, Settings, Sparkles, Search, Globe, Youtube } from 'lucide-react';
+import {
+  LayoutDashboard,
+  User,
+  Users,
+  Repeat,
+  PhoneCall,
+  Settings,
+  Sparkles,
+  Search,
+  Globe,
+  Youtube,
+  CalendarRange,
+} from 'lucide-react';
 
 const routes = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -7,9 +19,10 @@ const routes = [
   { label: 'Prospectos', path: '/prospectos', icon: Users },
   { label: 'Lead Hunter', path: '/lead-hunter', icon: Search },
   { label: 'YouTube Monitor', path: '/youtube-monitor', icon: Youtube },
-  { label: 'Social Scraper', path: '/social-scraper', icon: Globe },
+  { label: 'Social Scraper (demo)', path: '/social-scraper', icon: Globe },
   { label: 'Automatizaciones', path: '/automatizaciones', icon: Repeat },
   { label: 'CRM', path: '/crm', icon: PhoneCall },
+  { label: 'Lanzamientos', path: '/lanzamientos', icon: CalendarRange },
   { label: 'Configuración', path: '/configuracion', icon: Settings },
 ];
 
@@ -52,7 +65,9 @@ export const Sidebar = () => {
 
       <div className="mt-auto rounded-[1.75rem] border border-white/10 bg-dark-900/90 p-5 text-sm text-dark-300 shadow-lg shadow-black/20">
         <p className="font-semibold text-white">Panel moderno</p>
-        <p className="mt-2 leading-6 text-dark-300">Accede rápido a herramientas clave y mantén tu flujo de trabajo organizado.</p>
+        <p className="mt-2 leading-6 text-dark-300">
+          Accede rápido a herramientas clave y mantén tu flujo de trabajo organizado.
+        </p>
       </div>
     </aside>
   );

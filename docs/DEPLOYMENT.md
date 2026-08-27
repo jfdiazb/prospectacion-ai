@@ -25,7 +25,7 @@ Esta guía publica ALMA con el backend en Render, el frontend en Vercel y MongoD
    - `JWT_SECRET`: valor aleatorio largo y exclusivo de producción.
    - `CORS_ORIGIN`: URL HTTPS del frontend en Vercel. Puede ajustarse después de crear el frontend.
 3. Conserva `AI_MODE`, `YOUTUBE_MESSAGING_MODE`, `ZOOM_MODE`, `INSTAGRAM_MESSAGING_MODE` y `WHATSAPP_MESSAGING_MODE` en `mock`.
-4. Al terminar, abre `https://<servicio-render>/health`. Debe responder `{"success":true,"status":"ok"}`.
+4. Al terminar, abre `https://<servicio-render>/health` (liveness) y `https://<servicio-render>/api/v1/readiness` (DB/configuración esencial). Ambos deben responder HTTP 200.
 
 Render asigna `PORT` automáticamente; el servidor y el healthcheck del contenedor respetan ese valor.
 
@@ -46,6 +46,11 @@ Render asigna `PORT` automáticamente; el servidor y el healthcheck del contened
 3. Comprueba que el usuario aparezca en Atlas y que el dashboard cargue sin errores CORS.
 4. Ejecuta una prueba de ALMA en mock y confirma en MongoDB que la entrega indique `simulated`.
 5. Revisa los logs: no deben aparecer tokens ni cadenas completas de conexión.
+
+Para evitar copiar JWT manualmente, configura en la terminal `ALMA_SMOKE_API_URL`,
+`ALMA_SMOKE_EMAIL` y `ALMA_SMOKE_PASSWORD` con una cuenta QA existente y ejecuta
+`npm run alma:smoke` desde `backend`. El comando no imprime el token, no crea usuarios,
+no envía mensajes y devuelve un exit code distinto de cero ante cualquier fallo crítico.
 
 ## 5. Activación posterior de YouTube
 

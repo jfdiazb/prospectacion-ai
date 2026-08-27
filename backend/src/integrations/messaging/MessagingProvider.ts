@@ -1,6 +1,9 @@
 export type MessagingRecipient =
   | { type: 'comment'; commentId: string }
   | { type: 'instagram_user'; instagramScopedId: string }
+  | { type: 'instagram_comment'; commentId: string }
+  | { type: 'facebook_user'; pageScopedId: string }
+  | { type: 'facebook_comment'; commentId: string }
   | { type: 'whatsapp_user'; phoneNumber: string }
   | { type: 'youtube_comment'; parentCommentId: string };
 

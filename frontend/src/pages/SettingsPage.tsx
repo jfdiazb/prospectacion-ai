@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, CalendarCheck, CheckCircle2, Clock, RefreshCw, Youtube } from 'lucide-react';
 import { youtubeService, type OperationalDiagnostics, type YouTubeStatus } from '@services/youtubeService';
 import { useNavigate } from 'react-router-dom';
+import { commercialContextService, type CommercialContextSummary } from '@services/commercialContextService';
 
 export const SettingsPage = () => {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export const SettingsPage = () => {
   const [youtubeError, setYoutubeError] = useState('');
   const [diagnostics, setDiagnostics] = useState<OperationalDiagnostics | null>(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(true);
+  const [commercialContext, setCommercialContext] = useState<CommercialContextSummary | null>(null);
 
   const loadDiagnostics = async () => {
     setDiagnosticsLoading(true);
@@ -29,6 +31,7 @@ export const SettingsPage = () => {
       .catch(() => setYoutubeError('No fue posible consultar la conexión de YouTube.'))
       .finally(() => setYoutubeLoading(false));
     void loadDiagnostics();
+    commercialContextService.active().then(setCommercialContext).catch(() => setYoutubeError('No fue posible consultar el contexto comercial activo.'));
   }, []);
 
   const connectYouTube = async () => {
@@ -59,11 +62,11 @@ export const SettingsPage = () => {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-3xl bg-dark-900 p-5">
                   <p className="text-sm text-dark-400">Nombre</p>
-                  <p className="mt-2 text-lg font-medium text-white">{user?.fullName || 'Usuario ProspectAI'}</p>
+                  <p className="mt-2 text-lg font-medium text-white">{user?.fullName || 'No disponible'}</p>
                 </div>
                 <div className="rounded-3xl bg-dark-900 p-5">
                   <p className="text-sm text-dark-400">Email</p>
-                  <p className="mt-2 text-lg font-medium text-white">{user?.email || 'correo@ejemplo.com'}</p>
+                  <p className="mt-2 text-lg font-medium text-white">{user?.email || 'No disponible'}</p>
                 </div>
               </div>
 
@@ -90,9 +93,9 @@ export const SettingsPage = () => {
                 <div className="flex items-center justify-between rounded-2xl bg-dark-800 p-4">
                   <div>
                     <p className="font-medium text-white">Alertas de actividad</p>
-                    <p className="text-sm text-dark-400">Recibe notificaciones cuando llegan nuevos prospectos.</p>
+                    <p className="text-sm text-dark-400">Consulta tareas pendientes dentro del panel superior y el CRM.</p>
                   </div>
-                  <span className="rounded-full bg-primary-500 px-4 py-2 text-sm font-semibold text-white">Activado</span>
+                  <span className="rounded-full bg-primary-500 px-4 py-2 text-sm font-semibold text-white">Panel interno</span>
                 </div>
                 <div className="flex items-center justify-between rounded-2xl bg-dark-800 p-4">
                   <div>
@@ -106,6 +109,13 @@ export const SettingsPage = () => {
               <Button variant="danger" onClick={logout} className="w-full">Cerrar sesión</Button>
             </div>
           </motion.div>
+        </Card>
+
+        <Card className="lg:col-span-2" hover={false}>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div><p className="text-sm uppercase tracking-[0.3em] text-dark-500">Contexto comercial activo</p><h2 className="text-2xl font-semibold text-white">{commercialContext?.brandName || 'Cargando…'}</h2><p className="mt-1 text-dark-400">{commercialContext?.commercialLines?.join(' · ') || 'Sin líneas configuradas'}</p></div>
+            <div className="rounded-2xl bg-dark-900 px-5 py-3 text-sm"><p className="text-emerald-300">{commercialContext?.status || 'consultando'}</p><p className="text-dark-400">Versión {commercialContext?.version || '—'}</p></div>
+          </div>
         </Card>
 
         <Card className="lg:col-span-2" hover={false}>

@@ -1,5 +1,156 @@
 # AGENTS.md
 
+## Lanzamientos L6F consolidado: TikTok mock/inbound — 2026-08-22
+- El soporte TikTok real continúa limitado a un boundary normalizador y una ingesta inyectable, desactivada por defecto; no existe transporte oficial configurado, provider outbound ni capacidad DM verificable. L6F implementa únicamente comentarios fixture sobre contenido propio.
+- `LaunchTikTokContent` relaciona owner, lanzamiento, cuenta y contentId de forma explícita e inactivable. El adaptador no correlaciona por texto, INFO, hashtag, intención o IA; contenido no mapeado, cuenta ausente y lead no participante quedan en `pending_review`.
+- Los comentarios son evidencia débil y nunca registran, confirman, marcan asistencia ni crean reuniones. Lanzamientos terminales y participantes cancelados quedan `ignored`; el opt-out central rechaza el lead, conserva el canal e invalida acciones aplicables.
+- TikTok sigue completamente OFF: `TIKTOK_API_APPROVED=false`, ingesta/mensajería false, cero `OutboundMessage`, cero `MessagingService` y ningún API outbound. Validación vigente: L6F 13/13, TikTok conjunto 22/22, Lanzamientos 157/157, backend 535/535; build correcto y lint sin errores.
+
+## Lanzamientos L6E consolidado: YouTube mock/inbound — 2026-08-22
+- La ingesta existente de `YouTubeIngestionService` proyecta comentarios y respuestas de videos asociados hacia `LaunchExternalEvent`; el mapping video/canal/cuenta/lanzamiento es explícito, owner-scoped e inactivable.
+- Los comentarios son siempre evidencia débil: no registran, confirman ni marcan asistencia. Los hilos solo heredan asociación desde una raíz ya relacionada para el mismo owner y cuenta; los casos sin evidencia determinista quedan en `pending_review`.
+- Un evento vinculado a Lanzamientos termina antes de ALMA/mensajería. El opt-out explícito rechaza el lead, aplica el opt-out central, invalida propuestas/acciones y actualiza participantes sin migrar de canal.
+- YouTube permanece en mock/inbound: cero `OutboundMessage`, cero `MessagingService` y cero API outbound en L6E. Validación vigente: L6E 13/13, ingesta conjunta 25/25, Lanzamientos 144/144 y backend 522/522; build correcto y lint sin errores.
+
+## Lanzamientos L6D consolidado: adaptador WhatsApp mock/inbound — 2026-08-22
+- El webhook WhatsApp oficial continúa como único punto de entrada y conserva firma HMAC, `phone_number_id`, allowlist, timestamp/replay, respuesta HTTP previa al procesamiento, `InboundEvent`, reintentos e idempotencia. No se creó otro webhook.
+- `WhatsAppInboundNormalizer` reconoce texto, button reply, list reply y metadata segura de imagen/audio/video/documento. Los estados delivery/read continúan ignorados porque el flujo existente no los procesa como mensajes. Nunca descarga medios ni persiste tokens interactivos.
+- `WhatsAppLaunchAdapter` proyecta hacia `LaunchExternalEvent`. La asociación exige token opaco con launchId o una única conversación ya vinculada; INFO, “sí”, intención, IA, nombres y texto visible de controles no correlacionan lanzamientos.
+- Los controles usan `alma-launch:v1:<registration|confirmation|interaction>:<launchId>:<token>` y validan owner, hash del token, participante, launch vigente y `registrationConfig.whatsappInteractiveActions`. Solo registration/confirmation explícitamente autorizados generan hechos L3; el resto queda `pending_review`.
+- Texto, media e interacciones generales son eventos débiles y nunca registran, confirman, marcan asistencia ni crean reuniones. Opt-out, lanzamiento terminal y participante cancelado quedan `ignored` por políticas centrales.
+- `WhatsAppOptOutService` persiste rechazo/tag `opt_out`, aplica opt-out general a identidades confirmadas, invalida propuestas/tareas/acciones multicanal y transiciona participantes activos a `stage.opted_out`. El mensaje de opt-out no genera una nueva propuesta.
+- WhatsApp permanece seguro: `WHATSAPP_MESSAGING_MODE` usa default mock, `WHATSAPP_AUTO_REPLY_ENABLED` default false y `WHATSAPP_REPLY_MODE` assisted. L6D no importa mensajería, no crea `OutboundMessage` y no llama Cloud API.
+- Validación vigente: L6D 13/13, L6D + webhook histórico 27/27, L1–L6D 131/131, backend 509/509, build correcto y lint sin errores (559 advertencias permitidas). Frontend no fue modificado.
+
+## Lanzamientos L6C consolidado: adaptador Meta mock/inbound — 2026-08-22
+- El webhook Meta existente continúa siendo el único punto de entrada y conserva firma HMAC, respuesta rápida, normalización e idempotencia `InboundEvent`. `MetaIngestionService` proyecta después cada evento aceptado mediante `MetaLaunchAdapter` hacia `LaunchExternalEvent`, sin bloquear ni reemplazar el flujo CRM/asistido de Fase 4.
+- `LaunchMetaContent` relaciona de forma owner-scoped e idempotente lanzamiento, Instagram/Facebook, cuenta/página y contenido externo. El CRM autenticado permite listar, vincular y desactivar mapeos; un contenido no puede reasignarse silenciosamente a otro lanzamiento.
+- El adaptador distingue comentarios Instagram/Facebook, DM Instagram, Messenger y contexto de private reply. Conserva IDs mínimos, timestamp, plataforma, cuenta, contenido y hash del texto; nunca persiste el payload Meta completo en Lanzamientos.
+- La asociación exige contenido previamente mapeado, token opaco explícito o una única conversación ya vinculada. Una identidad multicanal solo se reutiliza si `ContactIdentity` está confirmada/activa. INFO, intención, IA, nombres y similitud no participan en la asociación.
+- Comentarios y DM son eventos débiles: permanecen `pending_review` aun con asociación determinista y nunca registran, confirman, marcan asistencia ni crean reuniones. Opt-out y lanzamientos/participantes no vigentes quedan `ignored`.
+- Replay se limita con `META_INBOUND_MAX_AGE_MS`; L6A conserva fingerprint, claves únicas, concurrencia y recuperación. Fixtures cubren Instagram, Facebook, Messenger, private reply, post mapeado/no mapeado, token, identidad, owner, duplicados y firma.
+- Meta permanece mock: `META_MESSAGING_MODE=mock`, `INSTAGRAM_MESSAGING_MODE=mock` y Facebook hereda mock. L6C no importa `MessagingService`, no crea `OutboundMessage` y no llama Graph API.
+- Validación vigente: L6C 15/15, L1–L6C 118/118, backend 496/496, build correcto y lint sin errores (551 advertencias permitidas). Frontend no fue modificado.
+
+## Lanzamientos L6B consolidado: formulario/webhook firmado inbound — 2026-08-22
+- `POST /api/v1/launches/inbound/form/webhook` recibe exclusivamente JSON raw con HMAC SHA-256 sobre `timestamp.cuerpo`, secreto/owner externos, tolerancia de 30–900 segundos, límite de 1–256 KiB, rate limit de 30/minuto e idempotency key consistente entre header y DTO.
+- El DTO v1 cerrado admite interés, registro o confirmación y una sola referencia determinista: `participantId`, `leadId` owner-scoped o token opaco previamente generado, que se persiste únicamente como SHA-256. No acepta owner, nombres, email/teléfono aproximado, texto libre ni objetos arbitrarios.
+- `LaunchExternalEvent` conserva fingerprint canónico. Reenvíos exactos y concurrentes reutilizan el evento; el mismo eventId o idempotency key con otro contenido devuelve conflicto. Fallos quedan reintentables y una reclamación vencida puede recuperarse.
+- La asociación verifica lanzamiento, participante, lead, conversación y propietario. Interés queda en `pending_review`; confirmación exige formulario autorizado y registro previo. Lanzamientos no vigentes, opt-out y participantes cancelados quedan `ignored` sin mutación.
+- La evidencia L3 minimizada conserva provider, externalEventId, timestamp, método, formId, referencia y metadata permitida. Nunca persiste cuerpo raw, token, firma ni secreto. La observabilidad registra solo provider, eventId, launch, estado, intentos, latencia y errores sanitizados.
+- L6B no importa mensajería, no crea `OutboundMessage`, tareas o propuestas y no invoca proveedores. Sin `LAUNCH_FORM_WEBHOOK_SECRET` y `LAUNCH_FORM_WEBHOOK_OWNER_ID` responde 503; ninguna credencial real fue configurada.
+- Validación vigente: L6A+L6B 34/34, L1–L6B 103/103, backend 481/481, build correcto y lint sin errores (541 advertencias permitidas). Frontend no fue modificado.
+
+## Lanzamientos L6A consolidado: contratos e ingesta externa segura — 2026-08-22
+- `LaunchExternalEvent` funciona como inbox durable, versionado, owner-scoped e idempotente para Meta, WhatsApp, YouTube, TikTok, formularios, proveedores de eventos y fixtures locales.
+- El contrato normaliza proveedor, tipo, canal, identificadores, instante, evidencia mínima y referencias explícitas. Rechaza versiones inválidas, eventos vencidos, verificación insuficiente y metadatos fuera de límites; incluye verificación HMAC reutilizable sin persistir secretos.
+- La asociación exige `launchId` y `participantId` explícitos y verifica propietario, lanzamiento, participante, lead y conversación. Nunca enlaza por nombre, texto, usuario social ni heurísticas; los eventos ambiguos o débiles quedan en `pending_review`.
+- Registro, confirmación, asistencia y no-show reutilizan exclusivamente `LaunchOperationsService`. La reclamación atómica, claves únicas, reintentos y recuperación de reclamaciones vencidas evitan doble aplicación y conservan errores auditables.
+- Los adaptadores L6A son fixtures/mock; no hay endpoint público, polling ni integración live. TikTok conserva su canal sin inventar destinatarios. L6A no importa `MessagingService`, no crea `OutboundMessage` y no envía nada.
+- Validación vigente: L1–L6A 87/87, backend 465/465, build correcto y lint sin errores (537 advertencias permitidas). Frontend no fue modificado.
+
+## Prueba operativa integral Lanzamientos L1–L5 — 2026-08-22
+- `launch-operational-e2e.test.ts` recorre en MongoDB efímero un `Lanzamiento Demo ALMA` con 13 leads ficticios, AND/OR, selección/exclusión, opt-out, evidencia L3, reunión, acciones pre/postevento, tareas, propuestas, invalidación, auditoría, métricas, concurrencia/idempotencia y aislamiento por owner.
+- WhatsApp, Instagram, Facebook, YouTube y TikTok se prueban con IA/mensajería en mock o desactivada. TikTok permanece como canal reconocido, sin destinatario inventado ni propuesta outbound.
+- Instrumentación explícita confirmó 0 `OutboundMessage`, 0 llamadas a `MessagingService`, 0 llamadas a Meta y 0 llamadas a YouTube. No se usaron credenciales, staging ni datos reales.
+- Validación final: Lanzamientos 69/69, backend 447/447, frontend 10/10, builds correctos y lint sin errores. La ruta local `/lanzamientos` redirige a autenticación sin sesión; sus flujos internos pasan las pruebas React automatizadas.
+
+## Lanzamientos L5 consolidado: CRM/frontend operativo — 2026-08-22
+- `/lanzamientos` ofrece listado filtrable, métricas reales, creación/edición, lifecycle validado, segmentación simple AND/OR con preview y confirmación humana, participantes, operación L3, acciones L4 y auditoría.
+- La capa `LaunchCrmService` agrega lecturas owner-scoped de lanzamientos, participantes enriquecidos, reuniones, identidad/consentimiento, acciones, tareas, propuestas y eventos. La edición de configuración es validada, idempotente, auditable y usa control optimista.
+- Registro, confirmación, asistencia y correcciones siguen pasando por los contratos de evidencia L3. Segmentación reutiliza L2 y permite exclusión manual; las señales de opt-out, canal bloqueado/preferido, estados terminales e invalidaciones permanecen visibles.
+- Las propuestas se editan, descartan o aprueban usando el CRM existente. El envío solo puede iniciarse mediante acción y confirmación humana explícitas; L5 no crea `OutboundMessage`, workers, proveedores ni automatizaciones.
+- Validación vigente: backend 446/446 y frontend 10/10; builds backend/frontend correctos; lint sin errores (526 advertencias backend y 65 frontend permitidas). Un timeout aislado preexistente de Perfil pasó al repetirlo y la suite completa posterior quedó verde.
+
+## Lanzamientos L4 consolidado: acciones asistidas — 2026-08-22
+- `LaunchAction` materializa de forma durable e idempotente invitaciones, recordatorios, acciones previas y posteriores al evento, recuperación no-show y siguientes pasos a partir de evidencia explícita de `LaunchParticipant`.
+- El worker existente de automatizaciones reclama, reintenta y recupera acciones; reutiliza políticas de seguimiento, identidad multicanal, tareas, reuniones y propuestas sin crear schedulers ni proveedores paralelos.
+- Cada ejecución revalida lanzamiento, participante, conversación, reunión, canal, consentimiento, cooldown, límites y TTL. Los cambios posteriores cancelan o reemplazan acciones y propuestas con auditoría en `LaunchEvent`.
+- Las acciones siempre son asistidas: generan tarea y, solo con conversación y destinatario seguros en WhatsApp/Instagram/Facebook, una `AssistedProposal` editable; nunca invocan `MessagingService` ni crean `OutboundMessage` automáticamente.
+- Validación vigente: L1–L4 66/66, backend 444/444, compilación correcta y lint sin errores (511 advertencias permitidas). Frontend no fue modificado en L4.
+
+## Lanzamientos L3 consolidado: registro y asistencia operativa — 2026-08-22
+- `LaunchOperationsService` registra hechos operativos owner-scoped para registro, confirmación, asistencia, no-show, correcciones, importación controlada, métricas y vínculo explícito con reuniones. No existen inferencias desde comentarios, mensajes, score ni paso del tiempo.
+- La evidencia L1 se amplió de forma compatible con `source`, canal, referencia, actor, fecha y metadata escalar limitada; fuentes externas/sistema requieren referencia. Registro, confirmación, attended y no-show conservan evidencias independientes.
+- La confirmación exige registro por defecto. Solo una política explícita `registrationConfig.requireRegistrationForConfirmation=false` permite confirmación sin registro y deja razón auditada. Asistencia permanece `unknown` hasta evidencia; volver a unknown requiere corrección humana con motivo y evento adicional.
+- Importaciones internas admiten hasta 100 hechos, resultados parciales e idempotencia por ítem. Métricas derivadas: seleccionados, registrados, confirmados, attended, notAttended y unknown, sin conversiones inferidas.
+- La deduplicación multicanal ahora reconcilia participantes creados antes de confirmar el vínculo entre identidades; no fusiona leads ni autoasocia identidades. Reuniones solo se vinculan si ya existen y pertenecen al mismo lead/owner.
+- Endpoints autenticados mínimos consultan/registran/corrigen hechos, importan lotes, obtienen métricas y vinculan reuniones. No se añadieron frontend, workers, IA, propuestas ni mensajería.
+- Validación vigente: L1+L2+L3 50/50, backend 428/428, build backend correcto y lint backend sin errores. `OutboundMessage` permanece en cero en las pruebas L3.
+
+## Lanzamientos L2 consolidado: segmentación y selección asistida — 2026-08-22
+- `targetSegment` usa un contrato cerrado `schemaVersion=1` con campos/operadores permitidos, lógica AND/OR, grupos anidados hasta profundidad 3, máximo 30 reglas y 10 grupos; no acepta consultas Mongo, código ni expresiones arbitrarias.
+- `LaunchSegmentVersion` conserva snapshots inmutables, hash, actor, razón y versión. El motor evalúa datos estructurados de Lead, historial de calificación, reuniones, participación previa e identidad multicanal sin IA y devuelve razones deterministas por regla y exclusión.
+- El preview es paginado (máximo 100), carga relaciones por lotes, presenta elegibilidad, razones, alertas de posibles duplicados y distribuciones, y nunca crea participantes. Opt-out, estados terminales, canales bloqueados/no permitidos y reuniones activas son exclusiones no omitibles en la selección por segmento.
+- La confirmación humana crea `LaunchParticipant` idempotente con snapshot de versión/hash/razones. Exclusiones manuales y overrides permitidos exigen actor y motivo; la selección manual directa permanece separada y reutiliza las invariantes L1.
+- Endpoints autenticados mínimos: validar/guardar segmento, preview, confirmar selección y selección manual. No se añadieron frontend, IA, workers, propuestas ni mensajería.
+- Validación vigente: L1+L2 35/35, backend 413/413, build backend correcto y lint backend sin errores. `OutboundMessage` permanece en cero en las pruebas L2.
+
+## Lanzamientos L1 consolidado: dominio y contratos — 2026-08-22
+- `Launch`, `LaunchParticipant` y `LaunchEvent` constituyen un agregado owner-scoped sin rutas públicas, workers, propuestas ni mensajería. El lifecycle de lanzamiento es `draft → scheduled → prelaunch → live → followup → completed`, con cancelación terminal desde cualquier etapa no terminal.
+- La participación conserva dimensiones independientes para etapa, invitación, registro, confirmación, asistencia y resultado. Registro, confirmación, asistencia/no-show y resultados terminales exigen evidencia tipada; asistencia permanece `unknown` sin evidencia fiable.
+- Un índice por lanzamiento y `participantKey` evita duplicados por lead o contacto multicanal ya confirmado, sin crear ni inferir vínculos de identidad. El mismo lead puede participar en distintos lanzamientos.
+- `LaunchLifecycleService` valida owner, fechas, timezone, referencias existentes, opt-out, transiciones, evidencia e idempotencia. `LaunchEvent` mantiene auditoría mínima sin copiar payloads completos; las actualizaciones usan versión y filtros condicionales para carreras concurrentes.
+- Validación vigente: L1 22/22, backend 400/400, build backend correcto y lint backend sin errores. Frontend no fue modificado. L1 no importa ni crea `OutboundMessage` y no dispone de ninguna vía de envío.
+
+## Automatización 5 consolidada: seguimiento multicanal seguro — 2026-08-22
+- `ContactProfile` y `ContactIdentity` agrupan leads únicamente después de confirmación humana explícita; no se fusionan leads, conversaciones ni historiales. Las coincidencias exactas de correo o teléfono solo crean `DuplicateCandidate` revisables y nunca enlazan automáticamente nombres o usuarios parecidos.
+- Seguimiento, reactivación y reuniones consultan contacto confirmado, preferencia y consentimiento antes de crear propuestas. Un opt-out general o por canal, una respuesta en otra identidad, una reunión activa o un destinatario obsoleto bloquean o invalidan la propuesta asistida.
+- Las tareas pendientes se coordinan por contacto confirmado mediante una clave única durable. El CRM permite confirmar/rechazar candidatos, elegir canal preferido, registrar consentimiento u opt-out, bloquear todo seguimiento y deshacer vínculos con auditoría.
+- WhatsApp, Instagram y Facebook conservan propuestas editables y aprobación humana; YouTube solo genera tarea cuando no existe un destinatario saliente seguro. No se habilitó ningún autoenvío ni se cambiaron modos de proveedores.
+- Validación vigente: backend 378/378, frontend 7/7, compilaciones backend/frontend correctas y lint backend sin errores (advertencias históricas de tipado permanecen).
+
+## Automatización 4 consolidada: reuniones asistidas — 2026-08-22
+- El worker durable existente materializa recordatorios configurables y acciones posreunión con claves únicas, reclamación recuperable, aislamiento por propietario y compatibilidad Zoom/Calendly; no existe scheduler paralelo ni autoenvío.
+- `MeetingAction` conserva ventanas, snapshots, intentos, tareas y propuestas. Reprogramación, cancelación, cambio de estado/canal/conversación y TTL invalidan recordatorios y opciones antiguas sin depender de abrir CRM.
+- El lifecycle unifica resultados `attended`, `no_show`, `cancelled`, `technical_failure` y `pending_review`. Una reunión pasada queda en revisión humana; nunca se infiere no-show por el paso del tiempo.
+- CRM permite confirmar asistencia, registrar no-show o fallo técnico y revisar propuestas de agenda, recordatorio y seguimiento. Gemini/mock usa fecha, zona, historial y resultado confirmado sin inventar conclusiones.
+- Eventos añadidos: `meeting.reminder_due`, `meeting.no_show` y `meeting.followup_due`. Seguimiento y calificación no se modifican arbitrariamente y una reunión activa continúa suspendiendo seguimientos comerciales incompatibles.
+- Validación vigente: reuniones 16/16, regresión enfocada 95/95, backend 366/366, frontend 7/7, builds correctos y lint backend sin errores.
+
+## Automatización 2 consolidada: reactivación asistida — 2026-08-22
+- El worker durable existente detecta conversaciones inactivas con una política configurable, reclamación atómica, aislamiento por propietario, cooldown y máximo de intentos; no existe un scheduler paralelo.
+- Reutiliza seguridad de seguimiento, calificación e historial durable para excluir opt-out/rechazo, cierres, control humano, reuniones activas, actividad reciente y propuestas vigentes.
+- Gemini/mock genera una continuación contextual con memoria y evita repetir preguntas/respuestas. WhatsApp, Instagram y Facebook crean propuesta editable; YouTube queda como tarea cuando no existe un destinatario de hilo seguro.
+- Las propuestas guardan snapshot y vencimiento, se invalidan por respuesta, estado, reunión, canal, conversación, reemplazo o TTL y se revalidan antes de editar/enviar.
+- La reactivación nunca llama a mensajería: solo crea tarea/propuesta CRM y cualquier envío requiere aprobación humana autenticada.
+- Validación vigente: 18/18 pruebas enfocadas, regresión backend 349/349 previa a la prueba adicional, frontend 7/7, builds correctos y lint backend sin errores.
+
+## Quinta automatización comercial combinada — 2026-08-21
+- `Interés combinado → Calificación asistida` se materializa únicamente bajo demanda como borrador inactivo y responde a `message.received` con `normalizedIntent=business_and_product_interest` en WhatsApp, Instagram o Facebook.
+- La intención actual puede evolucionar explícitamente hacia productos, venta o negocio sin borrar señales y tags históricos. Si el prospecto mantiene ambos intereses, ALMA consulta el historial y evita repetir la pregunta de priorización.
+- La automatización solo añade `interes_negocio_y_productos`, genera/reutiliza una propuesta asistida y consolida el seguimiento mediante `TaskService`; no modifica score, estado o meeting intent, no crea reuniones y no envía mensajes.
+- Conserva el mínimo conversacional existente de 70 para interés combinado y separa el interés comercial de una intención explícita de reunión. La plantilla es genérica y obtiene marca, información autorizada y restricciones desde `CommercialContext`.
+- Validación vigente: regresión comercial 121/121, backend 305/305, frontend 7/7, builds y type-check correctos; lint backend sin errores.
+
+## Fase 8 consolidada: auditoría final del MVP — 2026-08-21
+- Se eliminaron métricas ficticias del Dashboard; sus totales, tendencia semanal y canales provienen de una agregación Mongo real. Social Scraper y Lead Hunter mock quedan rotulados como demostración.
+- Se cerró un P0 de asignación masiva que permitía cambiar el owner de un lead. La idempotencia de inbound, outbound y propuestas ahora se aísla por owner, evitando colisiones entre tenants.
+- Los reintentos ambiguos de creación Zoom quedan bloqueados para verificación manual; los errores 5xx no exponen detalles en producción. Se reforzaron validación, rate limiting e índices owner-first.
+- Se eliminaron únicamente `Topbar.tsx` y `StatCard.tsx`, demostrablemente sin consumidores.
+- Validación vigente: 169/169 pruebas backend y 7/7 frontend; builds backend/frontend correctos; lint backend sin errores. Veredicto documentado: MVP funcional con limitaciones externas.
+
+## Fase 7 consolidada: reuniones con confirmación explícita — 2026-08-21
+- Un score alto ya no crea reuniones: el flujo Zoom requiere intención conversacional explícita, propuesta de disponibilidad, selección y confirmación antes de invocar al proveedor.
+- `MeetingAvailabilityService` calcula opciones por días, ventana horaria, duración, zona IANA y buffers configurables. `MeetingLifecycleService` persiste solicitud, selección, confirmación, fallos, reintentos, cancelación, reprogramación, finalización e historial aislado por propietario.
+- Zoom oficial soporta crear, actualizar y cancelar; el modo mock deja la selección en `pending_configuration`. La reserva atómica y su clave única impiden dobles confirmaciones y colisiones de horario. `startUrl` permanece excluido de consultas CRM normales.
+- El CRM muestra estado, horario, zona, duración, canal, Zoom, errores e historial, con controles autenticados para reintentar, reprogramar, cancelar y completar. Automatizaciones recibe `meeting.intent_detected`, `meeting.requested`, `meeting.confirmed`, `meeting.failed` y `meeting.completed` sin acoplarse a Zoom.
+- Validación vigente: 164/164 pruebas backend, compilaciones backend/frontend, type-check frontend y lint backend sin errores. No se realizó ninguna reunión real ni se cambiaron modos de proveedores.
+
+## Fase 6 consolidada: motor de automatizaciones multicanal — 2026-08-21
+- `AutomationFlow` conserva compatibilidad con reglas keyword históricas y añade estados, versión, triggers normalizados, condiciones AND/OR y acciones permitidas sin código arbitrario.
+- `AutomationExecution` registra historial e idempotencia por automatización/evento; `AutomationJob` implementa esperas persistentes, recuperación tras reinicios y reintentos limitados.
+- Las acciones de mensajería crean `AssistedProposal` y nunca invocan el proveedor outbound. Meta y WhatsApp emiten eventos al motor; YouTube conserva su keyword histórico y emite `message.received`; TikTok queda preparado pero desactivado.
+- Automatizaciones permite crear, editar, activar, pausar/reactivar, duplicar, eliminar, consultar historial y filtrar. La plantilla `INFO → Calificación` se crea en borrador.
+- Validación vigente: 149/149 pruebas backend, compilaciones backend/frontend y type-check frontend correctos; lint backend sin errores.
+
+## Fase 4 consolidada: Meta multicanal asistido — 2026-08-20
+- El webhook Meta valida firma, normaliza comentarios y mensajes de Instagram/Facebook, persiste el evento idempotente y responde antes de ejecutar IA; el procesamiento posterior conserva fallos y admite recuperación segura.
+- La intención inicial reconoce frases configurables además de `INFO`. Los identificadores se aíslan por plataforma y los leads conservan origen inicial, canal actual y evidencia pública permitida sin asociaciones especulativas entre identidades.
+- `AssistedProposal` generaliza las propuestas históricas de WhatsApp sin cambiar su colección. Instagram, Facebook y WhatsApp permiten editar, aprobar una sola vez y enviar manualmente desde CRM; Meta permanece en `mock` y sin autoenvío.
+- `MessagingRecipient`, `MessagingService`, `MetaMessagingProvider` y `OutboundMessage` distinguen comentarios/usuarios de Instagram y Facebook, incluyendo Page PSID y respuestas privadas a comentarios.
+- Validación vigente: 122/122 pruebas backend, compilaciones backend/frontend correctas y lint backend sin errores.
+
 ## Conversaciones CRM operativas y continuidad sin bloqueo — 2026-08-16
 - ALMA dispone de continuaciones no interrogativas cuando ya agotó las preguntas de descubrimiento; una conversación larga deja de fallar por no poder reservar otra pregunta única y avanza al siguiente paso.
 - Los reintentos de eventos YouTube conservan `conversationRecordedAt` y no vuelven a insertar el mismo mensaje del prospecto en el historial.

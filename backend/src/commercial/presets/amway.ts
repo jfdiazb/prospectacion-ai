@@ -1,0 +1,23 @@
+export const AMWAY_INITIAL_CONTEXT = {
+  brandName: 'Amway',
+  description: 'Contexto inicial para calificar intereses comerciales sin asumir una decisión del prospecto.',
+  businessType: 'venta directa y oportunidad de negocio independiente',
+  commercialLines: ['oportunidad de negocio', 'consumo de productos', 'comercialización de productos'],
+  categories: ['bienestar', 'nutrición', 'productos de consumo'],
+  productFamilies: ['Nutrilite'],
+  targetProfiles: [{ id: 'sales_job_seeker_nutrition_v1', label: 'Perfil comercial, emprendimiento y bienestar', searchTerms: ['ventas', 'emprendimiento', 'nutrición', 'bienestar'] }],
+  intentTerms: [
+    { intent: 'additional_income_interest', phrases: ['ingreso adicional', 'ingresos adicionales', 'ingreso extra', 'ingresos extra', 'generar ingresos', 'segunda fuente de ingresos', 'actividad adicional', 'trabajar desde casa'], tags: ['interes_ingresos_adicionales'] },
+    { intent: 'business_opportunity', phrases: ['oportunidad de negocio', 'oportunidad para emprender', 'oportunidad', 'emprendimiento', 'emprender', 'negocio propio', 'desarrollar un negocio', 'construir un negocio', 'construir algo propio', 'conocer el negocio', 'formar un equipo', 'desarrollar el negocio', 'como funciona el modelo', 'modelo de negocio'], tags: ['interes_oportunidad_negocio'] },
+    { intent: 'product_interest', phrases: ['productos', 'conocer los productos', 'conocer productos', 'comprar productos', 'comprar un producto', 'comprar producto', 'consumir productos', 'uso personal', 'usarlos', 'bienestar', 'nutricion', 'nutrilite'], tags: ['interes_productos'] },
+    { intent: 'product_sales_interest', phrases: ['vender productos', 'vender los productos', 'vender algunos productos', 'vendiendo estos productos', 'venderlos', 'venta de productos', 'comercializar productos', 'comercializarlos', 'distribuir productos', 'ofrecer estos productos', 'he vendido productos', 'vender por redes sociales'], tags: ['interes_venta_productos'] },
+  ],
+  qualificationCriteria: ['necesidad declarada', 'tipo de interés', 'apertura a conocer información', 'intención explícita de reunión'],
+  communicationRules: ['Preguntar antes de asumir si el interés es negocio, productos o ambos.', 'Mencionar la marca con transparencia cuando corresponda explicar la oportunidad.'],
+  allowedInformation: ['Nombre de la marca activa', 'Existencia de líneas de negocio y productos', 'Familia Nutrilite como parte de la configuración activa'],
+  informationPendingConfirmation: ['Plan de compensación', 'precios', 'catálogo', 'requisitos', 'políticas', 'declaraciones de ingresos', 'detalles oficiales de productos'],
+  restrictions: ['No presentar la oportunidad como empleo.', 'No prometer ingresos ni resultados.', 'No hacer afirmaciones médicas.', 'No insistir ante rechazo.'],
+  disclaimers: ['Los resultados dependen de circunstancias y esfuerzo individuales; no se garantizan ingresos.'],
+  version: 1,
+  status: 'active' as const,
+};

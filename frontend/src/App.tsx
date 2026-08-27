@@ -16,6 +16,7 @@ import { NotFoundPage } from '@pages/NotFoundPage';
 import { YouTubeMonitorPage } from '@pages/YouTubeMonitorPage';
 import { PrivacyPolicyPage } from '@pages/PrivacyPolicyPage';
 import { DataDeletionPage } from '@pages/DataDeletionPage';
+import { LaunchesPage } from '@pages/LaunchesPage';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -32,7 +33,10 @@ function App() {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
+        <Route
+          path="/"
+          element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />}
+        />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/privacidad" element={<PrivacyPolicyPage />} />
@@ -95,7 +99,19 @@ function App() {
         />
         <Route
           path="/youtube-monitor"
-          element={<ProtectedRoute><YouTubeMonitorPage /></ProtectedRoute>}
+          element={
+            <ProtectedRoute>
+              <YouTubeMonitorPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/lanzamientos"
+          element={
+            <ProtectedRoute>
+              <LaunchesPage />
+            </ProtectedRoute>
+          }
         />
         <Route
           path="/configuracion"
@@ -111,4 +127,4 @@ function App() {
   );
 }
 
-export default App
+export default App;

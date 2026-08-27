@@ -138,7 +138,7 @@ export const ProfilePage = () => {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="rounded-3xl bg-dark-900 p-5">
                     <p className="text-sm text-dark-400">Email</p>
-                    <p className="mt-2 text-lg font-medium text-white">{user?.email || 'correo@ejemplo.com'}</p>
+                    <p className="mt-2 text-lg font-medium text-white">{user?.email || 'No disponible'}</p>
                   </div>
                   <div className="rounded-3xl bg-dark-900 p-5">
                     <p className="text-sm text-dark-400">Rol</p>

@@ -5,7 +5,9 @@ export class MockMessagingProvider implements MessagingProvider {
   async sendMessage(request: MessagingRequest): Promise<MessagingResult> {
     const recipient = request.recipient.type === 'comment' ? request.recipient.commentId
       : request.recipient.type === 'instagram_user' ? request.recipient.instagramScopedId
-        : request.recipient.type === 'whatsapp_user' ? request.recipient.phoneNumber : request.recipient.parentCommentId;
+        : request.recipient.type === 'instagram_comment' || request.recipient.type === 'facebook_comment' ? request.recipient.commentId
+          : request.recipient.type === 'facebook_user' ? request.recipient.pageScopedId
+            : request.recipient.type === 'whatsapp_user' ? request.recipient.phoneNumber : request.recipient.parentCommentId;
     return { externalMessageId: `mock-${recipient}`, simulated: true };
   }
 }

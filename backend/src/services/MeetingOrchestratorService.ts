@@ -3,6 +3,8 @@ import Activity from '../models/Activity';
 import { TaskService } from './TaskService';
 import { getMeetingProvider, MeetingProviderError } from '../integrations/meetings';
 import crypto from 'crypto';
+import { MeetingLifecycleService } from './MeetingLifecycleService';
+import { AutomationEngineService } from './AutomationEngineService';
 
 type MeetingContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; wantsMeeting: boolean; platform?: 'instagram' | 'facebook' | 'youtube' | 'whatsapp' };
 type MeetingOutcome = { handled: boolean; reply?: string };
@@ -17,6 +19,23 @@ const TIMEZONE_ALIASES: Record<string, string> = {
 export class MeetingOrchestratorService {
   static async process(context: MeetingContext): Promise<MeetingOutcome> {
     const wantsCancellation = /\b(cancelar|cancela|olvida la reuni[oó]n|ya no quiero la (cita|reuni[oó]n))\b/i.test(context.text);
+    if ((process.env.SCHEDULING_MODE || 'zoom') === 'zoom') {
+      const lifecycle = new MeetingLifecycleService();
+      const current: any = await Meeting.findOne({ userId: context.userId, conversationId: context.conversationId, status: { $nin: ['cancelled', 'completed'] } }).sort({ createdAt: -1 });
+      if (wantsCancellation && current) { await lifecycle.cancel(context.userId, current._id.toString()); return { handled: true, reply: 'Entendido, cancelé la solicitud o reunión de forma controlada.' }; }
+      if (/\b(reprogramar|cambiar (la )?(fecha|hora)|otro horario)\b/i.test(context.text) && current) { const outcome = await lifecycle.requestReschedule(context); return { handled: true, reply: outcome.reply }; }
+      if (current?.status === 'pending_confirmation' || current?.status === 'reschedule_requested') {
+        const selection = context.text.trim().match(/^(?:opci[oó]n\s*)?(10|[1-9])\b/i); if (selection) { const outcome = await lifecycle.select(context, Number(selection[1])); return { handled: true, reply: outcome.reply }; }
+        if (/\b(confirmo|confirmar|de acuerdo|ese horario|esa hora)\b/i.test(context.text)) { const outcome = await lifecycle.confirm(context); return { handled: true, reply: outcome.reply }; }
+        return { handled: false };
+      }
+      if (current?.status === 'failed' && /\b(reintentar|confirmo|intenta de nuevo)\b/i.test(context.text)) { const outcome = await lifecycle.confirm(context); return { handled: true, reply: outcome.reply }; }
+      if (current?.status === 'pending_configuration') return { handled: context.wantsMeeting, reply: context.wantsMeeting ? 'Tu horario ya está registrado; Zoom permanece en modo de prueba y no crearé un duplicado.' : undefined };
+      if (current && ['confirmed', 'scheduled'].includes(current.status)) return { handled: context.wantsMeeting, reply: context.wantsMeeting ? 'Ya tienes una reunión confirmada. Los datos están disponibles de forma privada en el CRM.' : undefined };
+      if (!context.wantsMeeting || !MeetingLifecycleService.hasSufficientIntent(context.text)) return { handled: false };
+      await AutomationEngineService.emit({ eventId: `${context.sourceEventId}:meeting-intent`, trigger: 'meeting.intent_detected', userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, platform: context.platform, text: context.text, data: { meetingIntent: 'high' } });
+      const outcome = await lifecycle.propose(context); return { handled: true, reply: outcome.reply };
+    }
     let meeting = await Meeting.findOne({ conversationId: context.conversationId, status: { $in: ['pending_details', 'pending_booking', 'pending_configuration', 'failed'] } }).sort({ createdAt: -1 });
     if (meeting?.status === 'pending_booking') {
       if (wantsCancellation) {

@@ -85,6 +85,8 @@ export class CalendlyPollingService {
     if (snapshot.cancelled) {
       const changed = meeting.status !== 'cancelled';
       meeting.status = 'cancelled';
+      meeting.set('outcome', { type: 'cancelled', actor: 'prospect', reason: 'calendly_cancellation', recordedAt: new Date(), recordedBy: 'calendly_polling' });
+      meeting.lifecycleHistory.push({ status: 'cancelled', at: new Date(), reason: 'calendly_cancellation' });
       await meeting.save();
       await Task.updateMany({ 'metadata.meetingId': meeting._id.toString(), status: 'pending' }, { $set: { status: 'cancelled' } });
       if (changed) await Activity.create({ userId: meeting.userId, leadId: meeting.leadId, conversationId: meeting.conversationId,
@@ -100,6 +102,7 @@ export class CalendlyPollingService {
     meeting.externalId = snapshot.event.uri;
     meeting.joinUrl = snapshot.event.location?.join_url;
     if (snapshot.event.start_time) meeting.scheduledFor = new Date(snapshot.event.start_time);
+    if (changed) meeting.lifecycleHistory.push({ status: 'scheduled', at: new Date(), reason: 'calendly_snapshot' });
     await meeting.save();
     await Task.updateMany({ 'metadata.meetingId': meeting._id.toString(), status: 'pending' }, {
       $set: { title: 'Preparar reunión de descubrimiento', description: 'Reserva confirmada por Calendly.', dueDate: meeting.scheduledFor },

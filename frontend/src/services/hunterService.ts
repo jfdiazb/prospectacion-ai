@@ -3,14 +3,18 @@ import type { IApiResponse, IHunterProfile } from '@types';
 
 export const hunterService = {
   async searchProfiles(params: {
-    keyword: string;
+    keyword?: string;
+    profileId?: string;
     type?: 'channel' | 'video';
     minFollowers?: number;
     maxFollowers?: number;
     regionCode?: string;
     publishedAfter?: string;
     pageToken?: string;
-  }): Promise<IApiResponse<{ results: IHunterProfile[]; nextPageToken?: string; cached: boolean; quota: { projectSearchCalls: number; projectSearchLimit: number; userSearchCalls: number; userSearchLimit: number } }>> {
+    minScore?: number;
+    quantity?: number;
+    recentDays?: number;
+  }): Promise<IApiResponse<{ results: IHunterProfile[]; cached: boolean; profileId: string; searchedQueries: number; mode: 'mock' | 'live'; quota: { projectSearchCalls: number; projectSearchLimit: number; userSearchCalls: number; userSearchLimit: number } }>> {
     const response = await apiClient.post('/lead-hunter/search', params);
     return response.data;
   },

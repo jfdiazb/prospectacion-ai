@@ -2,7 +2,7 @@ import axios, { type AxiosInstance } from 'axios';
 import { MeetingProviderError, type MeetingProvider, type MeetingRequest, type MeetingResult } from './MeetingProvider';
 
 type ZoomTokenResponse = { access_token?: string; expires_in?: number; api_url?: string };
-type ZoomMeetingResponse = { id?: string | number; join_url?: string; start_time?: string };
+type ZoomMeetingResponse = { id?: string | number; join_url?: string; start_url?: string; start_time?: string };
 
 export class ZoomProvider implements MeetingProvider {
   readonly name = 'zoom';
@@ -46,8 +46,21 @@ export class ZoomProvider implements MeetingProvider {
       const externalId = response.data?.id;
       const joinUrl = response.data?.join_url;
       if ((typeof externalId !== 'string' && typeof externalId !== 'number') || !joinUrl || typeof joinUrl !== 'string') throw new MeetingProviderError('Respuesta inválida al crear la reunión en Zoom', 'ZOOM_INVALID_MEETING_RESPONSE');
-      return { externalId: String(externalId), joinUrl, simulated: false, scheduledFor: request.scheduledFor };
+      return { externalId: String(externalId), joinUrl, startUrl: response.data?.start_url, simulated: false, scheduledFor: request.scheduledFor };
     } catch (error) { throw this.normalizeError(error, 'ZOOM_CREATE_MEETING_ERROR'); }
+  }
+
+  async updateMeeting(externalId: string, request: MeetingRequest): Promise<MeetingResult> {
+    const token = await this.getAccessToken();
+    const payload = { topic: request.topic, timezone: request.timezone, duration: request.durationMinutes ?? 30, start_time: request.scheduledFor ? this.formatLocalStartTime(request.scheduledFor, request.timezone) : undefined };
+    try { await this.http.patch(`${token.apiUrl}/v2/meetings/${encodeURIComponent(externalId)}`, payload, { headers: { Authorization: `Bearer ${token.value}` }, timeout: Number(process.env.ZOOM_TIMEOUT_MS || 10000) }); return { externalId, joinUrl: '', simulated: false, scheduledFor: request.scheduledFor }; }
+    catch (error) { throw this.normalizeError(error, 'ZOOM_UPDATE_MEETING_ERROR'); }
+  }
+
+  async cancelMeeting(externalId: string): Promise<void> {
+    const token = await this.getAccessToken();
+    try { await this.http.delete(`${token.apiUrl}/v2/meetings/${encodeURIComponent(externalId)}`, { headers: { Authorization: `Bearer ${token.value}` }, timeout: Number(process.env.ZOOM_TIMEOUT_MS || 10000) }); }
+    catch (error) { throw this.normalizeError(error, 'ZOOM_CANCEL_MEETING_ERROR'); }
   }
 
   private validApiUrl(value?: string): string {

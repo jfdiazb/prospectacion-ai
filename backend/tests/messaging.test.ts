@@ -55,4 +55,21 @@ describe('MetaMessagingProvider', () => {
       { messaging_product: 'whatsapp', to: '573001234567', type: 'text', text: { body: 'Hola desde ALMA' } },
       expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer whatsapp-test-token' }) }));
   });
+
+  test('sends a Facebook Page DM with a PSID and the Page endpoint', async () => {
+    process.env.META_PAGE_ACCESS_TOKEN = 'page-token-never-logged';
+    process.env.META_PAGE_ID = 'page-1';
+    const post = jest.fn().mockResolvedValue({ data: { message_id: 'fb-message-1' } });
+    const provider = new MetaMessagingProvider({ post } as unknown as AxiosInstance);
+    await expect(provider.sendMessage({ text: 'Hola', recipient: { type: 'facebook_user', pageScopedId: 'psid-1' } })).resolves.toMatchObject({ externalMessageId: 'fb-message-1' });
+    expect(post).toHaveBeenCalledWith('https://graph.facebook.com/v23.0/page-1/messages', { recipient: { id: 'psid-1' }, message: { text: 'Hola' } }, expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer page-token-never-logged' }) }));
+  });
+
+  test('uses the official Facebook private-replies resource for a Page comment', async () => {
+    process.env.META_PAGE_ACCESS_TOKEN = 'page-token-never-logged';
+    const post = jest.fn().mockResolvedValue({ data: { id: 'private-reply-1' } });
+    const provider = new MetaMessagingProvider({ post } as unknown as AxiosInstance);
+    await provider.sendMessage({ text: 'Hola', recipient: { type: 'facebook_comment', commentId: 'comment-1' } });
+    expect(post).toHaveBeenCalledWith('https://graph.facebook.com/v23.0/comment-1/private_replies', { message: 'Hola' }, expect.any(Object));
+  });
 });

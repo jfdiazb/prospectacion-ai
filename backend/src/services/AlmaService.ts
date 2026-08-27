@@ -8,6 +8,9 @@ import type { MessagingRecipient } from '../integrations/messaging';
 import { MeetingOrchestratorService } from './MeetingOrchestratorService';
 import { AutomationService } from './AutomationService';
 import Conversation from '../models/Conversation';
+import { CommercialContextService } from './CommercialContextService';
+import { analyzeWhatsAppConversation } from './WhatsAppQualificationService';
+import { QualificationApplicationService } from './QualificationApplicationService';
 
 type AlmaContext = { userId: string; leadId: string; conversationId: string; text: string; isNewLead: boolean; platform: 'instagram' | 'facebook' | 'youtube' | 'whatsapp'; sourceEventId: string; recipient: MessagingRecipient; automation?: { flowId: string; response: string } };
 
@@ -65,23 +68,17 @@ export class AlmaService {
     if (controlMode !== 'automated') return '';
     const handoffReason = this.detectHandoffReason(normalized);
     if (handoffReason) return await this.requestHumanHandoff(context, handoffReason);
-    const wantsMeeting = /\b(cita|reuni[oó]n|zoom|agenda|agendar|llamada)\b/i.test(normalized);
-    const isInterested = wantsMeeting || /\b(interesa|precio|informaci[oó]n|info|quiero|c[oó]mo funciona)\b/i.test(normalized);
-    const isRejected = /\b(no me interesa|no gracias|deja de escribir|stop)\b/i.test(normalized);
+    const recentMessages = await ConversationService.getRecentMessages(context.conversationId, context.userId);
+    const commercialContext: any = await CommercialContextService.getActive(context.userId);
+    const leadTexts = recentMessages.filter((message: any) => message.sender === 'lead').map((message: any) => message.text).filter(Boolean);
+    if (!leadTexts.length || leadTexts[leadTexts.length - 1] !== context.text) leadTexts.push(context.text);
+    const qualification = analyzeWhatsAppConversation(leadTexts, commercialContext);
+    const wantsMeeting = qualification.signals.meetingIntent === 'high';
+    const applied = await QualificationApplicationService.apply({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, platform: context.platform, source: 'alma_autonomous_qualification', text: context.text, isNewLead: context.isNewLead, commercialContextId: commercialContext?._id, evaluation: qualification });
+    const isRejected = applied.current.status === 'rejected';
+    const score = applied.current.score;
 
-    const score = isRejected ? 0 : wantsMeeting ? 90 : isInterested ? 65 : 30;
-    const status = isRejected ? 'rejected' : wantsMeeting ? 'hot_prospect' : isInterested ? 'interested' : 'conversation_started';
-    await Lead.findByIdAndUpdate(context.leadId, {
-      status,
-      score,
-      interestLevel: score >= 80 ? 'hot' : score >= 50 ? 'warm' : 'cold',
-      lastContact: new Date(),
-      nextFollowUp: isRejected ? null : new Date(Date.now() + 24 * 60 * 60 * 1000),
-      qualification: { intent: isRejected ? 'rejection' : wantsMeeting ? 'meeting' : isInterested ? 'interest' : 'discovery', meetingRequested: wantsMeeting, lastEvaluatedAt: new Date() },
-    });
-
-    const intent = isRejected ? 'rejection' : wantsMeeting ? 'meeting' : isInterested ? 'interest' : 'discovery';
-    await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'qualified', description: `Lead calificado con score ${score}`, metadata: { score, status } });
+    const intent = qualification.intent;
     if (!isRejected) {
       await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'follow_up_scheduled', description: 'Seguimiento programado para 24 horas' });
       await TaskService.upsertPendingFollowUp(context.userId, {
@@ -97,7 +94,6 @@ export class AlmaService {
       });
     }
 
-    const recentMessages = await ConversationService.getRecentMessages(context.conversationId, context.userId);
     const latestMessage = recentMessages[recentMessages.length - 1];
     const previousMessages = latestMessage?.sender === 'lead' && latestMessage?.text === context.text
       ? recentMessages.slice(0, -1) : recentMessages;
@@ -109,7 +105,8 @@ export class AlmaService {
       ConversationService.fingerprintAIText(context.automation.response)));
     if (automationAlreadySent) context.automation = undefined;
     const aiProvider = context.automation ? null : getAIProvider();
-    const aiResult = context.automation ? null : await aiProvider!.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent, platform: context.platform, history, askedTopics: aiMemory.askedTopics });
+    const aiResult = context.automation ? null : await aiProvider!.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent, normalizedIntent: qualification.normalizedIntent, platform: context.platform, history, askedTopics: aiMemory.askedTopics,
+      commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines, allowedInformation: commercialContext.allowedInformation, informationPendingConfirmation: commercialContext.informationPendingConfirmation, communicationRules: commercialContext.communicationRules, restrictions: commercialContext.restrictions, disclaimers: commercialContext.disclaimers } : undefined });
     const generatedResponse = context.automation?.response ?? aiResult!.text;
     const meetingOutcome = await MeetingOrchestratorService.process({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: context.text, wantsMeeting, platform: context.platform });
     let deduplication = meetingOutcome.reply ? { text: meetingOutcome.reply, deduplicated: false }
@@ -154,7 +151,7 @@ export class AlmaService {
       }),
       Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'handoff_requested', description: 'ALMA solicitó intervención humana', metadata: { reason } }),
     ]);
-    await Lead.updateOne({ _id: context.leadId, userId: context.userId }, { $set: { nextFollowUp: new Date() } });
+    await Lead.updateOne({ _id: context.leadId, userId: context.userId }, { $set: { nextFollowUp: null, 'followUp.lastDecision': 'cancelled', 'followUp.lastReason': 'human_handoff', 'followUp.lastDecisionAt': new Date() } });
     await Conversation.updateOne({ _id: context.conversationId, userId: context.userId }, {
       $set: { controlMode: 'handoff_requested', handoffReason: reason, handoffRequestedAt: new Date() },
     });
