@@ -2,6 +2,19 @@ import type { AxiosInstance } from 'axios';
 import { AxiosError } from 'axios';
 import { MetaMessagingProvider } from '../src/integrations/messaging/MetaMessagingProvider';
 import { MessagingProviderError } from '../src/integrations/messaging/MessagingProvider';
+import { getMessagingProvider } from '../src/integrations/messaging';
+
+describe('production outbound kill switch', () => {
+  const originalEnv = process.env;
+  afterEach(() => { process.env = originalEnv; });
+
+  test('forces mock in production until real outbound is explicitly enabled', () => {
+    process.env = { ...originalEnv, NODE_ENV: 'production', WHATSAPP_MESSAGING_MODE: 'live' };
+    expect(getMessagingProvider('whatsapp').name).toBe('mock');
+    process.env.REAL_OUTBOUND_ENABLED = 'true';
+    expect(getMessagingProvider('whatsapp').name).toBe('meta');
+  });
+});
 
 describe('MetaMessagingProvider', () => {
   const originalEnv = process.env;

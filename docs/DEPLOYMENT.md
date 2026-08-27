@@ -10,6 +10,11 @@
 
 Esta guía publica ALMA con el backend en Render, el frontend en Vercel y MongoDB Atlas. El primer despliegue mantiene todos los proveedores externos en modo `mock`, por lo que no envía comentarios, mensajes, respuestas de IA ni reuniones reales.
 
+Producción aplica dos cierres adicionales aunque un modo histórico permanezca en `live` en Render:
+`REAL_OUTBOUND_ENABLED=false` fuerza proveedores salientes mock y
+`YOUTUBE_POLLING_ENABLED=false` impide iniciar el poller. La activación controlada exige cambiar
+explícitamente el cierre correspondiente además del modo del proveedor.
+
 ## 1. Preparar MongoDB Atlas
 
 1. Reutiliza tu clúster de Atlas y crea un usuario de base de datos exclusivo para ALMA.

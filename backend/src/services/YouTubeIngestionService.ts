@@ -595,8 +595,11 @@ export class YouTubeIngestionService {
 
 let timer: NodeJS.Timeout | undefined;
 let polling = false;
+export const isYouTubePollingEnabled = (): boolean =>
+  (process.env.YOUTUBE_INGESTION_MODE || 'mock') === 'live' &&
+  (process.env.NODE_ENV !== 'production' || process.env.YOUTUBE_POLLING_ENABLED === 'true');
 export const startYouTubePolling = (): void => {
-  if ((process.env.YOUTUBE_INGESTION_MODE || 'mock') !== 'live' || timer) return;
+  if (!isYouTubePollingEnabled() || timer) return;
   const service = new YouTubeIngestionService();
   const configuredInterval = Number(process.env.YOUTUBE_POLL_INTERVAL_MS || 60000);
   const intervalMs = Number.isFinite(configuredInterval)

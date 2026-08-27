@@ -22,6 +22,10 @@ services:
         value: live
       - key: GEMINI_API_KEY
         sync: false
+      - key: REAL_OUTBOUND_ENABLED
+        value: "false"
+      - key: YOUTUBE_POLLING_ENABLED
+        value: "false"
       - key: YOUTUBE_MESSAGING_MODE
         value: mock
       - key: YOUTUBE_INGESTION_MODE
