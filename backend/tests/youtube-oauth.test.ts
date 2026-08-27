@@ -1,5 +1,7 @@
 import { YouTubeOAuthService } from '../src/integrations/youtube/YouTubeOAuthService';
 import { YouTubeTokenService } from '../src/integrations/youtube/YouTubeTokenService';
+import { YouTubeController } from '../src/controllers/YouTubeController';
+import YouTubeCredential from '../src/models/YouTubeCredential';
 
 describe('YouTube OAuth security', () => {
   const originalEnv = process.env;
@@ -31,5 +33,34 @@ describe('YouTube OAuth security', () => {
     expect(url.searchParams.get('access_type')).toBe('offline');
     expect(url.searchParams.get('prompt')).toBe('consent');
     expect(url.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/youtube.force-ssl');
+  });
+
+  test('status marks an invalid OAuth grant as requiring reconnection without exposing failure details', async () => {
+    const findOne = jest.spyOn(YouTubeCredential, 'findOne').mockReturnValue({
+      select: () => ({
+        lean: async () => ({
+          channelId: 'channel-1',
+          channelTitle: 'Controlled channel',
+          connectedAt: new Date('2026-08-01T00:00:00Z'),
+          lastPollingFailure: { operation: 'oauth_refresh', reason: 'invalid_grant' },
+        }),
+      }),
+    } as any);
+    process.env.NODE_ENV = 'production';
+    process.env.YOUTUBE_INGESTION_MODE = 'live';
+    process.env.YOUTUBE_MESSAGING_MODE = 'live';
+    delete process.env.YOUTUBE_POLLING_ENABLED;
+    delete process.env.REAL_OUTBOUND_ENABLED;
+    const json = jest.fn();
+    await YouTubeController.status({ userId: 'owner-1' } as any, { json } as any, jest.fn());
+    expect(json).toHaveBeenCalledWith({ success: true, data: expect.objectContaining({
+      connected: false,
+      reconnectRequired: true,
+      pollingEnabled: false,
+      inboundMode: 'live',
+      outboundMode: 'mock',
+    }) });
+    expect(JSON.stringify(json.mock.calls[0][0])).not.toContain('invalid_grant');
+    findOne.mockRestore();
   });
 });

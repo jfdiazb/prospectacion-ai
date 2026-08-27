@@ -6,6 +6,7 @@ import { YouTubeTokenService } from '../integrations/youtube/YouTubeTokenService
 import { OperationalDiagnosticsService } from '../services/OperationalDiagnosticsService';
 import { YouTubeMonitorService } from '../services/YouTubeMonitorService';
 import { MessagingService } from '../services/MessagingService';
+import { isYouTubePollingEnabled } from '../services/YouTubeIngestionService';
 
 export class YouTubeController {
   static connect(req: AuthRequest, res: Response) {
@@ -30,8 +31,31 @@ export class YouTubeController {
 
   static async status(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const credential = await YouTubeCredential.findOne({ userId: req.userId }).select('channelId channelTitle connectedAt lastPolledAt');
-      res.json({ success: true, data: { connected: Boolean(credential), credential } });
+      const credential: any = await YouTubeCredential.findOne({ userId: req.userId })
+        .select('channelId channelTitle connectedAt lastPolledAt lastPollingFailure')
+        .lean();
+      const reconnectRequired = credential?.lastPollingFailure?.operation === 'oauth_refresh';
+      res.json({
+        success: true,
+        data: {
+          connected: Boolean(credential) && !reconnectRequired,
+          reconnectRequired,
+          pollingEnabled: isYouTubePollingEnabled(),
+          inboundMode: process.env.YOUTUBE_INGESTION_MODE || 'mock',
+          outboundMode:
+            process.env.NODE_ENV === 'production' && process.env.REAL_OUTBOUND_ENABLED !== 'true'
+              ? 'mock'
+              : process.env.YOUTUBE_MESSAGING_MODE || 'mock',
+          credential: credential
+            ? {
+                channelId: credential.channelId,
+                channelTitle: credential.channelTitle,
+                connectedAt: credential.connectedAt,
+                lastPolledAt: credential.lastPolledAt,
+              }
+            : null,
+        },
+      });
     } catch (error) { next(error); }
   }
 

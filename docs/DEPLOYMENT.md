@@ -66,8 +66,9 @@ La base OAuth e ingesta ya está implementada, pero conserva ambos modos en `moc
 3. Configura `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_OAUTH_REDIRECT_URI`, `YOUTUBE_OAUTH_STATE_SECRET` (mínimo 32 caracteres), `YOUTUBE_TOKEN_ENCRYPTION_KEY` (32 bytes en base64 o 64 hex) y `CRM_OWNER_ID`.
 4. Genera secretos independientes, por ejemplo con `openssl rand -base64 32`; no reutilices `JWT_SECRET` ni guardes valores reales en el repositorio.
 5. Inicia sesión en ALMA, solicita `GET /api/v1/youtube/oauth/connect` con JWT y abre la URL devuelta para autorizar el canal.
-6. Confirma `connected: true` en `GET /api/v1/youtube/status`; después cambia `YOUTUBE_MESSAGING_MODE=live` y `YOUTUBE_INGESTION_MODE=live` y reinicia el backend.
-7. Publica un comentario nuevo que contenga `INFO` y verifica lead, conversación, `InboundEvent`, respuesta y `OutboundMessage`. El sistema no importa comentarios históricos anteriores a la conexión.
+6. Confirma en `GET /api/v1/youtube/status` que `connected=true`, `reconnectRequired=false`, `outboundMode=mock` y `pollingEnabled=false`.
+7. Conserva `YOUTUBE_MESSAGING_MODE=mock` y `REAL_OUTBOUND_ENABLED=false`. Configura `YOUTUBE_INGESTION_MODE=live` y, solo después de reconectar correctamente, cambia `YOUTUBE_POLLING_ENABLED=true` y reinicia el backend.
+8. Publica un comentario nuevo y controlado que contenga `INFO`. Verifica `InboundEvent`, lead, conversación y propuesta/tarea; no debe existir una entrega outbound real. El sistema no importa comentarios históricos anteriores a la conexión.
 
 ## Variables que debe proporcionar el operador
 

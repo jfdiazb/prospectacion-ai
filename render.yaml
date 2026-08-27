@@ -29,7 +29,7 @@ services:
       - key: YOUTUBE_MESSAGING_MODE
         value: mock
       - key: YOUTUBE_INGESTION_MODE
-        value: mock
+        value: live
       - key: YOUTUBE_HUNTER_MODE
         value: live
       - key: YOUTUBE_HUNTER_USER_DAILY_SEARCH_LIMIT
