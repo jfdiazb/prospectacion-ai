@@ -8,7 +8,7 @@ export class OperationalDiagnosticsService {
   static async getForUser(userId: string) {
     const now = new Date();
     const credential: any = await YouTubeCredential.findOne({ userId }).select(
-      'channelTitle connectedAt lastPolledAt lastRepliesPolledAt lastPollingSummary lastPollingFailure lastReplyPollingSummary',
+      'channelId channelTitle channelHandle authorizedChannelId authorizedChannelTitle authorizedChannelHandle connectedAt lastPolledAt lastRepliesPolledAt lastPollingSummary lastPollingFailure lastReplyPollingSummary',
     ).lean();
     const [pendingBooking, futureScheduled, expiredScheduled, failedMeetings, latestCalendly] = await Promise.all([
       Meeting.countDocuments({ userId, status: 'pending_booking' }),
@@ -20,6 +20,10 @@ export class OperationalDiagnosticsService {
     const youtube = {
       connected: Boolean(credential),
       channelTitle: credential?.channelTitle,
+      channelId: credential?.channelId,
+      channelHandle: credential?.channelHandle,
+      authorizedChannelId: credential?.authorizedChannelId || credential?.channelId,
+      authorizedChannelTitle: credential?.authorizedChannelTitle || credential?.channelTitle,
       lastPolledAt: credential?.lastPolledAt,
       lastRepliesPolledAt: credential?.lastRepliesPolledAt,
       polling: credential?.lastPollingSummary,

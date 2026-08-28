@@ -2,13 +2,13 @@ import apiClient from './api';
 
 export interface YouTubeStatus {
   connected: boolean;
-  credential?: { channelId: string; channelTitle?: string; connectedAt: string; lastPolledAt?: string } | null;
+  credential?: { channelId: string; channelTitle?: string; channelHandle?: string; authorizedChannelId?: string; authorizedChannelTitle?: string; authorizedChannelHandle?: string; connectedAt: string; lastPolledAt?: string } | null;
 }
 
 export interface OperationalDiagnostics {
   checkedAt: string;
   youtube: {
-    connected: boolean; channelTitle?: string; lastPolledAt?: string; lastRepliesPolledAt?: string;
+    connected: boolean; channelId?: string; channelTitle?: string; channelHandle?: string; authorizedChannelId?: string; authorizedChannelTitle?: string; lastPolledAt?: string; lastRepliesPolledAt?: string;
     polling?: {
       receivedThreads?: number; topLevelComments?: number; cutoffAt?: string; afterCutoff?: number;
       processed?: number; processing_failed?: number; invalid?: number; own_channel?: number; not_eligible?: number; duplicate?: number;
@@ -50,6 +50,9 @@ export const youtubeService = {
   },
   async disconnect(): Promise<void> {
     await apiClient.delete('/youtube/connection');
+  },
+  async selectChannel(handle: string): Promise<void> {
+    await apiClient.patch('/youtube/channel', { handle });
   },
   async getDiagnostics(): Promise<OperationalDiagnostics> {
     const response = await apiClient.get('/youtube/diagnostics');

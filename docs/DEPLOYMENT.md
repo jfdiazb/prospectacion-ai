@@ -66,9 +66,17 @@ La base OAuth e ingesta ya está implementada, pero conserva ambos modos en `moc
 3. Configura `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_OAUTH_REDIRECT_URI`, `YOUTUBE_OAUTH_STATE_SECRET` (mínimo 32 caracteres), `YOUTUBE_TOKEN_ENCRYPTION_KEY` (32 bytes en base64 o 64 hex) y `CRM_OWNER_ID`.
 4. Genera secretos independientes, por ejemplo con `openssl rand -base64 32`; no reutilices `JWT_SECRET` ni guardes valores reales en el repositorio.
 5. Inicia sesión en ALMA, solicita `GET /api/v1/youtube/oauth/connect` con JWT y abre la URL devuelta para autorizar el canal.
-6. Confirma en `GET /api/v1/youtube/status` que `connected=true`, `reconnectRequired=false`, `outboundMode=mock` y `pollingEnabled=false`.
-7. Conserva `YOUTUBE_MESSAGING_MODE=mock` y `REAL_OUTBOUND_ENABLED=false`. Configura `YOUTUBE_INGESTION_MODE=live` y, solo después de reconectar correctamente, cambia `YOUTUBE_POLLING_ENABLED=true` y reinicia el backend.
-8. Publica un comentario nuevo y controlado que contenga `INFO`. Verifica `InboundEvent`, lead, conversación y propuesta/tarea; no debe existir una entrega outbound real. El sistema no importa comentarios históricos anteriores a la conexión.
+6. Confirma en `GET /api/v1/youtube/status` que `connected=true`, `reconnectRequired=false` y `outboundMode=mock`.
+7. En **Configuración**, escribe el handle del canal monitorizado, por ejemplo `@100mentalmente6`, y pulsa **Validar y monitorizar**. Comprueba nombre, handle y un `channelId` permanente con formato `UC...`. La identidad OAuth puede ser distinta; ALMA conserva ambas explícitamente.
+8. Conserva `YOUTUBE_MESSAGING_MODE=mock` y `REAL_OUTBOUND_ENABLED=false`. Configura `YOUTUBE_INGESTION_MODE=live` y, solo después de validar el canal, cambia `YOUTUBE_POLLING_ENABLED=true` y reinicia el backend.
+9. Publica desde otra cuenta un comentario nuevo que contenga `INFO ALMA`. Tras un ciclo, actualiza Autodiagnóstico y verifica recibidos, candidatos, procesados, duplicados, no elegibles, canal propio y errores. No debe existir una entrega outbound real.
+
+El smoke también valida el estado y formato del canal monitorizado:
+`ALMA_SMOKE_API_URL=https://alma-backend-9eo1.onrender.com ALMA_SMOKE_EMAIL=<qa> ALMA_SMOKE_PASSWORD=<secreto> npm run alma:smoke`.
+
+Para revertir solo este despliegue, usa `git revert <hash-del-commit> && git push origin main`.
+Los campos nuevos de `YouTubeCredential` son opcionales y las lecturas conservan fallback a
+`channelId/channelTitle`, por lo que no se requiere migración manual ni destructiva.
 
 ## Variables que debe proporcionar el operador
 

@@ -14,6 +14,7 @@ export const SettingsPage = () => {
   const [youtube, setYoutube] = useState<YouTubeStatus>({ connected: false });
   const [youtubeLoading, setYoutubeLoading] = useState(true);
   const [youtubeError, setYoutubeError] = useState('');
+  const [youtubeHandle, setYoutubeHandle] = useState('@100mentalmente6');
   const [diagnostics, setDiagnostics] = useState<OperationalDiagnostics | null>(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(true);
   const [commercialContext, setCommercialContext] = useState<CommercialContextSummary | null>(null);
@@ -43,6 +44,16 @@ export const SettingsPage = () => {
     if (!window.confirm('¿Desconectar el canal de YouTube de ALMA?')) return;
     setYoutubeLoading(true);
     try { await youtubeService.disconnect(); setYoutube({ connected: false }); } catch { setYoutubeError('No fue posible desconectar YouTube.'); }
+    finally { setYoutubeLoading(false); }
+  };
+
+  const selectYouTubeChannel = async () => {
+    setYoutubeError(''); setYoutubeLoading(true);
+    try {
+      await youtubeService.selectChannel(youtubeHandle);
+      setYoutube(await youtubeService.getStatus());
+      await loadDiagnostics();
+    } catch { setYoutubeError('No fue posible validar y seleccionar ese canal de YouTube.'); }
     finally { setYoutubeLoading(false); }
   };
 
@@ -128,7 +139,17 @@ export const SettingsPage = () => {
                 <p className="mt-1 text-dark-400">
                   {youtube.connected ? `Conectado${youtube.credential?.channelTitle ? ` a ${youtube.credential.channelTitle}` : ''}.` : 'Conecta tu canal para que ALMA procese comentarios INFO.'}
                 </p>
+                {youtube.credential && <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+                  <div><p className="text-dark-500">Nombre del canal monitorizado</p><p className="text-white">{youtube.credential.channelTitle || 'Sin nombre'}</p></div>
+                  <div><p className="text-dark-500">Handle</p><p className="text-white">{youtube.credential.channelHandle || 'No disponible'}</p></div>
+                  <div><p className="text-dark-500">Channel ID</p><p className="break-all font-mono text-white">{youtube.credential.channelId}</p></div>
+                  {youtube.credential.authorizedChannelId !== youtube.credential.channelId && <p className="sm:col-span-3 text-amber-300">OAuth autorizado como {youtube.credential.authorizedChannelTitle || youtube.credential.authorizedChannelId}; el poller está dirigido al canal indicado arriba.</p>}
+                </div>}
                 {youtubeError && <p className="mt-2 text-sm text-red-400">{youtubeError}</p>}
+                {youtube.connected && <div className="mt-4 flex max-w-xl flex-col gap-2 sm:flex-row">
+                  <input aria-label="Handle del canal de YouTube" value={youtubeHandle} onChange={event => setYoutubeHandle(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-dark-700 bg-dark-800 px-4 py-2 text-white" placeholder="@canal" />
+                  <Button variant="secondary" loading={youtubeLoading} onClick={selectYouTubeChannel}>Validar y monitorizar</Button>
+                </div>}
               </div>
             </div>
             {youtube.connected

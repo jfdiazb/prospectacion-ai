@@ -4,6 +4,7 @@ import YouTubeCredential from '../../models/YouTubeCredential';
 
 type Encrypted = { ciphertext: string; iv: string; authTag: string };
 type TokenPayload = { access_token: string; expires_in: number; refresh_token?: string; scope?: string };
+type ChannelItem = { id: string; snippet?: { title?: string; customUrl?: string } };
 
 export class YouTubeTokenService {
   constructor(private readonly http: AxiosInstance = axios) {}
@@ -42,21 +43,47 @@ export class YouTubeTokenService {
 
   async saveAuthorization(userId: string, payload: TokenPayload): Promise<void> {
     if (!payload.access_token || !payload.refresh_token) throw new Error('Google no devolvió access token y refresh token; revoca el consentimiento y vuelve a conectar');
-    const channel = await this.http.get<{ items?: Array<{ id: string; snippet?: { title?: string } }> }>('https://www.googleapis.com/youtube/v3/channels?part=id,snippet&mine=true', {
+    const channel = await this.http.get<{ items?: ChannelItem[] }>('https://www.googleapis.com/youtube/v3/channels?part=id,snippet&mine=true', {
       headers: { Authorization: `Bearer ${payload.access_token}` }, timeout: Number(process.env.YOUTUBE_TIMEOUT_MS || 10000),
     });
     const item = channel.data.items?.[0];
     if (!item?.id) throw new Error('No se encontró un canal de YouTube asociado');
-    const existing: any = await YouTubeCredential.findOne({ userId }).select('connectedAt lastPolledAt').lean();
+    const existing: any = await YouTubeCredential.findOne({ userId })
+      .select('connectedAt lastPolledAt channelId channelTitle channelHandle authorizedChannelId')
+      .lean();
     const now = new Date();
+    const preserveExplicitSelection = Boolean(
+      existing?.authorizedChannelId && existing.channelId !== existing.authorizedChannelId
+    );
     await YouTubeCredential.findOneAndUpdate({ userId }, {
-      $set: { userId, channelId: item.id, channelTitle: item.snippet?.title,
+      $set: { userId,
+        channelId: preserveExplicitSelection ? existing.channelId : item.id,
+        channelTitle: preserveExplicitSelection ? existing.channelTitle : item.snippet?.title,
+        channelHandle: preserveExplicitSelection ? existing.channelHandle : item.snippet?.customUrl,
+        authorizedChannelId: item.id, authorizedChannelTitle: item.snippet?.title, authorizedChannelHandle: item.snippet?.customUrl,
         refreshToken: this.encrypt(payload.refresh_token), accessToken: this.encrypt(payload.access_token),
         accessTokenExpiresAt: new Date(Date.now() + payload.expires_in * 1000), scope: payload.scope?.split(' ') ?? [],
         connectedAt: existing?.connectedAt || now, lastPolledAt: existing?.lastPolledAt || now,
       },
       $unset: { lastPollingFailure: 1 },
     }, { upsert: true });
+  }
+
+  async selectMonitoredChannel(userId: string, handle: string): Promise<ChannelItem> {
+    const normalized = handle.trim().replace(/^https?:\/\/(?:www\.)?youtube\.com\//i, '').replace(/^@?/, '@');
+    if (!/^@[A-Za-z0-9._-]{3,30}$/.test(normalized)) throw new Error('Handle de YouTube inválido');
+    const token = await this.getAccessToken(userId);
+    const params = new URLSearchParams({ part: 'id,snippet', forHandle: normalized });
+    const response = await this.http.get<{ items?: ChannelItem[] }>(`https://www.googleapis.com/youtube/v3/channels?${params}`, {
+      headers: { Authorization: `Bearer ${token}` }, timeout: Number(process.env.YOUTUBE_TIMEOUT_MS || 10000),
+    });
+    const item = response.data.items?.[0];
+    if (!item?.id) throw new Error('No se encontró el canal solicitado');
+    await YouTubeCredential.updateOne({ userId }, {
+      $set: { channelId: item.id, channelTitle: item.snippet?.title, channelHandle: item.snippet?.customUrl || normalized },
+      $unset: { lastPollingFailure: 1, lastPollingSummary: 1 },
+    });
+    return item;
   }
 
   async getAccessToken(userId: string): Promise<string> {

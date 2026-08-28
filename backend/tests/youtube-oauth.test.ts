@@ -63,4 +63,68 @@ describe('YouTube OAuth security', () => {
     expect(JSON.stringify(json.mock.calls[0][0])).not.toContain('invalid_grant');
     findOne.mockRestore();
   });
+
+  test('resolves and persists an explicitly selected monitored channel by handle', async () => {
+    const http = { get: jest.fn().mockResolvedValue({ data: { items: [{
+      id: 'UC100mentalmente00000001',
+      snippet: { title: '100 % Mentalmente', customUrl: '@100mentalmente6' },
+    }] } }) } as any;
+    const service = new YouTubeTokenService(http);
+    jest.spyOn(service, 'getAccessToken').mockResolvedValue('access-token');
+    const update = jest.spyOn(YouTubeCredential, 'updateOne').mockResolvedValue({ acknowledged: true } as any);
+
+    const selected = await service.selectMonitoredChannel('owner-1', 'https://youtube.com/@100mentalmente6');
+
+    expect(selected.id).toBe('UC100mentalmente00000001');
+    expect(http.get.mock.calls[0][0]).toContain('forHandle=%40100mentalmente6');
+    expect(update).toHaveBeenCalledWith({ userId: 'owner-1' }, expect.objectContaining({
+      $set: expect.objectContaining({
+        channelId: 'UC100mentalmente00000001',
+        channelTitle: '100 % Mentalmente',
+        channelHandle: '@100mentalmente6',
+      }),
+    }));
+    update.mockRestore();
+  });
+
+  test('rejects invalid handles without contacting YouTube', async () => {
+    const http = { get: jest.fn() } as any;
+    await expect(new YouTubeTokenService(http).selectMonitoredChannel('owner-1', 'not a channel')).rejects.toThrow('Handle de YouTube inválido');
+    expect(http.get).not.toHaveBeenCalled();
+  });
+
+  test('reconnecting OAuth refreshes the authorized identity without losing an explicit monitored channel', async () => {
+    const http = { get: jest.fn().mockResolvedValue({ data: { items: [{
+      id: 'UCauthorized000000000001',
+      snippet: { title: 'soy_jfer', customUrl: '@soy_jfer' },
+    }] } }) } as any;
+    const service = new YouTubeTokenService(http);
+    const find = jest.spyOn(YouTubeCredential, 'findOne').mockReturnValue({
+      select: () => ({ lean: async () => ({
+        channelId: 'UCmonitored000000000001',
+        channelTitle: '100 % Mentalmente',
+        channelHandle: '@100mentalmente6',
+        authorizedChannelId: 'UColdAuthorized000000001',
+        connectedAt: new Date('2026-08-01T00:00:00Z'),
+      }) }),
+    } as any);
+    const update = jest.spyOn(YouTubeCredential, 'findOneAndUpdate').mockResolvedValue({} as any);
+
+    await service.saveAuthorization('owner-1', {
+      access_token: 'access-token',
+      refresh_token: 'refresh-token',
+      expires_in: 3600,
+    });
+
+    expect(update).toHaveBeenCalledWith({ userId: 'owner-1' }, expect.objectContaining({
+      $set: expect.objectContaining({
+        channelId: 'UCmonitored000000000001',
+        channelTitle: '100 % Mentalmente',
+        authorizedChannelId: 'UCauthorized000000000001',
+        authorizedChannelTitle: 'soy_jfer',
+      }),
+    }), { upsert: true });
+    find.mockRestore();
+    update.mockRestore();
+  });
 });

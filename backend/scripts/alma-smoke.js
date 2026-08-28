@@ -32,6 +32,18 @@ const main = async () => {
     ['AUTOMATIONS', '/api/v1/automations'], ['TASKS/FOLLOW-UP', '/api/v1/crm/tasks'], ['LAUNCHES', '/api/v1/launches'],
   ];
   for (const [name, path] of checks) await request(name, path, { headers });
+  const youtube = await request('YOUTUBE status', '/api/v1/youtube/status', { headers });
+  if (youtube?.data?.connected) {
+    const credential = youtube.data.credential;
+    const validChannelId = typeof credential?.channelId === 'string' && /^UC[A-Za-z0-9_-]{22}$/.test(credential.channelId);
+    results.push({
+      name: 'YOUTUBE monitored channel',
+      status: validChannelId ? 'PASS' : 'FAIL',
+      detail: validChannelId
+        ? `${credential.channelTitle || 'unnamed'} ${credential.channelHandle || 'no-handle'} ${credential.channelId}`
+        : 'La conexión no expone un channelId válido',
+    });
+  }
   for (const [channel, status] of Object.entries(readiness.runtime?.providers || {})) {
     const state = status.configured ? `${status.outbound || 'configured'}` : 'BLOCKED_CONFIG';
     results.push({ name: `PROVIDER ${channel}`, status: 'INFO', detail: state });

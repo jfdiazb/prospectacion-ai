@@ -79,6 +79,7 @@ export class YouTubeIngestionService {
         await credential.save().catch(() => undefined);
         console.error('YouTube polling error', {
           userId: credential.userId.toString(),
+          monitoredChannelId: credential.channelId,
           httpStatus: failure.httpStatus,
           reason: failure.reason,
           operation: failure.operation,
@@ -141,6 +142,7 @@ export class YouTubeIngestionService {
     }
     credential.lastPolledAt = new Date();
     const credentialSummary = {
+      monitoredChannelId: credential.channelId,
       receivedThreads: response.data.items?.length ?? 0,
       topLevelComments: comments.length,
       cutoffAt: new Date(cutoff).toISOString(),

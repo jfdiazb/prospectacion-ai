@@ -32,7 +32,7 @@ export class YouTubeController {
   static async status(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const credential: any = await YouTubeCredential.findOne({ userId: req.userId })
-        .select('channelId channelTitle connectedAt lastPolledAt lastPollingFailure')
+        .select('channelId channelTitle channelHandle authorizedChannelId authorizedChannelTitle authorizedChannelHandle connectedAt lastPolledAt lastPollingFailure')
         .lean();
       const reconnectRequired = credential?.lastPollingFailure?.operation === 'oauth_refresh';
       res.json({
@@ -50,6 +50,10 @@ export class YouTubeController {
             ? {
                 channelId: credential.channelId,
                 channelTitle: credential.channelTitle,
+                channelHandle: credential.channelHandle,
+                authorizedChannelId: credential.authorizedChannelId || credential.channelId,
+                authorizedChannelTitle: credential.authorizedChannelTitle || credential.channelTitle,
+                authorizedChannelHandle: credential.authorizedChannelHandle || credential.channelHandle,
                 connectedAt: credential.connectedAt,
                 lastPolledAt: credential.lastPolledAt,
               }
@@ -57,6 +61,16 @@ export class YouTubeController {
         },
       });
     } catch (error) { next(error); }
+  }
+
+  static async selectChannel(req: AuthRequest, res: Response) {
+    try {
+      const handle = typeof req.body?.handle === 'string' ? req.body.handle : '';
+      const channel = await new YouTubeTokenService().selectMonitoredChannel(req.userId!, handle);
+      res.json({ success: true, data: { channelId: channel.id, channelTitle: channel.snippet?.title, channelHandle: channel.snippet?.customUrl } });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error instanceof Error ? error.message : 'No fue posible seleccionar el canal' });
+    }
   }
 
   static async diagnostics(req: AuthRequest, res: Response, next: NextFunction) {
