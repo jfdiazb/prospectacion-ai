@@ -4,9 +4,11 @@ on:
   push:
     paths:
       - 'frontend/**'
+      - '.github/workflows/frontend-playwright.yml'
   pull_request:
     paths:
       - 'frontend/**'
+      - '.github/workflows/frontend-playwright.yml'
 
 jobs:
   e2e:
