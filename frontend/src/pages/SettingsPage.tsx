@@ -7,6 +7,7 @@ import { AlertTriangle, CalendarCheck, CheckCircle2, Clock, RefreshCw, Youtube }
 import { youtubeService, type OperationalDiagnostics, type YouTubeStatus } from '@services/youtubeService';
 import { useNavigate } from 'react-router-dom';
 import { commercialContextService, type CommercialContextSummary } from '@services/commercialContextService';
+import { WhatsAppLiveDiagnostics } from '@components/settings/WhatsAppLiveDiagnostics';
 
 export const SettingsPage = () => {
   const navigate = useNavigate();
@@ -128,6 +129,8 @@ export const SettingsPage = () => {
             <div className="rounded-2xl bg-dark-900 px-5 py-3 text-sm"><p className="text-emerald-300">{commercialContext?.status || 'consultando'}</p><p className="text-dark-400">Versión {commercialContext?.version || '—'}</p></div>
           </div>
         </Card>
+
+        {user?.role === 'admin' && <WhatsAppLiveDiagnostics />}
 
         <Card className="lg:col-span-2" hover={false}>
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
