@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import type { Request, Response } from 'express';
+import type { AuthRequest } from '../middlewares/auth';
 import { LeadService } from '../services/LeadService';
 import { ConversationService } from '../services/ConversationService';
 import { WhatsAppAssistedService } from '../services/WhatsAppAssistedService';
@@ -10,8 +11,20 @@ import InboundEvent from '../models/InboundEvent';
 import { WhatsAppInboundNormalizer } from '../services/WhatsAppInboundNormalizer';
 import { WhatsAppLaunchAdapter } from '../services/WhatsAppLaunchAdapter';
 import { WhatsAppOptOutService } from '../services/WhatsAppOptOutService';
+import { WhatsAppInboundDiagnosticsService } from '../services/WhatsAppInboundDiagnosticsService';
 
 export class WhatsAppController {
+  static async inboundDiagnostics(req: AuthRequest, res: Response) {
+    const from = new Date(String(req.query.from || ''));
+    const to = new Date(String(req.query.to || ''));
+    const textSha256 = String(req.query.textSha256 || '').toLowerCase();
+    const duration = to.getTime() - from.getTime();
+    if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) || duration < 0 || duration > 15 * 60 * 1000 || !/^[a-f0-9]{64}$/.test(textSha256))
+      return res.status(400).json({ success: false, message: 'Consulta de diagnóstico inválida' });
+    const data = await WhatsAppInboundDiagnosticsService.inspect(req.userId!, { from, to, textSha256 });
+    return res.json({ success: true, data });
+  }
+
   private static normalizePhone(value: unknown): string {
     return typeof value === 'string' ? value.replace(/\D/g, '') : '';
   }
