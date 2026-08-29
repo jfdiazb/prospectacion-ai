@@ -12,7 +12,8 @@ export function analyzeWhatsAppConversation(texts: string[], context?: Commercia
   const normalized = IntentNormalizationService.analyze(texts, context);
   const onlySalary = /solo (?:estoy )?busco|solo quiero/.test(text) && /empleo|trabajo/.test(text) && /salario|contrato/.test(text);
   const rejected = normalized.rejection || /no me interesa|no gracias|no quiero (?:amway|un negocio|continuar)|deja de escribir|\bstop\b/.test(text) || onlySalary;
-  const meeting = /quiero (?:una )?reunion|podemos hablar|agendemos|quiero agendar|una llamada/.test(text);
+  const currentText = norm(texts.at(-1) ?? '');
+  const meeting = /\b(quiero|podemos|quisiera|agendemos|programar|tener|necesito|deseo)\b.{0,45}\b(reunion|reunirnos|llamada|agendar|agenda|videollamada|asesoria|horarios?)\b|\bpodemos hablar(?:\s+(?:hoy|manana|esta semana))?\b|\b(agendar|agenda|programar|reservar)\b/.test(currentText);
   const interested = /me interesa|quiero conocer|explicame|quiero informacion|\binfo\b|como funciona/.test(text);
   const employment = /busco empleo|buscando trabajo|nueva oportunidad|open to work/.test(text);
   const noCommercialExperience = /nunca he vendido|no (?:tengo|cuento con) experiencia (?:en ventas|comercial)|sin experiencia (?:en ventas|comercial)|seria (?:algo )?nuevo para mi/.test(text);

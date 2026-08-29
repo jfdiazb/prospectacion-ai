@@ -30,7 +30,12 @@ export class MockAIProvider implements AIProvider {
     if (context.intent === 'meeting') return 'Perfecto. Para programar la reunión necesito tu correo, fecha y hora preferidas.';
     if (context.normalizedIntent === 'additional_income_interest') return 'Entiendo que buscas una forma de generar ingresos adicionales. Para orientarte sin asumir, ¿te interesa conocer una oportunidad de negocio, una actividad de venta de productos o primero explorar ambas opciones?';
     if (context.normalizedIntent === 'product_interest') return 'Gracias por contármelo. ¿Buscas productos para tu consumo y bienestar, o también te interesa conocer cómo comercializarlos?';
-    if (context.normalizedIntent === 'product_sales_interest') return 'Entiendo que te interesa comercializar productos. ¿Qué experiencia o resultado buscas con esa actividad?';
+    if (context.normalizedIntent === 'product_sales_interest') {
+      const hasContext = context.history.some(message => message.sender === 'lead' && /ya vendo|tengo experiencia|estoy empezando|desde cero|sin experiencia/i.test(message.text));
+      return hasContext
+        ? 'Gracias por contármelo. ¿Cuál es hoy la principal dificultad que quieres resolver: conseguir clientes, dar seguimiento o cerrar ventas?'
+        : 'Entiendo que quieres aprender sobre ventas. ¿Actualmente ya vendes o estás buscando empezar desde cero?';
+    }
     if (context.normalizedIntent === 'business_opportunity') return 'Entiendo que te interesa conocer una oportunidad de negocio. ¿Qué te gustaría comprender primero sobre cómo funciona o sobre el tipo de actividad que buscas desarrollar?';
     if (context.normalizedIntent === 'business_and_product_interest') {
       const priorityAsked = previousAI.some(text => (text.includes('productos') && text.includes('negocio')) && (text.includes('prefieres') || text.includes('primero') || text.includes('prioridad')));

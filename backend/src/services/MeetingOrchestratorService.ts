@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import { MeetingLifecycleService } from './MeetingLifecycleService';
 import { AutomationEngineService } from './AutomationEngineService';
 
-type MeetingContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; wantsMeeting: boolean; platform?: 'instagram' | 'facebook' | 'youtube' | 'whatsapp' };
+type MeetingContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; wantsMeeting: boolean; meetingReadiness?: 'explicit_request' | 'qualified_discovery' | 'needs_discovery'; platform?: 'instagram' | 'facebook' | 'youtube' | 'whatsapp' };
 type MeetingOutcome = { handled: boolean; reply?: string };
 
 const TIMEZONE_ALIASES: Record<string, string> = {
@@ -32,8 +32,8 @@ export class MeetingOrchestratorService {
       if (current?.status === 'failed' && /\b(reintentar|confirmo|intenta de nuevo)\b/i.test(context.text)) { const outcome = await lifecycle.confirm(context); return { handled: true, reply: outcome.reply }; }
       if (current?.status === 'pending_configuration') return { handled: context.wantsMeeting, reply: context.wantsMeeting ? 'Tu horario ya está registrado; Zoom permanece en modo de prueba y no crearé un duplicado.' : undefined };
       if (current && ['confirmed', 'scheduled'].includes(current.status)) return { handled: context.wantsMeeting, reply: context.wantsMeeting ? 'Ya tienes una reunión confirmada. Los datos están disponibles de forma privada en el CRM.' : undefined };
-      if (!context.wantsMeeting || !MeetingLifecycleService.hasSufficientIntent(context.text)) return { handled: false };
-      await AutomationEngineService.emit({ eventId: `${context.sourceEventId}:meeting-intent`, trigger: 'meeting.intent_detected', userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, platform: context.platform, text: context.text, data: { meetingIntent: 'high' } });
+      if (!context.wantsMeeting) return { handled: false };
+      await AutomationEngineService.emit({ eventId: `${context.sourceEventId}:meeting-intent`, trigger: 'meeting.intent_detected', userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, platform: context.platform, text: context.text, data: { meetingIntent: 'high', meetingReadiness: context.meetingReadiness } });
       const outcome = await lifecycle.propose(context); return { handled: true, reply: outcome.reply };
     }
     let meeting = await Meeting.findOne({ conversationId: context.conversationId, status: { $in: ['pending_details', 'pending_booking', 'pending_configuration', 'failed'] } }).sort({ createdAt: -1 });

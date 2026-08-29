@@ -11,7 +11,7 @@ import { MeetingAutomationPolicyService } from './MeetingAutomationService';
 export type MeetingLifecycleContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; platform?: 'instagram' | 'facebook' | 'youtube' | 'whatsapp'; timezone?: string; attendeeEmail?: string };
 export class MeetingLifecycleService {
   constructor(private readonly provider: MeetingProvider = getMeetingProvider()) {}
-  static hasSufficientIntent(text: string): boolean { return /\b(quiero|quisiera|podemos|necesito|deseo|me gustaria|me gustaría|agenda|agendar|programar|reservar|confirmo)\b.{0,35}\b(cita|reunion|reunión|zoom|llamada|horario)\b|\b(agenda|agendar|programar|reservar)\b/i.test(text); }
+  static hasSufficientIntent(text: string): boolean { return /\b(quiero|quisiera|podemos|necesito|deseo|me gustaria|me gustaría|agenda|agendar|programar|reservar|confirmo)\b.{0,45}\b(cita|reunion|reunión|zoom|llamada|horario|asesoria|asesoría)\b|\bpodemos hablar(?:\s+(?:hoy|mañana|esta semana))?\b|\b(hablar|comunicarme)\b.{0,25}\b(con alguien|una persona|un asesor|una asesora)\b|\b(agenda|agendar|programar|reservar)\b/i.test(text); }
   static isLowIntent(text: string): boolean { return /\b(quiza|quizá|tal vez|de pronto|algun dia|algún día)\b/i.test(text) && !this.hasSufficientIntent(text); }
   private async emit(meeting: any, trigger: AutomationTrigger) { await AutomationEngineService.emit({ eventId: `meeting:${meeting._id}:${trigger}:${meeting.updatedAt?.getTime?.() || Date.now()}`, trigger, userId: meeting.userId.toString(), leadId: meeting.leadId.toString(), conversationId: meeting.conversationId?.toString(), platform: meeting.originChannel as any, data: { meetingIntent: 'high', meetingId: meeting._id.toString(), status: meeting.status } }); }
 
