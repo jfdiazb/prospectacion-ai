@@ -54,9 +54,17 @@ export class MetaMessagingProvider implements MessagingProvider {
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
     const version = process.env.META_GRAPH_API_VERSION || 'v23.0';
     if (!accessToken || !phoneNumberId) throw new MessagingProviderError('Credenciales de WhatsApp no configuradas', 'WHATSAPP_CONFIGURATION_ERROR');
+    const normalizePhone = (value: string) => value.replace(/\D/g, '');
+    const recipient = normalizePhone(request.recipient.phoneNumber);
+    const allowlist = (process.env.WHATSAPP_ACTIVATION_ALLOWLIST || '')
+      .split(',')
+      .map(normalizePhone)
+      .filter(Boolean);
+    if (!recipient || !allowlist.includes(recipient))
+      throw new MessagingProviderError('Destinatario de WhatsApp no autorizado para activación controlada', 'WHATSAPP_RECIPIENT_NOT_ALLOWLISTED');
     try {
       const response = await this.http.post<MetaResponse>(`https://graph.facebook.com/${version}/${encodeURIComponent(phoneNumberId)}/messages`,
-        { messaging_product: 'whatsapp', to: request.recipient.phoneNumber, type: 'text', text: { body: request.text } },
+        { messaging_product: 'whatsapp', to: recipient, type: 'text', text: { body: request.text } },
         { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, timeout: Number(process.env.META_MESSAGING_TIMEOUT_MS || 10000) });
       const data = response.data as MetaResponse & { messages?: Array<{ id?: string }> };
       const externalMessageId = data.messages?.[0]?.id ?? data.message_id ?? data.id;

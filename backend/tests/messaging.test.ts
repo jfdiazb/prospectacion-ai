@@ -60,6 +60,7 @@ describe('MetaMessagingProvider', () => {
   test('sends WhatsApp through the same official Meta provider', async () => {
     process.env.WHATSAPP_TOKEN = 'whatsapp-test-token';
     process.env.WHATSAPP_PHONE_NUMBER_ID = 'phone-number-id';
+    process.env.WHATSAPP_ACTIVATION_ALLOWLIST = '+57 300 123 4567';
     const post = jest.fn().mockResolvedValue({ data: { messages: [{ id: 'wamid.official-1' }] } });
     const provider = new MetaMessagingProvider({ post } as unknown as AxiosInstance);
     await expect(provider.sendMessage({ text: 'Hola desde ALMA', recipient: { type: 'whatsapp_user', phoneNumber: '573001234567' } }))
@@ -67,6 +68,17 @@ describe('MetaMessagingProvider', () => {
     expect(post).toHaveBeenCalledWith('https://graph.facebook.com/v23.0/phone-number-id/messages',
       { messaging_product: 'whatsapp', to: '573001234567', type: 'text', text: { body: 'Hola desde ALMA' } },
       expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer whatsapp-test-token' }) }));
+  });
+
+  test('blocks a WhatsApp recipient outside the activation allowlist before calling Meta', async () => {
+    process.env.WHATSAPP_TOKEN = 'whatsapp-test-token';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = 'phone-number-id';
+    process.env.WHATSAPP_ACTIVATION_ALLOWLIST = '573001111111';
+    const post = jest.fn();
+    const provider = new MetaMessagingProvider({ post } as unknown as AxiosInstance);
+    await expect(provider.sendMessage({ text: 'No enviar', recipient: { type: 'whatsapp_user', phoneNumber: '573009999999' } }))
+      .rejects.toMatchObject({ code: 'WHATSAPP_RECIPIENT_NOT_ALLOWLISTED' });
+    expect(post).not.toHaveBeenCalled();
   });
 
   test('sends a Facebook Page DM with a PSID and the Page endpoint', async () => {
