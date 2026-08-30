@@ -56,11 +56,14 @@ export class MetaMessagingProvider implements MessagingProvider {
     if (!accessToken || !phoneNumberId) throw new MessagingProviderError('Credenciales de WhatsApp no configuradas', 'WHATSAPP_CONFIGURATION_ERROR');
     const normalizePhone = (value: string) => value.replace(/\D/g, '');
     const recipient = normalizePhone(request.recipient.phoneNumber);
+    const authorization = request.whatsappAuthorization;
     const allowlist = (process.env.WHATSAPP_ACTIVATION_ALLOWLIST || '')
       .split(',')
       .map(normalizePhone)
       .filter(Boolean);
-    if (!recipient || !allowlist.includes(recipient))
+    const validStaticAuthorization = authorization?.mode === 'static_allowlist' && allowlist.includes(recipient);
+    const validInboundAuthorization = authorization?.mode === 'inbound_conversation' && Boolean(authorization.sourceEventId);
+    if (!recipient || !authorization || authorization.recipientId !== recipient || (!validStaticAuthorization && !validInboundAuthorization))
       throw new MessagingProviderError('Destinatario de WhatsApp no autorizado para activación controlada', 'WHATSAPP_RECIPIENT_NOT_ALLOWLISTED');
     try {
       const response = await this.http.post<MetaResponse>(`https://graph.facebook.com/${version}/${encodeURIComponent(phoneNumberId)}/messages`,

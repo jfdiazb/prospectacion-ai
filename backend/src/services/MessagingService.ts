@@ -1,5 +1,6 @@
 import OutboundMessage from '../models/OutboundMessage';
 import { getMessagingProvider, MessagingProviderError, type MessagingProvider, type MessagingRecipient } from '../integrations/messaging';
+import { WhatsAppOutboundAuthorizationService } from './WhatsAppOutboundAuthorizationService';
 
 type SendContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; recipient: MessagingRecipient };
 
@@ -13,19 +14,47 @@ export class MessagingService {
         : context.recipient.type === 'facebook_user' ? context.recipient.pageScopedId
           : context.recipient.type === 'instagram_comment' || context.recipient.type === 'facebook_comment' ? context.recipient.commentId
             : context.recipient.type === 'whatsapp_user' ? context.recipient.phoneNumber : context.recipient.parentCommentId;
+    const authorization = context.recipient.type === 'whatsapp_user'
+      ? await WhatsAppOutboundAuthorizationService.authorize({
+          userId: context.userId,
+          leadId: context.leadId,
+          conversationId: context.conversationId,
+          phoneNumber: context.recipient.phoneNumber,
+        })
+      : undefined;
     let outbound;
     try {
       outbound = await OutboundMessage.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId,
         sourceEventId: context.sourceEventId, channel, messageType: ['comment', 'instagram_comment', 'facebook_comment'].includes(context.recipient.type) ? 'private_reply'
           : context.recipient.type === 'whatsapp_user' ? 'whatsapp_message' : context.recipient.type === 'youtube_comment' ? 'youtube_reply' : 'direct_message',
         text: context.text, deliveryStatus: 'pending', provider: selectedProvider.name, recipientId,
-        commentId: context.recipient.type === 'comment' || context.recipient.type === 'instagram_comment' || context.recipient.type === 'facebook_comment' ? context.recipient.commentId : undefined });
+        commentId: context.recipient.type === 'comment' || context.recipient.type === 'instagram_comment' || context.recipient.type === 'facebook_comment' ? context.recipient.commentId : undefined,
+        authorization: authorization || undefined });
     } catch (error: any) {
       if (error?.code === 11000) return 'duplicate';
       throw error;
     }
+    if (context.recipient.type === 'whatsapp_user' && !authorization) {
+      await OutboundMessage.updateOne({ _id: outbound._id }, {
+        deliveryStatus: 'failed',
+        failedAt: new Date(),
+        errorCode: 'WHATSAPP_RECIPIENT_NOT_AUTHORIZED',
+        errorMessage: 'No existe evidencia inbound vigente para esta conversación',
+        simulatedDelivery: false,
+      });
+      return 'failed';
+    }
     try {
-      const result = await selectedProvider.sendMessage({ userId: context.userId, text: context.text, recipient: context.recipient });
+      const result = await selectedProvider.sendMessage({
+        userId: context.userId,
+        text: context.text,
+        recipient: context.recipient,
+        whatsappAuthorization: authorization ? {
+          mode: authorization.mode,
+          recipientId: authorization.recipientId,
+          sourceEventId: authorization.sourceEventId,
+        } : undefined,
+      });
       await OutboundMessage.updateOne({ _id: outbound._id }, { deliveryStatus: result.simulated ? 'simulated' : 'sent', externalMessageId: result.externalMessageId, sentAt: new Date(), simulatedDelivery: result.simulated });
       console.info('Outbound messaging delivery completed', {
         channel,

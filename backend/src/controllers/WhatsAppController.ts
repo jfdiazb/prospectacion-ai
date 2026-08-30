@@ -131,14 +131,6 @@ export class WhatsAppController {
       console.warn('WhatsApp webhook message ignored', { reason: 'invalid_or_stale_timestamp' });
       return;
     }
-    const allowlist = (process.env.WHATSAPP_ACTIVATION_ALLOWLIST || '')
-      .split(',')
-      .map(WhatsAppController.normalizePhone)
-      .filter(Boolean);
-    if (allowlist.length && !allowlist.includes(senderPhone)) {
-      console.info('WhatsApp webhook message ignored', { reason: 'sender_not_allowlisted' });
-      return;
-    }
     console.info('WhatsApp webhook message accepted', {
       messageType: normalized.messageType,
       autoReplyEnabled: process.env.WHATSAPP_AUTO_REPLY_ENABLED === 'true',

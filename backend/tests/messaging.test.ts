@@ -63,7 +63,7 @@ describe('MetaMessagingProvider', () => {
     process.env.WHATSAPP_ACTIVATION_ALLOWLIST = '+57 300 123 4567';
     const post = jest.fn().mockResolvedValue({ data: { messages: [{ id: 'wamid.official-1' }] } });
     const provider = new MetaMessagingProvider({ post } as unknown as AxiosInstance);
-    await expect(provider.sendMessage({ text: 'Hola desde ALMA', recipient: { type: 'whatsapp_user', phoneNumber: '573001234567' } }))
+    await expect(provider.sendMessage({ text: 'Hola desde ALMA', recipient: { type: 'whatsapp_user', phoneNumber: '573001234567' }, whatsappAuthorization: { mode: 'static_allowlist', recipientId: '573001234567' } }))
       .resolves.toEqual({ externalMessageId: 'wamid.official-1', simulated: false });
     expect(post).toHaveBeenCalledWith('https://graph.facebook.com/v23.0/phone-number-id/messages',
       { messaging_product: 'whatsapp', to: '573001234567', type: 'text', text: { body: 'Hola desde ALMA' } },

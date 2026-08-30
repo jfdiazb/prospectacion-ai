@@ -20,6 +20,15 @@ const outboundMessageSchema = new Schema({
   retryCount: { type: Number, default: 0 },
   lastRetryAt: Date,
   simulatedDelivery: { type: Boolean, default: false },
+  authorization: {
+    mode: { type: String, enum: ['static_allowlist', 'inbound_conversation'] },
+    channel: String,
+    recipientId: String,
+    conversationId: Schema.Types.ObjectId,
+    authorizedAt: Date,
+    sourceEventId: String,
+    inboundAt: Date,
+  },
 }, { timestamps: true });
 
 outboundMessageSchema.index({ conversationId: 1, createdAt: -1 });

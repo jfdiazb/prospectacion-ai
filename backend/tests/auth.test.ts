@@ -430,7 +430,7 @@ describe('Auth integration tests', () => {
     expect(await OutboundMessage.countDocuments({ sourceEventId: eventId })).toBe(0);
   });
 
-  test('filters unsafe WhatsApp deliveries and processes every valid message in a batch', async () => {
+  test('filters forged or stale WhatsApp deliveries and accepts signed contacts beyond the control allowlist', async () => {
     await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'whatsapp-safety@example.com', password: 'password123', fullName: 'WhatsApp Safety Owner' });
     const owner = await User.findOne({ email: 'whatsapp-safety@example.com' });
     process.env.CRM_OWNER_ID = owner!._id.toString();
@@ -449,15 +449,16 @@ describe('Auth integration tests', () => {
     await postSigned({ entry: [{ changes: [{ value: value('wrong-phone-number-id', [{ id: 'wamid.wrong-recipient', from: '573001111111', timestamp: currentTimestamp, type: 'text', text: { body: 'Hola' } }]) }] }] });
     await postSigned({ entry: [{ changes: [{ value: value('expected-phone-number-id', [{ id: 'wamid.stale', from: '573001111111', timestamp: String(Math.floor((Date.now() - 3600000) / 1000)), type: 'text', text: { body: 'Hola' } }]) }] }] });
     await postSigned({ entry: [{ changes: [{ value: value('expected-phone-number-id', [{ id: 'wamid.not-allowed', from: '573009999999', timestamp: currentTimestamp, type: 'text', text: { body: 'Hola' } }]) }] }] });
-    expect(await InboundEvent.countDocuments({ userId: owner!._id })).toBe(0);
+    await waitUntil(async () => Boolean(await InboundEvent.exists({ userId: owner!._id, externalEventId: 'wamid.not-allowed', processingState: 'completed' })));
+    expect(await InboundEvent.countDocuments({ userId: owner!._id })).toBe(1);
 
     await postSigned({ entry: [{ changes: [{ value: value('expected-phone-number-id', [
       { id: 'wamid.batch-1', from: '573001111111', timestamp: currentTimestamp, type: 'text', text: { body: 'Primer mensaje' } },
       { id: 'wamid.batch-2', from: '573002222222', timestamp: currentTimestamp, type: 'text', text: { body: 'Segundo mensaje' } },
     ]) }] }] });
-    await waitUntil(async () => await InboundEvent.countDocuments({ userId: owner!._id, channel: 'whatsapp', processingState: 'completed' }) === 2);
-    expect(await InboundEvent.countDocuments({ userId: owner!._id, channel: 'whatsapp', processingState: 'completed' })).toBe(2);
-    expect(await Lead.countDocuments({ userId: owner!._id, platform: 'whatsapp' })).toBe(2);
+    await waitUntil(async () => await InboundEvent.countDocuments({ userId: owner!._id, channel: 'whatsapp', processingState: 'completed' }) === 3);
+    expect(await InboundEvent.countDocuments({ userId: owner!._id, channel: 'whatsapp', processingState: 'completed' })).toBe(3);
+    expect(await Lead.countDocuments({ userId: owner!._id, platform: 'whatsapp' })).toBe(3);
     expect(await OutboundMessage.countDocuments({ userId: owner!._id, channel: 'whatsapp' })).toBe(0);
   });
 

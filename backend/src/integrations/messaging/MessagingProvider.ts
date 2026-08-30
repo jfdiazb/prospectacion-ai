@@ -7,7 +7,16 @@ export type MessagingRecipient =
   | { type: 'whatsapp_user'; phoneNumber: string }
   | { type: 'youtube_comment'; parentCommentId: string };
 
-export interface MessagingRequest { userId?: string; text: string; recipient: MessagingRecipient }
+export interface MessagingRequest {
+  userId?: string;
+  text: string;
+  recipient: MessagingRecipient;
+  whatsappAuthorization?: {
+    mode: 'static_allowlist' | 'inbound_conversation';
+    recipientId: string;
+    sourceEventId?: string;
+  };
+}
 export interface MessagingResult { externalMessageId: string; simulated: boolean }
 
 export interface MessagingProvider {
