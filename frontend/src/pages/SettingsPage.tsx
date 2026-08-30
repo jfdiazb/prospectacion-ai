@@ -130,7 +130,15 @@ export const SettingsPage = () => {
           </div>
         </Card>
 
-        {user?.role === 'admin' && <WhatsAppLiveDiagnostics />}
+        {user?.role === 'admin' ? <WhatsAppLiveDiagnostics /> : (
+          <Card className="lg:col-span-2" hover={false}>
+            <div className="space-y-2">
+              <p className="text-sm uppercase tracking-[0.3em] text-dark-500">Administración · solo lectura</p>
+              <h2 className="text-2xl font-semibold text-white">Diagnóstico WhatsApp LIVE</h2>
+              <p className="text-sm text-amber-300">Tu sesión está autenticada con rol {user?.role || 'sin rol'}, pero este diagnóstico requiere autorización administrativa.</p>
+            </div>
+          </Card>
+        )}
 
         <Card className="lg:col-span-2" hover={false}>
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">

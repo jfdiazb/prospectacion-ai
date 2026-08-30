@@ -19,9 +19,10 @@ describe('SettingsPage WhatsApp diagnostics visibility', () => {
     expect(screen.getByText('Diagnóstico WhatsApp LIVE')).toBeInTheDocument();
   });
 
-  it('no muestra el diagnóstico a un usuario no autorizado', () => {
+  it('explica por qué el diagnóstico no está habilitado para un usuario no autorizado', () => {
     role = 'user';
     render(<SettingsPage />);
-    expect(screen.queryByText('Diagnóstico WhatsApp LIVE')).not.toBeInTheDocument();
+    expect(screen.getByText('Diagnóstico WhatsApp LIVE')).toBeInTheDocument();
+    expect(screen.getByText(/este diagnóstico requiere autorización administrativa/i)).toBeInTheDocument();
   });
 });
