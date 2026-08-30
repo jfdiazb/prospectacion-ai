@@ -1,6 +1,7 @@
 ﻿import type { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/helpers';
 import { MESSAGES, HTTP_STATUS } from '../config/constants';
+import User from '../models/User';
 
 /**
  * Interface extendida de Request con usuario
@@ -13,7 +14,7 @@ export interface AuthRequest extends Request {
 /**
  * Middleware de autenticaciÃ³n JWT
  */
-export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction): void => {
+export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const authorization = req.headers.authorization;
     const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
@@ -27,8 +28,21 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
     }
 
     const decoded = verifyToken(token);
-    req.user = decoded;
-    req.userId = decoded.id;
+    const persistedUser = await User.findById(decoded.id).select('_id email role isActive');
+    if (!persistedUser || persistedUser.isActive === false) {
+      res.status(HTTP_STATUS.UNAUTHORIZED).json({
+        success: false,
+        message: MESSAGES.ERROR.UNAUTHORIZED,
+      });
+      return;
+    }
+    req.user = {
+      ...decoded,
+      id: persistedUser._id.toString(),
+      email: persistedUser.email,
+      role: persistedUser.role,
+    };
+    req.userId = persistedUser._id.toString();
     next();
   } catch (error) {
     res.status(HTTP_STATUS.UNAUTHORIZED).json({

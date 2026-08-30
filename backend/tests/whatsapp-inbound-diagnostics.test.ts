@@ -51,9 +51,9 @@ describe('WhatsApp inbound administrative diagnostics', () => {
     const before = { inbound: await InboundEvent.countDocuments(), conversations: await Conversation.countDocuments(), leads: await Lead.countDocuments(), outbound: await OutboundMessage.countDocuments() };
     const unauthorized = await axios.get(`${baseURL}/api/v1/whatsapp/admin/inbound-diagnostics`, { params, validateStatus: () => true });
     expect(unauthorized.status).toBe(401);
-    const forbidden = await axios.get(`${baseURL}/api/v1/whatsapp/admin/inbound-diagnostics`, { params, headers: { Authorization: `Bearer ${generateToken({ id: user._id.toString(), role: 'user' })}` }, validateStatus: () => true });
+    const forbidden = await axios.get(`${baseURL}/api/v1/whatsapp/admin/inbound-diagnostics`, { params, headers: { Authorization: `Bearer ${generateToken({ id: user._id.toString(), role: 'admin' })}` }, validateStatus: () => true });
     expect(forbidden.status).toBe(403);
-    const response = await axios.get(`${baseURL}/api/v1/whatsapp/admin/inbound-diagnostics`, { params, headers: { Authorization: `Bearer ${generateToken({ id: admin._id.toString(), role: 'admin' })}` } });
+    const response = await axios.get(`${baseURL}/api/v1/whatsapp/admin/inbound-diagnostics`, { params, headers: { Authorization: `Bearer ${generateToken({ id: admin._id.toString(), role: 'user' })}` } });
     expect(response.data.data).toMatchObject({ inboundEventCount: 1, uniqueExternalEventCount: 1, messagePersistenceCount: 1, leadMatchCount: 1, conversationMatchCount: 1, outboundMode: 'mock', autoReplyEnabled: false });
     expect(JSON.stringify(response.data)).not.toContain(text);
     expect(JSON.stringify(response.data)).not.toContain(lead.phone);
