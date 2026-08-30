@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Button, Card } from '@components/shared';
 import { whatsappDiagnosticsService, type WhatsAppInboundDiagnostics } from '@services/whatsappDiagnosticsService';
 
@@ -15,17 +15,27 @@ export const WhatsAppLiveDiagnostics = () => {
   const [result, setResult] = useState<WhatsAppInboundDiagnostics | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const requestInFlight = useRef(false);
 
   const verify = async () => {
+    if (requestInFlight.current) return;
     if (!from || !to || !text) return setError('Completa la ventana y el texto de la prueba.');
+    requestInFlight.current = true;
     setLoading(true); setError(''); setResult(null);
     try {
       const textSha256 = await sha256(text);
       setResult(await whatsappDiagnosticsService.inbound({ from: colombiaIso(from), to: colombiaIso(to), textSha256 }));
       setText('');
     } catch (requestError: any) {
-      setError(requestError?.response?.data?.message || 'No fue posible verificar el evento.');
-    } finally { setLoading(false); }
+      const status = requestError?.response?.status;
+      const messages: Record<number, string> = {
+        401: 'La sesión administrativa expiró. Inicia sesión nuevamente.',
+        403: 'Tu usuario no tiene autorización administrativa para este diagnóstico.',
+        404: 'El diagnóstico WhatsApp no está disponible en este despliegue.',
+        500: 'El diagnóstico no pudo completarse. No se modificó ningún dato.',
+      };
+      setError(messages[status] || 'No fue posible verificar el evento.');
+    } finally { requestInFlight.current = false; setLoading(false); }
   };
 
   const inboundUnique = result?.inboundEventCount === 1 && result.uniqueExternalEventCount === 1;
@@ -43,7 +53,7 @@ export const WhatsAppLiveDiagnostics = () => {
         <Field label="Hasta · hora Colombia"><input aria-label="Hasta · hora Colombia" type="datetime-local" value={to} onChange={event => setTo(event.target.value)} className="mt-2 w-full rounded-xl border border-dark-700 bg-dark-900 px-3 py-2 text-white" /></Field>
         <Field label="Texto de la prueba"><input aria-label="Texto de la prueba" type="password" autoComplete="off" value={text} onChange={event => setText(event.target.value)} className="mt-2 w-full rounded-xl border border-dark-700 bg-dark-900 px-3 py-2 text-white" /></Field>
       </div>
-      <Button loading={loading} disabled={loading} onClick={() => void verify()}>Verificar inbound</Button>
+      <Button loading={loading} disabled={loading} onClick={() => void verify()}>{loading ? 'Consultando…' : 'Verificar inbound'}</Button>
       {error && <p className="text-sm text-red-300">{error}</p>}
       {result && <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

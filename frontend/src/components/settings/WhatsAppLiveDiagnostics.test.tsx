@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WhatsAppLiveDiagnostics } from './WhatsAppLiveDiagnostics';
@@ -44,5 +44,38 @@ describe('WhatsAppLiveDiagnostics', () => {
     expect(screen.getByText('MOCK')).toBeInTheDocument();
     expect(screen.getByText('FALSE')).toBeInTheDocument();
     expect(screen.getByLabelText('Texto de la prueba')).toHaveValue('');
+  });
+
+  it('bloquea consultas duplicadas durante una petición en curso', async () => {
+    let resolveRequest!: (value: Awaited<ReturnType<typeof whatsappDiagnosticsService.inbound>>) => void;
+    vi.mocked(whatsappDiagnosticsService.inbound).mockReturnValue(new Promise(resolve => { resolveRequest = resolve; }));
+    render(<WhatsAppLiveDiagnostics />);
+    await userEvent.type(screen.getByLabelText('Texto de la prueba'), 'prueba');
+
+    const button = screen.getByRole('button', { name: 'Verificar inbound' });
+    button.click();
+    button.click();
+    await waitFor(() => expect(whatsappDiagnosticsService.inbound).toHaveBeenCalledOnce());
+    expect(screen.getByRole('button', { name: /Cargando/ })).toBeDisabled();
+
+    await act(async () => resolveRequest({
+        inboundEventCount: 0, uniqueExternalEventCount: 0, messagePersistenceCount: 0,
+        leadMatchCount: 0, conversationMatchCount: 0, events: [], outboundMode: 'mock', autoReplyEnabled: false,
+      }));
+    await screen.findByText('WHATSAPP INBOUND LIVE: FAIL');
+  });
+
+  it.each([
+    [401, 'La sesión administrativa expiró. Inicia sesión nuevamente.'],
+    [403, 'Tu usuario no tiene autorización administrativa para este diagnóstico.'],
+    [404, 'El diagnóstico WhatsApp no está disponible en este despliegue.'],
+    [500, 'El diagnóstico no pudo completarse. No se modificó ningún dato.'],
+  ])('presenta un error seguro para HTTP %i', async (status, message) => {
+    vi.mocked(whatsappDiagnosticsService.inbound).mockRejectedValue({ response: { status, data: { secret: 'oculto' } } });
+    render(<WhatsAppLiveDiagnostics />);
+    await userEvent.type(screen.getByLabelText('Texto de la prueba'), 'prueba');
+    await userEvent.click(screen.getByRole('button', { name: 'Verificar inbound' }));
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByText('oculto')).not.toBeInTheDocument();
   });
 });
