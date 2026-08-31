@@ -24,6 +24,8 @@ services:
         sync: false
       - key: REAL_OUTBOUND_ENABLED
         value: "false"
+      - key: INSTAGRAM_REAL_OUTBOUND_ENABLED
+        value: "true"
       - key: YOUTUBE_POLLING_ENABLED
         value: "false"
       - key: YOUTUBE_MESSAGING_MODE
@@ -79,7 +81,7 @@ services:
       - key: CALENDLY_TIMEOUT_MS
         value: 10000
       - key: INSTAGRAM_MESSAGING_MODE
-        value: mock
+        value: live
       - key: FACEBOOK_MESSAGING_MODE
         value: mock
       - key: META_AUTO_SEND_ENABLED

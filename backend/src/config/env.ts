@@ -64,6 +64,9 @@ export const validateServerEnvironment = (): void => {
   }
   const messagingMode =
     process.env.INSTAGRAM_MESSAGING_MODE || process.env.META_MESSAGING_MODE || 'mock';
+  const instagramRealOutboundEnabled = process.env.INSTAGRAM_REAL_OUTBOUND_ENABLED;
+  if (instagramRealOutboundEnabled && !['true', 'false'].includes(instagramRealOutboundEnabled))
+    throw new Error('INSTAGRAM_REAL_OUTBOUND_ENABLED debe ser true o false');
   for (const key of ['META_INBOUND_MAX_AGE_MS', 'META_LAUNCH_EVENT_TOLERANCE_MS']) {
     const value = Number(process.env[key] || 600000);
     if (!Number.isFinite(value) || value < 60000 || value > 3600000)
@@ -78,6 +81,10 @@ export const validateServerEnvironment = (): void => {
     if (metaMissing.length)
       throw new Error(`Faltan variables para mensajería Meta live: ${metaMissing.join(', ')}`);
   }
+  if (instagramRealOutboundEnabled === 'true' && messagingMode !== 'live')
+    throw new Error(
+      'INSTAGRAM_MESSAGING_MODE debe ser live cuando INSTAGRAM_REAL_OUTBOUND_ENABLED=true'
+    );
   const facebookMessagingMode =
     process.env.FACEBOOK_MESSAGING_MODE || process.env.META_MESSAGING_MODE || 'mock';
   if (!['mock', 'live'].includes(facebookMessagingMode))

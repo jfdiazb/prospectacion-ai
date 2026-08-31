@@ -42,7 +42,10 @@ export class AssistedResponseService {
     const meetingOutcome = await MeetingOrchestratorService.process({
       userId: context.userId, leadId: context.leadId, conversationId: context.conversationId,
       sourceEventId: context.sourceEventId, text: context.text, platform: context.platform,
-      wantsMeeting: qualification.signals.meetingIntent === 'high' || MeetingLifecycleService.hasSufficientIntent(context.text),
+      wantsMeeting: !handoffReason && (
+        qualification.signals.meetingIntent === 'high'
+        || MeetingLifecycleService.hasSufficientIntent(context.text)
+      ),
     });
     const deduplicated = meetingOutcome.reply
       ? { text: meetingOutcome.reply, usedFallback: false }

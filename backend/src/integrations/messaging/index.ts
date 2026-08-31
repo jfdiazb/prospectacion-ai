@@ -8,8 +8,9 @@ export const getMessagingProvider = (channel: 'instagram' | 'facebook' | 'whatsa
     : channel === 'whatsapp' ? (process.env.WHATSAPP_MESSAGING_MODE || 'mock')
       : channel === 'facebook' ? (process.env.FACEBOOK_MESSAGING_MODE || process.env.META_MESSAGING_MODE || 'mock')
         : (process.env.INSTAGRAM_MESSAGING_MODE || process.env.META_MESSAGING_MODE || 'mock');
-  const productionOutboundAllowed =
-    process.env.NODE_ENV !== 'production' || process.env.REAL_OUTBOUND_ENABLED === 'true';
+  const productionOutboundAllowed = process.env.NODE_ENV !== 'production'
+    || process.env.REAL_OUTBOUND_ENABLED === 'true'
+    || (channel === 'instagram' && process.env.INSTAGRAM_REAL_OUTBOUND_ENABLED === 'true');
   if (mode === 'mock' || !productionOutboundAllowed) return new MockMessagingProvider();
   if (mode === 'live') return channel === 'youtube' ? new YouTubeMessagingProvider() : new MetaMessagingProvider();
   throw new Error(`Modo de mensajería inválido para ${channel}: ${mode}`);
