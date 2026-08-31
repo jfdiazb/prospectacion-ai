@@ -16,7 +16,6 @@ import { MeetingReadinessService } from './MeetingReadinessService';
 type AlmaContext = { userId: string; leadId: string; conversationId: string; text: string; isNewLead: boolean; platform: 'instagram' | 'facebook' | 'youtube' | 'whatsapp'; sourceEventId: string; recipient: MessagingRecipient; automation?: { flowId: string; response: string } };
 
 export class AlmaService {
-  static buildActionableNextStep(incomingText: string, history: Array<{ sender: 'lead' | 'ai'; text: string }>): string {
   private static buildNaturalContinuation(incomingText: string, history: Array<{ sender: 'lead' | 'ai'; text: string }>): string {
     const leadConversation = [...history.filter(message => message.sender === 'lead').map(message => message.text), incomingText]
       .join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
@@ -32,6 +31,7 @@ export class AlmaService {
     return 'Perfecto 😊 ¿Qué es lo que más te gustaría lograr con esto?';
   }
 
+  static buildActionableNextStep(incomingText: string, history: Array<{ sender: 'lead' | 'ai'; text: string }>): string {
     const context = [...history.filter(message => message.sender === 'lead').map(message => message.text), incomingText]
       .join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
     if (/tecnologia|redes sociales|seguidores|clientes/.test(context)) {
@@ -46,8 +46,8 @@ export class AlmaService {
     const previousAI = new Set(history.filter(message => message.sender === 'ai').map(message => normalize(message.text)));
     const fingerprint = ConversationService.fingerprintAIText(response);
     const topic = ConversationService.classifyQuestionTopic(response);
-    const repeated = previousAI.has(normalize(response)) || memory.responseFingerprints.includes(fingerprint)
     const exposesInternalLanguage = /\b(contexto|avanzar|proces(?:ar|ando|ado)|flujo|calificaci[oó]n|lead)\b|informaci[oó]n recopilada|intenci[oó]n detectada|no repetirte preguntas/i.test(response);
+    const repeated = previousAI.has(normalize(response)) || memory.responseFingerprints.includes(fingerprint)
       || Boolean(topic && memory.askedTopics.includes(topic)) || exposesInternalLanguage;
     if (!repeated) return { text: response, deduplicated: false };
     const discoveryComplete = ['desired_outcome', 'main_obstacle', 'previous_attempts', 'support_needed']
