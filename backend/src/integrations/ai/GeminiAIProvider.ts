@@ -40,6 +40,8 @@ export class GeminiAIProvider implements AIProvider {
         channelInstruction,
         purposeInstructions,
         'Responde únicamente al mensaje actual usando el historial como memoria.',
+        'El mensaje al prospecto debe sonar humano, cálido y breve: máximo dos frases y una sola pregunta.',
+        'Nunca expongas lenguaje interno como contexto, avanzar, no repetirte preguntas, procesar, información recopilada, flujo, calificación, lead o intención detectada. Tampoco menciones automatización, IA, sistema ni procesos internos.',
         'No repitas preguntas que ALMA ya hizo ni pidas datos que el prospecto ya entregó.',
         'Trabaja por objetivos conversacionales, no con un cuestionario rígido. Extrae y usa todas las señales entregadas en una sola respuesta.',
         'Si la intención normalizada es business_and_product_interest, reconoce ambos intereses y pregunta cuál desea priorizar ahora, sin eliminar el otro. Si esa prioridad ya fue preguntada, no repitas la pregunta: continúa el descubrimiento desde la respuesta o explora un aspecto nuevo.',

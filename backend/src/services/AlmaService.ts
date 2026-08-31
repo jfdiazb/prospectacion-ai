@@ -17,6 +17,21 @@ type AlmaContext = { userId: string; leadId: string; conversationId: string; tex
 
 export class AlmaService {
   static buildActionableNextStep(incomingText: string, history: Array<{ sender: 'lead' | 'ai'; text: string }>): string {
+  private static buildNaturalContinuation(incomingText: string, history: Array<{ sender: 'lead' | 'ai'; text: string }>): string {
+    const leadConversation = [...history.filter(message => message.sender === 'lead').map(message => message.text), incomingText]
+      .join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
+    if (/producto|bienestar|consumo/.test(leadConversation)) {
+      return 'Perfecto 😊 ¿Qué te gustaría conocer primero sobre los productos?';
+    }
+    if (/negocio|ingreso|emprend|venta/.test(leadConversation)) {
+      return 'Perfecto 😊 ¿Qué te gustaría lograr con esta oportunidad?';
+    }
+    if (/tecnologia|redes sociales|seguidores|clientes/.test(leadConversation)) {
+      return 'Entiendo 😊 ¿Qué te gustaría mejorar primero?';
+    }
+    return 'Perfecto 😊 ¿Qué es lo que más te gustaría lograr con esto?';
+  }
+
     const context = [...history.filter(message => message.sender === 'lead').map(message => message.text), incomingText]
       .join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
     if (/tecnologia|redes sociales|seguidores|clientes/.test(context)) {
@@ -32,7 +47,8 @@ export class AlmaService {
     const fingerprint = ConversationService.fingerprintAIText(response);
     const topic = ConversationService.classifyQuestionTopic(response);
     const repeated = previousAI.has(normalize(response)) || memory.responseFingerprints.includes(fingerprint)
-      || Boolean(topic && memory.askedTopics.includes(topic));
+    const exposesInternalLanguage = /\b(contexto|avanzar|proces(?:ar|ando|ado)|flujo|calificaci[oó]n|lead)\b|informaci[oó]n recopilada|intenci[oó]n detectada|no repetirte preguntas/i.test(response);
+      || Boolean(topic && memory.askedTopics.includes(topic)) || exposesInternalLanguage;
     if (!repeated) return { text: response, deduplicated: false };
     const discoveryComplete = ['desired_outcome', 'main_obstacle', 'previous_attempts', 'support_needed']
       .every(askedTopic => memory.askedTopics.includes(askedTopic));
@@ -40,26 +56,7 @@ export class AlmaService {
     if (discoveryComplete || explicitlyRequestsAction) {
       return { text: this.buildActionableNextStep(incomingText, history), deduplicated: true };
     }
-    const continuations = [
-      'Gracias por contármelo. ¿Qué obstáculo te está frenando más en este momento?',
-      'Entiendo. ¿Qué tipo de apoyo consideras que te ayudaría más?',
-      'Perfecto. ¿Qué cambio concreto te gustaría conseguir primero?',
-      'Gracias por explicarlo. Puedo orientarte sobre el siguiente paso cuando quieras.',
-      'Gracias por confirmarlo. Ya tengo suficiente contexto para avanzar sin repetirte preguntas.',
-      'Entendido. Con lo que me has contado, podemos pasar al siguiente paso.',
-      'Perfecto, tomo en cuenta tu respuesta. Ahora corresponde definir una acción concreta.',
-      'Muy bien. He registrado lo que necesitas y podemos continuar con una orientación más precisa.',
-      'Gracias. El contexto está claro; no necesito volver a preguntarte lo mismo.',
-      'De acuerdo. Podemos dejar atrás el diagnóstico y avanzar hacia una solución.',
-      'Comprendido. Tu respuesta completa esta etapa y nos permite continuar.',
-      'Excelente. Ya contamos con la información necesaria para decidir el siguiente paso.',
-    ];
-    const replacement = continuations.find(candidate => {
-      const candidateTopic = ConversationService.classifyQuestionTopic(candidate);
-      return !previousAI.has(normalize(candidate))
-        && !memory.responseFingerprints.includes(ConversationService.fingerprintAIText(candidate))
-        && !(candidateTopic && memory.askedTopics.includes(candidateTopic));
-    }) || `Gracias por responder. He registrado este avance de la conversación (${memory.responseFingerprints.length + 1}) y podemos continuar sin repetir preguntas.`;
+    const replacement = this.buildNaturalContinuation(incomingText, history);
     return { text: replacement, deduplicated: true };
   }
 

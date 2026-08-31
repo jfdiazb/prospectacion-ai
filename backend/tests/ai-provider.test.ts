@@ -51,6 +51,22 @@ describe('AI provider selection', () => {
     expect(result.text).not.toMatch(/has intentado hasta ahora/i);
   });
 
+  test('replaces internal system language with a natural continuation based on the conversation', () => {
+    const result = AlmaService.avoidRepeatedResponse(
+      'Gracias por confirmarlo. Ya tengo suficiente contexto para avanzar sin repetirte preguntas.',
+      [{ sender: 'lead', text: 'Me interesan los productos para bienestar' }],
+      { askedTopics: [], responseFingerprints: [] },
+      'Sí, eso mismo',
+    );
+
+    expect(result).toEqual({
+      text: 'Perfecto 😊 ¿Qué te gustaría conocer primero sobre los productos?',
+      deduplicated: true,
+    });
+    expect(result.text).not.toMatch(/contexto|avanzar|repetirte|procesar|recopilada|flujo|calificación|lead|intención detectada/i);
+    expect((result.text.match(/\?/g) || [])).toHaveLength(1);
+  });
+
   test('keeps a new response unchanged', () => {
     expect(AlmaService.avoidRepeatedResponse('Una respuesta nueva', [{ sender: 'ai', text: 'Respuesta anterior' }]))
       .toEqual({ text: 'Una respuesta nueva', deduplicated: false });
