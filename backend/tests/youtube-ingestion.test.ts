@@ -1,11 +1,29 @@
 import { YouTubeIngestionService } from '../src/services/YouTubeIngestionService';
 import { AutomationService } from '../src/services/AutomationService';
+import Lead from '../src/models/Lead';
+import { YouTubeLaunchAdapter } from '../src/services/YouTubeLaunchAdapter';
 
 describe('YouTubeIngestionService polling cursor', () => {
   test('matches complete automation keywords without accents or partial words', () => {
     expect(AutomationService.textMatchesKeyword('Quiero la guia, por favor', 'GUÍA')).toBe(true);
     expect(AutomationService.textMatchesKeyword('Quiero información', 'INFO')).toBe(false);
     expect(AutomationService.textMatchesKeyword('INFO ALMA', 'INFO')).toBe(true);
+  });
+
+  test('accepts explicit interest in learning how the opportunity works', async () => {
+    jest.spyOn(Lead, 'findOne').mockResolvedValue(null);
+    jest.spyOn(AutomationService, 'findMatchingKeywordFlow').mockResolvedValue(null);
+    jest.spyOn(YouTubeLaunchAdapter, 'hasMappedVideo').mockResolvedValue(false);
+    const service = new YouTubeIngestionService();
+    jest.spyOn(service as any, 'claimComment').mockResolvedValue(null);
+
+    await expect(service.processComment('owner-1', {
+      id: 'real-comment-1',
+      snippet: {
+        textOriginal: 'Hola, quiero conocer más sobre esta oportunidad y cómo funciona.',
+        authorChannelId: { value: 'lead-channel-1' },
+      },
+    }, 'real-comment-1', 'owner-channel')).resolves.toBe('duplicate');
   });
 
   const originalOverlap = process.env.YOUTUBE_POLL_OVERLAP_MS;

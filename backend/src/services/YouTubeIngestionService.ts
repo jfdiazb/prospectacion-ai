@@ -398,6 +398,7 @@ export class YouTubeIngestionService {
     if (!text || !senderId || !comment.id) return 'invalid';
     if (ownChannelId && senderId === ownChannelId) return 'own_channel';
     const hasInfoKeyword = /(^|\s)info(\s|$)/i.test(text);
+    const hasExplicitOpportunityInterest = /\bquiero\s+conocer\s+m[aá]s\s+sobre\s+(?:esta|la)\s+oportunidad(?:\s+y\s+c[oó]mo\s+funciona)?\b/i.test(text);
     const automation = await AutomationService.findMatchingKeywordFlow(userId, text);
     const automationReply = AutomationService.getReply(automation);
     const existingLead = await Lead.findOne({ userId, username: senderId, platform: 'youtube' });
@@ -405,7 +406,7 @@ export class YouTubeIngestionService {
     const hasLaunchMapping = launchEvent
       ? await YouTubeLaunchAdapter.hasMappedVideo(userId, launchEvent)
       : false;
-    if (!existingLead && !hasInfoKeyword && !automationReply && !hasLaunchMapping)
+    if (!existingLead && !hasInfoKeyword && !hasExplicitOpportunityInterest && !automationReply && !hasLaunchMapping)
       return 'not_eligible';
     const sourceEventId = `youtube:${comment.id}`;
     const claimed = await this.claimComment({
