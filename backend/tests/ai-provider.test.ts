@@ -37,6 +37,8 @@ describe('AI provider selection', () => {
     expect(generate).toHaveBeenCalledWith(expect.stringContaining('No repitas preguntas'));
     expect(generate).toHaveBeenCalledWith(expect.stringContaining('Quiero conseguir clientes'));
     expect(generate).toHaveBeenCalledWith(expect.stringContaining('WhatsApp privado'));
+    expect(generate).toHaveBeenCalledWith(expect.stringContaining('descubre primero sin introducir productos'));
+    expect(generate).toHaveBeenCalledWith(expect.stringContaining('si es Amway'));
     expect(result).toEqual({ text: 'Respuesta distinta', aiProviderUsed: 'gemini' });
     generate.mockRestore();
   });
