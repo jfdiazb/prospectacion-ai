@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppLayout } from '@components/AppLayout';
 import { Button, Card } from '@components/shared';
 import { crmService, type CrmActivity, type CrmConversation, type CrmMeeting, type CrmTask, type DuplicateCandidate } from '@services/crmService';
+import { leadService } from '@services/leadService';
 
 export const CrmPage = () => {
   const [activities, setActivities] = useState<CrmActivity[]>([]);
@@ -16,6 +17,16 @@ export const CrmPage = () => {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [proposalDrafts, setProposalDrafts] = useState<Record<string, string>>({});
   const [duplicateCandidates, setDuplicateCandidates] = useState<DuplicateCandidate[]>([]);
+  const [changingOutcome, setChangingOutcome] = useState<string | null>(null);
+
+  const recordOutcome = async (meeting: CrmMeeting, outcome: 'follow_up' | 'not_interested' | 'client' | 'partner') => {
+    if (!meeting.leadId?._id) return;
+    setChangingOutcome(meeting._id);
+    try {
+      const lead: any = await leadService.recordCommercialOutcome(meeting.leadId._id, outcome, meeting._id);
+      setMeetings(current => current.map(item => item._id === meeting._id ? { ...item, leadId: { ...item.leadId, commercialOutcome: lead.commercialOutcome } } : item));
+    } finally { setChangingOutcome(null); }
+  };
 
   const changeTaskStatus = async (taskId: string, status: 'pending' | 'completed') => {
     setChangingTask(taskId);
@@ -152,6 +163,15 @@ export const CrmPage = () => {
                   {meeting.status === 'pending_review' && <Button size="sm" loading={changingMeeting === meeting._id} onClick={() => void runMeetingAction(meeting._id, 'complete')}>Confirmar asistencia</Button>}
                   {!['cancelled', 'completed'].includes(meeting.status) && <Button size="sm" variant="danger" loading={changingMeeting === meeting._id} onClick={() => void runMeetingAction(meeting._id, 'cancel')}>Cancelar</Button>}
                 </div>
+                {meeting.status === 'completed' && <div className="mt-3 rounded-xl border border-dark-700 p-3">
+                  <p className="mb-2 text-xs text-dark-400">Resultado comercial {meeting.leadId?.commercialOutcome?.type ? `actual: ${meeting.leadId.commercialOutcome.type}` : '(requiere confirmación humana)'}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" loading={changingOutcome === meeting._id} onClick={() => void recordOutcome(meeting, 'follow_up')}>Seguimiento</Button>
+                    <Button size="sm" variant="secondary" loading={changingOutcome === meeting._id} onClick={() => void recordOutcome(meeting, 'not_interested')}>No interesado</Button>
+                    <Button size="sm" loading={changingOutcome === meeting._id} onClick={() => void recordOutcome(meeting, 'client')}>Cliente</Button>
+                    <Button size="sm" loading={changingOutcome === meeting._id} onClick={() => void recordOutcome(meeting, 'partner')}>Socio/negocio</Button>
+                  </div>
+                </div>}
                 {meeting.lifecycleHistory?.length ? <details className="mt-2 text-xs text-dark-400"><summary>Historial</summary>{meeting.lifecycleHistory.map((entry, index) => <p key={`${entry.at}-${index}`}>{new Date(entry.at).toLocaleString()} · {entry.status}{entry.reason ? ` · ${entry.reason}` : ''}</p>)}</details> : null}
               </div>
             ))}
@@ -232,6 +252,7 @@ export const CrmPage = () => {
                     <div className="flex flex-wrap gap-2"><Button size="sm" variant="secondary" loading={changingControl === conversation._id} onClick={() => void saveProposal(conversation)}>Guardar edición</Button><Button size="sm" variant="danger" loading={changingControl === conversation._id} onClick={() => void discardProposal(conversation)}>Descartar</Button><Button size="sm" loading={changingControl === conversation._id} disabled={!(proposalDrafts[conversation._id] ?? conversation.proposedResponse.text).trim()} onClick={() => void sendProposal(conversation)}>Enviar por {conversation.proposedResponse.platform || 'WhatsApp'}</Button></div>
                   </div>}
                   {conversation.proposedResponse?.status === 'sent' && <p className="mt-3 text-xs font-semibold text-emerald-300">Respuesta asistida enviada.</p>}
+                  {conversation.proposedResponse?.status === 'simulated' && <p className="mt-3 text-xs font-semibold text-amber-300">Respuesta asistida simulada (mock); no se entregó un mensaje real.</p>}
                   {conversation.controlMode === 'human_controlled' && ['whatsapp', 'instagram', 'facebook'].includes(lastMessage?.platform || conversation.leadId?.platform || '') && <div className="mt-3 space-y-2">
                     <textarea value={drafts[conversation._id] || ''} maxLength={1000} onChange={event => setDrafts(current => ({ ...current, [conversation._id]: event.target.value }))} placeholder={`Responder por ${lastMessage?.platform || conversation.leadId?.platform}...`} className="min-h-20 w-full rounded-xl border border-white/10 bg-dark-800 px-3 py-2 text-sm text-white outline-none focus:border-primary-500" />
                     <Button size="sm" loading={changingControl === conversation._id} disabled={!drafts[conversation._id]?.trim()} onClick={() => void sendHumanMessage(conversation._id)}>Enviar respuesta</Button>

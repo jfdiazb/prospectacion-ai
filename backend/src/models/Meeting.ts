@@ -4,6 +4,8 @@ const meetingSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   leadId: { type: Schema.Types.ObjectId, ref: 'Lead', required: true },
   conversationId: { type: Schema.Types.ObjectId, ref: 'Conversation' },
+  launchId: { type: Schema.Types.ObjectId, ref: 'Launch' },
+  launchParticipantId: { type: Schema.Types.ObjectId, ref: 'LaunchParticipant' },
   provider: { type: String, enum: ['zoom', 'calendly'], default: 'zoom' },
   status: { type: String, enum: ['potential', 'requested', 'pending_confirmation', 'confirmed', 'completed', 'cancelled', 'failed', 'reschedule_requested', 'pending_details', 'pending_booking', 'pending_configuration', 'scheduled', 'pending_review', 'no_show'], default: 'potential' },
   requestedAt: Date,
@@ -45,6 +47,7 @@ const meetingSchema = new Schema({
 }, { timestamps: true });
 
 meetingSchema.index({ userId: 1, leadId: 1, createdAt: -1 });
+meetingSchema.index({ userId: 1, launchId: 1, launchParticipantId: 1, createdAt: -1 });
 meetingSchema.index({ conversationId: 1, status: 1 });
 meetingSchema.index({ userId: 1, conversationId: 1, status: 1 });
 meetingSchema.index({ userId: 1, scheduledAt: 1, status: 1 });

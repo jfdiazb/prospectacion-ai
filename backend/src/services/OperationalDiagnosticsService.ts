@@ -1,5 +1,8 @@
 import Meeting from '../models/Meeting';
+import InboundEvent from '../models/InboundEvent';
 import YouTubeCredential from '../models/YouTubeCredential';
+import { ReadinessService } from './ReadinessService';
+import { Types } from 'mongoose';
 
 type Severity = 'healthy' | 'info' | 'warning' | 'error';
 type DiagnosticAlert = { severity: Severity; code: string; message: string };
@@ -10,12 +13,18 @@ export class OperationalDiagnosticsService {
     const credential: any = await YouTubeCredential.findOne({ userId }).select(
       'channelId channelTitle channelHandle authorizedChannelId authorizedChannelTitle authorizedChannelHandle connectedAt lastPolledAt lastRepliesPolledAt lastPollingSummary lastPollingFailure lastReplyPollingSummary',
     ).lean();
-    const [pendingBooking, futureScheduled, expiredScheduled, failedMeetings, latestCalendly] = await Promise.all([
+    const [pendingBooking, futureScheduled, expiredScheduled, failedMeetings, latestCalendly, readiness, latestInbound] = await Promise.all([
       Meeting.countDocuments({ userId, status: 'pending_booking' }),
       Meeting.countDocuments({ userId, status: 'scheduled', scheduledFor: { $gt: now } }),
       Meeting.countDocuments({ userId, status: 'scheduled', scheduledFor: { $lte: now } }),
       Meeting.countDocuments({ userId, status: 'failed' }),
       Meeting.findOne({ userId, provider: 'calendly', status: 'scheduled' }).sort({ updatedAt: -1 }).select('scheduledFor updatedAt').lean(),
+      ReadinessService.inspect(),
+      InboundEvent.aggregate([
+        { $match: { userId: new Types.ObjectId(userId) } },
+        { $sort: { eventTimestamp: -1, createdAt: -1 } },
+        { $group: { _id: '$channel', lastActivityAt: { $first: { $ifNull: ['$eventTimestamp', '$createdAt'] } } } },
+      ]),
     ]);
     const youtube = {
       connected: Boolean(credential),
@@ -31,8 +40,39 @@ export class OperationalDiagnosticsService {
       replies: credential?.lastReplyPollingSummary,
     };
     const meetings = { pendingBooking, futureScheduled, expiredScheduled, failed: failedMeetings, latestCalendly };
+    const inboundActivity = Object.fromEntries(latestInbound.map((item: any) => [item._id, item.lastActivityAt]));
+    const providers: any = readiness.runtime.providers;
+    const channel = (key: string, label: string) => {
+      const provider = providers[key] || {};
+      const inbound = provider.inbound === true || provider.inbound === 'live' ? 'live' : provider.inbound === 'disabled' ? 'disabled' : 'disabled';
+      return {
+        key,
+        label,
+        connected: Boolean(provider.configured && (inbound === 'live' || provider.outbound === 'live')),
+        mode: provider.outbound === 'live' || inbound === 'live' ? 'live' : provider.configured ? 'mock' : 'disabled',
+        inbound,
+        outbound: provider.outbound === 'live' ? 'live' : provider.outbound === 'mock' ? 'mock' : 'disabled',
+        automatic: Boolean(provider.automatic),
+        lastActivityAt: inboundActivity[key],
+      };
+    };
+    const integrations = [
+      channel('whatsapp', 'WhatsApp'),
+      channel('instagram', 'Instagram'),
+      channel('facebook', 'Facebook'),
+      { ...channel('youtube', 'YouTube'), connected: Boolean(credential), lastActivityAt: credential?.lastRepliesPolledAt || credential?.lastPolledAt },
+      channel('tiktok', 'TikTok'),
+      {
+        key: 'calendly', label: 'Calendly',
+        connected: Boolean(process.env.CALENDLY_PERSONAL_ACCESS_TOKEN && process.env.CALENDLY_BOOKING_URL),
+        mode: process.env.SCHEDULING_MODE === 'calendly' ? 'live' : 'disabled',
+        inbound: process.env.SCHEDULING_MODE === 'calendly' ? 'live' : 'disabled',
+        outbound: 'disabled', automatic: false, lastActivityAt: latestCalendly?.updatedAt,
+      },
+    ];
     return {
       checkedAt: now,
+      integrations,
       youtube,
       calendly: {
         configured: Boolean(process.env.CALENDLY_PERSONAL_ACCESS_TOKEN && process.env.CALENDLY_BOOKING_URL),

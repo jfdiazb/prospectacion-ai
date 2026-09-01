@@ -31,7 +31,7 @@ export const SegmentPanel = ({
 }) => {
   const [logic, setLogic] = useState<'AND' | 'OR'>(launch.targetSegment?.logic || 'AND');
   const [rules, setRules] = useState<SegmentRule[]>(
-    launch.targetSegment?.rules || [
+    launch.targetSegment?.rules?.map(rule => ({ ...rule, id: rule.id || crypto.randomUUID() })) || [
       { id: crypto.randomUUID(), field: 'score', operator: 'gte', value: 50 },
     ]
   );
@@ -39,8 +39,11 @@ export const SegmentPanel = ({
   const [version, setVersion] = useState(launch.targetSegmentVersion || 0);
   const [message, setMessage] = useState('');
   const [included, setIncluded] = useState<Record<string, boolean>>({});
+  const [busy, setBusy] = useState(false);
   const definition = (): SegmentDefinition => ({ schemaVersion: 1, logic, rules, groups: [] });
   const savePreview = async () => {
+    if (busy) return;
+    setBusy(true);
     try {
       const saved = await launchService.saveSegment(launch._id, definition());
       setVersion(saved.version);
@@ -51,21 +54,23 @@ export const SegmentPanel = ({
       setMessage('Segmento validado. Revisa razones antes de confirmar.');
     } catch (error: any) {
       setMessage(error?.response?.data?.message || 'No fue posible validar el segmento.');
-    }
+    } finally { setBusy(false); }
   };
   const confirm = async () => {
+    if (busy) return;
     const decisions = preview.map(item => ({
       leadId: item.leadId,
       action: included[item.leadId] ? ('include' as const) : ('exclude' as const),
       reason: included[item.leadId] ? undefined : 'Exclusión manual confirmada desde preview',
     }));
     try {
+      setBusy(true);
       await launchService.select(launch._id, version, decisions);
       setMessage('Selección confirmada con trazabilidad.');
       await refresh();
     } catch (error: any) {
       setMessage(error?.response?.data?.message || 'No fue posible confirmar la selección.');
-    }
+    } finally { setBusy(false); }
   };
   const update = (index: number, key: keyof SegmentRule, value: unknown) =>
     setRules(current => current.map((rule, i) => (i === index ? { ...rule, [key]: value } : rule)));
@@ -82,6 +87,7 @@ export const SegmentPanel = ({
           />
           <Button
             variant="secondary"
+            disabled={busy}
             onClick={() =>
               setRules(current => [
                 ...current,
@@ -91,7 +97,7 @@ export const SegmentPanel = ({
           >
             Añadir criterio
           </Button>
-          <Button onClick={() => void savePreview()}>Guardar y previsualizar</Button>
+          <Button loading={busy} disabled={busy} onClick={() => void savePreview()}>Guardar y previsualizar</Button>
         </div>
         <div className="mt-4 space-y-3">
           {rules.map((rule, index) => (
@@ -133,7 +139,7 @@ export const SegmentPanel = ({
               <Button
                 variant="danger"
                 onClick={() => setRules(current => current.filter((_, i) => i !== index))}
-                disabled={rules.length === 1}
+                disabled={busy || rules.length === 1}
               >
                 Quitar
               </Button>
@@ -146,7 +152,7 @@ export const SegmentPanel = ({
         <Card hover={false}>
           <div className="flex items-center">
             <h3 className="mr-auto text-lg font-semibold">Preview ({preview.length})</h3>
-            <Button onClick={() => void confirm()}>Confirmar selección humana</Button>
+            <Button loading={busy} disabled={busy} onClick={() => void confirm()}>Confirmar selección humana</Button>
           </div>
           <div className="mt-4 max-h-96 space-y-2 overflow-auto">
             {preview.map(item => (

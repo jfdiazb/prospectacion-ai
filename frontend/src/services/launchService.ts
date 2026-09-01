@@ -4,6 +4,12 @@ export type LaunchStatus =
   'draft' | 'scheduled' | 'prelaunch' | 'live' | 'followup' | 'completed' | 'cancelled';
 export interface LaunchMetrics {
   selected: number;
+  conversations: number;
+  qualified: number;
+  meetingReady: number;
+  meetings: number;
+  converted: number;
+  closedLost: number;
   registered: number;
   confirmed: number;
   attended: number;
@@ -78,6 +84,8 @@ export interface LaunchParticipant {
   attendance: { status: string };
   outcome: { status: string };
   nextAction?: { type?: string; dueAt?: string };
+  qualifiedAt?: string;
+  meetingReadiness?: { ready?: boolean; reason?: string; evaluatedAt?: string };
   lead?: {
     _id: string;
     fullName?: string;

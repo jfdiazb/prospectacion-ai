@@ -24,6 +24,12 @@ const next: Partial<Record<LaunchStatus, LaunchStatus>> = {
 };
 const metricLabels: Array<[keyof LaunchDetail['metrics'], string]> = [
   ['selected', 'Seleccionados'],
+  ['conversations', 'Conversaciones'],
+  ['qualified', 'Calificados'],
+  ['meetingReady', 'Preparados'],
+  ['meetings', 'Reuniones'],
+  ['converted', 'Conversiones'],
+  ['closedLost', 'No convertidos'],
   ['registered', 'Registrados'],
   ['confirmed', 'Confirmados'],
   ['attended', 'Asistieron'],

@@ -1,6 +1,7 @@
 ﻿import Lead from '../models/Lead';
 import type { ILead, IPaginatedResponse, IPaginationParams } from '../types/index';
 import mongoose from 'mongoose';
+import Activity from '../models/Activity';
 import { calculateLeadScore } from '../utils/helpers';
 
 /**
@@ -128,6 +129,17 @@ export class LeadService {
     return await Lead.findOneAndUpdate({ _id: leadId, userId }, { status }, { new: true });
   }
 
+  static async recordCommercialOutcome(userId: string, leadId: string, outcome: 'follow_up' | 'not_interested' | 'client' | 'partner', sourceMeetingId?: string) {
+    const recordedAt = new Date();
+    const lead = await Lead.findOneAndUpdate(
+      { _id: leadId, userId },
+      { $set: { commercialOutcome: { type: outcome, recordedAt, recordedBy: 'human', sourceMeetingId: sourceMeetingId || undefined } } },
+      { new: true, runValidators: true },
+    );
+    if (lead) await Activity.create({ userId, leadId, type: 'commercial_outcome_recorded', description: `Resultado comercial registrado: ${outcome}`, metadata: { outcome, sourceMeetingId } });
+    return lead;
+  }
+
   /**
    * Buscar leads por plataforma
    */
@@ -166,8 +178,9 @@ export class LeadService {
     const [result] = await Lead.aggregate([
       { $match: { userId: new mongoose.Types.ObjectId(userId) } },
       { $facet: {
-        totals: [{ $group: { _id: null, totalLeads: { $sum: 1 }, newLeads: { $sum: { $cond: [{ $eq: ['$status', 'new'] }, 1, 0] } }, hotLeads: { $sum: { $cond: [{ $eq: ['$interestLevel', 'hot'] }, 1, 0] } }, registeredLeads: { $sum: { $cond: [{ $eq: ['$status', 'registered'] }, 1, 0] } } } }],
-        weekly: [{ $match: { createdAt: { $gte: since } } }, { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'UTC' } }, leads: { $sum: 1 }, conversions: { $sum: { $cond: [{ $eq: ['$status', 'registered'] }, 1, 0] } }, hot: { $sum: { $cond: [{ $eq: ['$interestLevel', 'hot'] }, 1, 0] } } } }, { $sort: { _id: 1 } }],
+        totals: [{ $group: { _id: null, totalLeads: { $sum: 1 }, newLeads: { $sum: { $cond: [{ $eq: ['$status', 'new'] }, 1, 0] } }, hotLeads: { $sum: { $cond: [{ $eq: ['$interestLevel', 'hot'] }, 1, 0] } }, registeredLeads: { $sum: { $cond: [{ $eq: ['$status', 'registered'] }, 1, 0] } }, convertedLeads: { $sum: { $cond: [{ $in: ['$commercialOutcome.type', ['client', 'partner']] }, 1, 0] } } } }],
+        weekly: [{ $match: { createdAt: { $gte: since } } }, { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'UTC' } }, leads: { $sum: 1 }, hot: { $sum: { $cond: [{ $eq: ['$interestLevel', 'hot'] }, 1, 0] } } } }, { $sort: { _id: 1 } }],
+        weeklyConversions: [{ $match: { 'commercialOutcome.recordedAt': { $gte: since }, 'commercialOutcome.type': { $in: ['client', 'partner'] } } }, { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$commercialOutcome.recordedAt', timezone: 'UTC' } }, conversions: { $sum: 1 } } }],
         channels: [{ $group: { _id: { $ifNull: ['$platform', 'unknown'] }, value: { $sum: 1 } } }, { $sort: { value: -1 } }],
       } },
     ]);
@@ -176,11 +189,13 @@ export class LeadService {
     const newLeads = totals.newLeads || 0;
     const hotLeads = totals.hotLeads || 0;
     const registeredLeads = totals.registeredLeads || 0;
+    const convertedLeads = totals.convertedLeads || 0;
     const weeklyByDate = new Map((result?.weekly || []).map((item: any) => [item._id, item]));
+    const conversionsByDate = new Map((result?.weeklyConversions || []).map((item: any) => [item._id, item.conversions]));
     const weeklyLeads = Array.from({ length: 7 }, (_, index) => {
       const date = new Date(since); date.setUTCDate(since.getUTCDate() + index);
       const key = date.toISOString().slice(0, 10); const item: any = weeklyByDate.get(key);
-      return { name: new Intl.DateTimeFormat('es-CO', { weekday: 'short', timeZone: 'UTC' }).format(date), leads: item?.leads || 0, conversions: item?.conversions || 0, hot: item?.hot || 0 };
+      return { name: new Intl.DateTimeFormat('es-CO', { weekday: 'short', timeZone: 'UTC' }).format(date), leads: item?.leads || 0, conversions: conversionsByDate.get(key) || 0, hot: item?.hot || 0 };
     });
 
     return {
@@ -188,7 +203,8 @@ export class LeadService {
       newLeads,
       hotLeads,
       registeredLeads,
-      conversionRate: totalLeads > 0 ? (registeredLeads / totalLeads) * 100 : 0,
+      convertedLeads,
+      conversionRate: totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0,
       weeklyLeads,
       channelPerformance: (result?.channels || []).map((item: any) => ({ name: item._id, value: item.value })),
     };
@@ -212,7 +228,10 @@ export class LeadService {
       interestLevel?: string;
       minFollowers?: number;
       maxFollowers?: number;
+      minScore?: number;
+      maxScore?: number;
       searchTerm?: string;
+      sortBy?: 'score_desc' | 'score_asc' | 'recent';
     }
   ): Promise<ILead[]> {
     const query: any = { userId };
@@ -222,6 +241,8 @@ export class LeadService {
     if (filters.interestLevel) query.interestLevel = filters.interestLevel;
     if (filters.minFollowers) query.followers = { $gte: filters.minFollowers };
     if (filters.maxFollowers) query.followers = { ...query.followers, $lte: filters.maxFollowers };
+    if (filters.minScore !== undefined) query.score = { $gte: Math.max(0, Number(filters.minScore)) };
+    if (filters.maxScore !== undefined) query.score = { ...query.score, $lte: Math.min(100, Number(filters.maxScore)) };
     if (filters.searchTerm) {
       query.$or = [
         { username: { $regex: filters.searchTerm, $options: 'i' } },
@@ -230,7 +251,10 @@ export class LeadService {
       ];
     }
 
-    return await Lead.find(query).sort({ score: -1 });
+    const sort: Record<string, 1 | -1> = filters.sortBy === 'score_asc' ? { score: 1 }
+      : filters.sortBy === 'recent' ? { createdAt: -1 }
+        : { score: -1 };
+    return await Lead.find(query).sort(sort);
   }
 }
 

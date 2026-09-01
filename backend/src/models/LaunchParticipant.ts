@@ -27,6 +27,8 @@ const schema = new Schema({
   attendance: { type: stateSchema(participantStates.attendance, 'unknown'), default: () => ({ status: 'unknown' }) },
   outcome: { type: stateSchema(participantStates.outcome, 'pending'), default: () => ({ status: 'pending' }) },
   nextAction: { type: { type: String, maxlength: 100 }, dueAt: Date, status: { type: String, enum: ['pending', 'completed', 'cancelled'] } },
+  qualifiedAt: Date,
+  meetingReadiness: { ready: Boolean, reason: String, evaluatedAt: Date },
   lifecycleVersion: { type: Number, default: 1, min: 1 },
   lastActivityAt: { type: Date, default: Date.now },
   addedBy: { type: String, required: true, maxlength: 120 },

@@ -6,14 +6,14 @@ import { AutomationEngineService } from './AutomationEngineService';
 import AssistedProposal from '../models/AssistedProposal';
 import Task from '../models/Task';
 
-type Context = { userId: string; leadId: string; conversationId: string; sourceEventId: string; platform: 'youtube' | 'whatsapp' | 'instagram' | 'facebook' | 'tiktok'; source: string; text: string; isNewLead: boolean; commercialContextId?: any; evaluation: any };
+type Context = { userId: string; leadId: string; conversationId: string; sourceEventId: string; platform: 'youtube' | 'whatsapp' | 'instagram' | 'facebook' | 'tiktok'; source: string; text: string; isNewLead: boolean; commercialContextId?: any; launchId?: string; launchParticipantId?: string; meetingReadiness?: any; evaluation: any };
 
 export class QualificationApplicationService {
   static async apply(context: Context): Promise<{ previous: any; current: any; history: any; duplicate: boolean }> {
     const existingHistory: any = await QualificationHistory.findOne({ userId: context.userId, sourceEventId: context.sourceEventId }).lean();
     if (existingHistory?.processingState === 'completed') return { previous: existingHistory.previous, current: existingHistory.current, history: existingHistory, duplicate: true };
     let history: any;
-    try { history = await QualificationHistory.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, channel: context.platform, source: context.source, evaluatorVersion: QualificationPolicyService.version, processingState: 'processing' }); }
+    try { history = await QualificationHistory.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, channel: context.platform, source: context.source, evaluatorVersion: QualificationPolicyService.version, processingState: 'processing', launchId: context.launchId, launchParticipantId: context.launchParticipantId, meetingReadiness: context.meetingReadiness }); }
     catch (error: any) {
       if (error?.code !== 11000) throw error;
       const duplicate: any = await QualificationHistory.findOne({ userId: context.userId, sourceEventId: context.sourceEventId });
@@ -37,7 +37,9 @@ export class QualificationApplicationService {
           qualification: { ...(previous.qualification || {}), intent: context.evaluation.intent, normalizedIntent: context.evaluation.normalizedIntent, normalizedIntents: intents,
             matchedPhrases: (context.evaluation.matchedPhrases ?? []).slice(0, 20), meetingRequested: context.evaluation.signals?.meetingIntent === 'high', meetingIntent: context.evaluation.signals?.meetingIntent,
             conversationalScore: context.evaluation.score, conversationalSignals: context.evaluation.signals, declaredByProspect: true, lastEvaluatedAt: evaluatedAt, evaluatorVersion: QualificationPolicyService.version } };
-        const result: any = await Lead.findOneAndUpdate({ _id: context.leadId, userId: context.userId, updatedAt: previous.updatedAt }, { $set: update, $addToSet: { tags: { $each: context.evaluation.tags ?? [] } } }, { new: true });
+        const addToSet: any = { tags: { $each: context.evaluation.tags ?? [] } };
+        if (context.launchId) addToSet.launchIds = context.launchId;
+        const result: any = await Lead.findOneAndUpdate({ _id: context.leadId, userId: context.userId, updatedAt: previous.updatedAt }, { $set: update, $addToSet: addToSet }, { new: true });
         if (result) { current = result.toObject(); break; }
       }
       if (!current) throw new Error('Conflicto concurrente al aplicar calificación');
@@ -57,7 +59,7 @@ export class QualificationApplicationService {
           Task.updateMany({ userId: context.userId, 'metadata.proposalId': { $in: ids }, status: 'pending' }, { $set: { status: 'cancelled', 'metadata.cancelReason': 'lead_status_changed' } }),
         ]);
       }
-      await AutomationEngineService.emitLeadLifecycleEvents({ eventId: context.sourceEventId, userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, platform: context.platform, source: context.source, text: context.text, data: { score: current.score, previousScore: previous.score, scoreDelta: current.score - Number(previous.score || 0), interestLevel: current.interestLevel, previousInterestLevel: previous.interestLevel, status: current.status, previousStatus: previous.status, tags: current.tags, intent: current.qualification?.intent, normalizedIntent: current.normalizedIntent, normalizedIntents: current.normalizedIntents, meetingIntent: current.qualification?.meetingIntent, qualificationReasons: reasons, evaluatorVersion: QualificationPolicyService.version, commercialContextId: context.commercialContextId?.toString() } }, context.isNewLead ? null : previous, current);
+      await AutomationEngineService.emitLeadLifecycleEvents({ eventId: context.sourceEventId, userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, platform: context.platform, source: context.source, text: context.text, data: { score: current.score, previousScore: previous.score, scoreDelta: current.score - Number(previous.score || 0), interestLevel: current.interestLevel, previousInterestLevel: previous.interestLevel, status: current.status, previousStatus: previous.status, tags: current.tags, intent: current.qualification?.intent, normalizedIntent: current.normalizedIntent, normalizedIntents: current.normalizedIntents, meetingIntent: current.qualification?.meetingIntent, qualificationReasons: reasons, evaluatorVersion: QualificationPolicyService.version, commercialContextId: context.commercialContextId?.toString(), launchId: context.launchId, launchParticipantId: context.launchParticipantId, meetingReadiness: context.meetingReadiness } }, context.isNewLead ? null : previous, current);
       return { previous, current, history, duplicate: false };
     } catch (error) { await QualificationHistory.deleteOne({ _id: history._id, processingState: 'processing' }); throw error; }
   }

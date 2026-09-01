@@ -92,7 +92,7 @@ export interface IMessage {
   timestamp: Date;
   isRead?: boolean;
   direction?: 'inbound' | 'outbound';
-  status?: 'received' | 'proposed' | 'pending' | 'sent' | 'failed';
+  status?: 'received' | 'proposed' | 'pending' | 'sent' | 'simulated' | 'failed';
   externalMessageId?: string;
   relatedMessageId?: string;
   processingError?: string;

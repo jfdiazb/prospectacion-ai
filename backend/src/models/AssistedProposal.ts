@@ -39,7 +39,7 @@ const schema = new Schema({
   expiresAt: Date,
   invalidatedAt: Date,
   invalidationReason: String,
-  status: { type: String, enum: ['proposed', 'sending', 'sent', 'failed', 'cancelled'], default: 'proposed' },
+  status: { type: String, enum: ['proposed', 'sending', 'sent', 'simulated', 'failed', 'cancelled'], default: 'proposed' },
   editedAt: Date, approvedAt: Date, sentAt: Date, failedAt: Date,
   deliveryStatus: String, errorMessage: String,
   outboundMessageId: { type: Schema.Types.ObjectId, ref: 'OutboundMessage' },

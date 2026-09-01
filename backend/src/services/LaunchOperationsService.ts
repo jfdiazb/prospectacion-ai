@@ -260,6 +260,12 @@ export class LaunchOperationsService {
         $group: {
           _id: null,
           selected: { $sum: 1 },
+          conversations: { $sum: { $cond: [{ $ne: ['$conversationId', null] }, 1, 0] } },
+          qualified: { $sum: { $cond: [{ $ne: ['$qualifiedAt', null] }, 1, 0] } },
+          meetingReady: { $sum: { $cond: [{ $eq: ['$meetingReadiness.ready', true] }, 1, 0] } },
+          meetings: { $sum: { $cond: [{ $ne: ['$meetingId', null] }, 1, 0] } },
+          converted: { $sum: { $cond: [{ $eq: ['$outcome.status', 'converted'] }, 1, 0] } },
+          closedLost: { $sum: { $cond: [{ $eq: ['$outcome.status', 'closed_lost'] }, 1, 0] } },
           registered: {
             $sum: {
               $cond: [
@@ -323,13 +329,19 @@ export class LaunchOperationsService {
     return row
       ? {
           selected: row.selected,
+          conversations: row.conversations,
+          qualified: row.qualified,
+          meetingReady: row.meetingReady,
+          meetings: row.meetings,
+          converted: row.converted,
+          closedLost: row.closedLost,
           registered: row.registered,
           confirmed: row.confirmed,
           attended: row.attended,
           notAttended: row.notAttended,
           unknown: row.unknown,
         }
-      : { selected: 0, registered: 0, confirmed: 0, attended: 0, notAttended: 0, unknown: 0 };
+      : { selected: 0, conversations: 0, qualified: 0, meetingReady: 0, meetings: 0, converted: 0, closedLost: 0, registered: 0, confirmed: 0, attended: 0, notAttended: 0, unknown: 0 };
   }
   static async importBatch(userId: string, launchId: string, items: ImportItem[], actor: string) {
     if (!Array.isArray(items) || !items.length || items.length > 100)

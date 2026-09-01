@@ -7,6 +7,12 @@ export interface YouTubeStatus {
 
 export interface OperationalDiagnostics {
   checkedAt: string;
+  integrations: Array<{
+    key: 'whatsapp' | 'instagram' | 'facebook' | 'youtube' | 'tiktok' | 'calendly';
+    label: string; connected: boolean; mode: 'live' | 'mock' | 'disabled';
+    inbound: 'live' | 'disabled'; outbound: 'live' | 'mock' | 'disabled';
+    automatic: boolean; lastActivityAt?: string;
+  }>;
   youtube: {
     connected: boolean; channelId?: string; channelTitle?: string; channelHandle?: string; authorizedChannelId?: string; authorizedChannelTitle?: string; lastPolledAt?: string; lastRepliesPolledAt?: string;
     polling?: {

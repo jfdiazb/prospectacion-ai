@@ -92,7 +92,7 @@ Las credenciales de YouTube, Gemini y Zoom no son necesarias para este primer de
 El Blueprint declara las credenciales como valores externos y mantiene `WHATSAPP_MESSAGING_MODE=mock` y `WHATSAPP_AUTO_REPLY_ENABLED=false` hasta terminar esta secuencia:
 
 1. En una aplicación oficial de Meta con WhatsApp, obtiene el token de sistema, Phone Number ID y App Secret. No copies esos valores al repositorio ni a archivos versionados.
-2. En Render configura `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET` y un `VERIFY_TOKEN` aleatorio exclusivo.
+2. En Render configura `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_WABA_ID`, `WHATSAPP_APP_SECRET` y un `VERIFY_TOKEN` aleatorio exclusivo. El WABA ID se conserva como referencia operativa y no sustituye al Phone Number ID en Graph API.
 3. En Meta registra como callback `https://alma-backend-9eo1.onrender.com/api/v1/whatsapp/webhook`, usa el mismo `VERIFY_TOKEN` y suscribe los eventos de mensajes.
 4. Conserva primero `WHATSAPP_MESSAGING_MODE=mock`, cambia temporalmente `WHATSAPP_AUTO_REPLY_ENABLED=true` y verifica con un payload firmado controlado que el CRM registra una entrega `simulated`.
 5. Cambia `WHATSAPP_MESSAGING_MODE=live`, reinicia y envía un único mensaje desde un número autorizado. Confirma lead, conversación, `InboundEvent`, `OutboundMessage` y respuesta recibida.

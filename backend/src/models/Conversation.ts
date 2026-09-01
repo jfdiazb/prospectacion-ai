@@ -29,7 +29,7 @@ const conversationSchema = new Schema(
         timestamp: { type: Date, default: Date.now },
         isRead: { type: Boolean, default: false },
         direction: { type: String, enum: ['inbound', 'outbound'] },
-        status: { type: String, enum: ['received', 'proposed', 'pending', 'sent', 'failed'] },
+        status: { type: String, enum: ['received', 'proposed', 'pending', 'sent', 'simulated', 'failed'] },
         externalMessageId: String,
         relatedMessageId: String,
         processingError: String,
@@ -40,6 +40,8 @@ const conversationSchema = new Schema(
       enum: ['active', 'paused', 'closed'],
       default: 'active',
     },
+    launchId: { type: Schema.Types.ObjectId, ref: 'Launch' },
+    launchParticipantId: { type: Schema.Types.ObjectId, ref: 'LaunchParticipant' },
     controlMode: {
       type: String,
       enum: ['automated', 'handoff_requested', 'human_controlled'],
@@ -67,6 +69,7 @@ const conversationSchema = new Schema(
  * Indices
  */
 conversationSchema.index({ userId: 1, leadId: 1 });
+conversationSchema.index({ userId: 1, launchId: 1, launchParticipantId: 1 });
 conversationSchema.index({ userId: 1, status: 1, lastMessage: -1 });
 conversationSchema.index({ createdAt: -1 });
 conversationSchema.index({ status: 1 });

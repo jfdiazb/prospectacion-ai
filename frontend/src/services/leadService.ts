@@ -46,6 +46,11 @@ export const leadService = {
     return data.data!;
   },
 
+  async recordCommercialOutcome(id: string, outcome: 'follow_up' | 'not_interested' | 'client' | 'partner', sourceMeetingId?: string): Promise<ILead> {
+    const { data } = await apiClient.put<IApiResponse<ILead>>(`/leads/${id}/commercial-outcome`, { outcome, sourceMeetingId });
+    return data.data!;
+  },
+
   async advancedSearch(filters: any) {
     const { data } = await apiClient.post<IApiResponse<ILead[]>>('/leads/search', filters);
     return data.data!;

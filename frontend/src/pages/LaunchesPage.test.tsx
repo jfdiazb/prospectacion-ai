@@ -131,6 +131,8 @@ describe('LaunchesPage L5', () => {
     (launchService.create as any).mockResolvedValue(launch);
     (launchService.operation as any).mockResolvedValue({});
     (launchService.attendance as any).mockResolvedValue({});
+    (launchService.saveSegment as any).mockResolvedValue({ version: 3 });
+    (launchService.previewSegment as any).mockResolvedValue({ version: 3, items: [] });
   });
   it('lists, filters and opens real launch detail with metrics and participants', async () => {
     render(
@@ -188,5 +190,18 @@ describe('LaunchesPage L5', () => {
     });
     await userEvent.click(screen.getByRole('button', { name: /Avanzar a prelaunch/ }));
     expect(await screen.findByText('Conflicto concurrente')).toBeInTheDocument();
+  });
+  it('adds and removes criteria and always releases the segmentation loading state', async () => {
+    render(<MemoryRouter><LaunchesPage /></MemoryRouter>);
+    await userEvent.click(await screen.findByText('Evento ALMA'));
+    await userEvent.click(screen.getByRole('button', { name: 'Segmentación' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Añadir criterio' }));
+    expect(screen.getAllByLabelText('Campo')).toHaveLength(2);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Quitar' })[1]);
+    expect(screen.getAllByLabelText('Campo')).toHaveLength(1);
+    (launchService.saveSegment as any).mockRejectedValueOnce({ response: { data: { message: 'Criterio inválido' } } });
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar y previsualizar' }));
+    expect(await screen.findByText('Criterio inválido')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar y previsualizar' })).toBeEnabled();
   });
 });

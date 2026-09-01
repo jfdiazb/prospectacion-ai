@@ -4,15 +4,17 @@ export type MeetingReadiness = {
   ready: boolean;
   reason: 'explicit_request' | 'qualified_discovery' | 'needs_discovery';
   evidence: string[];
+  launchId?: string;
+  launchParticipantId?: string;
 };
 
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
 
 export class MeetingReadinessService {
-  static evaluate(leadTexts: string[], qualification: any): MeetingReadiness {
+  static evaluate(leadTexts: string[], qualification: any, attribution?: { launchId: string; participantId: string }): MeetingReadiness {
     const current = leadTexts.at(-1) ?? '';
     if (MeetingLifecycleService.hasSufficientIntent(current)) {
-      return { ready: true, reason: 'explicit_request', evidence: ['explicit_meeting_intent'] };
+      return { ready: true, reason: 'explicit_request', evidence: ['explicit_meeting_intent'], launchId: attribution?.launchId, launchParticipantId: attribution?.participantId };
     }
 
     const conversation = normalize(leadTexts.join(' '));
@@ -29,6 +31,6 @@ export class MeetingReadinessService {
       && evidence.has('prospect_context')
       && evidence.has('next_step_openness')
       && evidence.has('discovery_conversation');
-    return { ready: qualified, reason: qualified ? 'qualified_discovery' : 'needs_discovery', evidence: [...evidence] };
+    return { ready: qualified, reason: qualified ? 'qualified_discovery' : 'needs_discovery', evidence: [...evidence], launchId: attribution?.launchId, launchParticipantId: attribution?.participantId };
   }
 }

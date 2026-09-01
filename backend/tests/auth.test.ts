@@ -308,7 +308,7 @@ describe('Auth integration tests', () => {
     const edited = await axios.patch(`${baseURL}/api/v1/crm/conversations/${conversation._id}/proposals/${proposal._id}`, { text: 'Respuesta Facebook revisada.' }, auth);
     expect(edited.data.data.text).toBe('Respuesta Facebook revisada.');
     const sent = await axios.post(`${baseURL}/api/v1/crm/conversations/${conversation._id}/proposals/${proposal._id}/send`, {}, auth);
-    expect(sent.data.data.status).toBe('sent');
+    expect(sent.data.data.status).toBe('simulated');
     expect(await Lead.findById(lead._id)).toMatchObject({ followUp: { lastDecision: 'scheduled', lastReason: 'assisted_message_sent' } });
     expect(await OutboundMessage.findOne({ sourceEventId: `proposal:${proposal._id}` })).toMatchObject({ channel: 'facebook', messageType: 'private_reply', recipientId: rawEventId });
     const duplicate = await axios.post(`${baseURL}/api/v1/crm/conversations/${conversation._id}/proposals/${proposal._id}/send`, {}, { ...auth, validateStatus: () => true });
@@ -515,7 +515,7 @@ describe('Auth integration tests', () => {
     const edited = await axios.patch(`${baseURL}/api/v1/crm/conversations/${conversation._id}/proposals/${proposal._id}`, { text: 'Respuesta revisada por una persona.' }, auth);
     expect(edited.data.data).toMatchObject({ text: 'Respuesta revisada por una persona.', status: 'proposed' });
     const approved = await axios.post(`${baseURL}/api/v1/crm/conversations/${conversation._id}/proposals/${proposal._id}/send`, {}, auth);
-    expect(approved.data.data.status).toBe('sent');
+    expect(approved.data.data.status).toBe('simulated');
     const duplicateApproval = await axios.post(`${baseURL}/api/v1/crm/conversations/${conversation._id}/proposals/${proposal._id}/send`, {}, { ...auth, validateStatus: () => true });
     expect(duplicateApproval.status).toBe(409);
     const taken = await axios.patch(`${baseURL}/api/v1/crm/conversations/${conversation._id}/control`, { action: 'take' }, auth);

@@ -52,6 +52,12 @@ const leadSchema = new Schema(
       min: 0,
       max: 100,
     },
+    commercialOutcome: {
+      type: { type: String, enum: ['follow_up', 'not_interested', 'client', 'partner'] },
+      recordedAt: Date,
+      recordedBy: String,
+      sourceMeetingId: { type: Schema.Types.ObjectId, ref: 'Meeting' },
+    },
     tags: [String],
     lastContact: Date,
     nextFollowUp: Date,
@@ -86,6 +92,7 @@ const leadSchema = new Schema(
     commercialContextId: { type: Schema.Types.ObjectId, ref: 'CommercialContext' },
     normalizedIntent: String,
     normalizedIntents: { type: [String], default: [] },
+    launchIds: [{ type: Schema.Types.ObjectId, ref: 'Launch' }],
     origin: {
       platform: String, source: String, externalContentId: String,
       initialContent: String, occurredAt: Date, publicUrl: String,

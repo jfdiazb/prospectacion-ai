@@ -53,12 +53,24 @@ describe('Phase 8 MVP consolidation', () => {
 
   test('returns only real persisted Dashboard metrics', async () => {
     await lead(ownerA, 'new-youtube', { createdAt: new Date(), interestLevel: 'hot' });
-    await lead(ownerA, 'registered-whatsapp', { platform: 'whatsapp', status: 'registered', createdAt: new Date() });
+    const converted: any = await lead(ownerA, 'registered-whatsapp', { platform: 'whatsapp', status: 'registered', createdAt: new Date() });
+    await LeadService.recordCommercialOutcome(ownerA.toString(), converted._id.toString(), 'client');
+    await LeadService.recordCommercialOutcome(ownerA.toString(), converted._id.toString(), 'client');
     await lead(ownerB, 'foreign', { status: 'registered' });
     const stats: any = await LeadService.getLeadStats(ownerA.toString());
-    expect(stats).toMatchObject({ totalLeads: 2, newLeads: 1, hotLeads: 1, registeredLeads: 1 });
+    expect(stats).toMatchObject({ totalLeads: 2, newLeads: 1, hotLeads: 1, registeredLeads: 1, convertedLeads: 1 });
     expect(stats.weeklyLeads.reduce((sum: number, item: any) => sum + item.leads, 0)).toBe(2);
+    expect(stats.weeklyLeads.reduce((sum: number, item: any) => sum + item.conversions, 0)).toBe(1);
     expect(stats.channelPerformance).toEqual(expect.arrayContaining([{ name: 'youtube', value: 1 }, { name: 'whatsapp', value: 1 }]));
+  });
+
+  test('filters and orders prospects by channel, interest, status and score', async () => {
+    await lead(ownerA, 'cold', { score: 20 });
+    await lead(ownerA, 'match-low', { platform: 'whatsapp', status: 'interested', interestLevel: 'hot', score: 75 });
+    await lead(ownerA, 'match-high', { platform: 'whatsapp', status: 'interested', interestLevel: 'hot', score: 92 });
+    await lead(ownerB, 'foreign', { platform: 'whatsapp', status: 'interested', interestLevel: 'hot', score: 99 });
+    const result: any[] = await LeadService.advancedSearch(ownerA.toString(), { platform: 'whatsapp', status: 'interested', interestLevel: 'hot', minScore: 70, maxScore: 95, sortBy: 'score_desc' });
+    expect(result.map(item => item.username)).toEqual(['match-high', 'match-low']);
   });
 
   test('completes Hunter opportunity to CRM lead without crossing owners', async () => {

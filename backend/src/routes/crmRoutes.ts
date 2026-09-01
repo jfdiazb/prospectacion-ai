@@ -20,22 +20,10 @@ import { MultichannelIdentityService } from '../services/MultichannelIdentitySer
 import DuplicateCandidate from '../models/DuplicateCandidate';
 import IdentityAudit from '../models/IdentityAudit';
 import { LaunchActionService } from '../services/LaunchActionService';
+import { ProposalRoutingError, ProposalRoutingService } from '../services/ProposalRoutingService';
 
 const router = Router();
 router.use(authMiddleware, apiLimiter);
-
-const recipientFromProposal = (proposal: any): MessagingRecipient | null => {
-  const type = proposal.recipient?.type;
-  const externalId = proposal.recipient?.externalId;
-  if (type === 'whatsapp_user' && externalId) return { type, phoneNumber: externalId };
-  if (type === 'instagram_user' && externalId) return { type, instagramScopedId: externalId };
-  if (type === 'instagram_comment' && externalId) return { type, commentId: externalId };
-  if (type === 'facebook_user' && externalId) return { type, pageScopedId: externalId };
-  if (type === 'facebook_comment' && externalId) return { type, commentId: externalId };
-  if ((!proposal.platform || proposal.platform === 'whatsapp') && proposal.leadId?.phone)
-    return { type: 'whatsapp_user', phoneNumber: proposal.leadId.phone };
-  return null;
-};
 
 router.get('/conversations', async (req: AuthRequest, res, next) => {
   try {
@@ -259,24 +247,31 @@ router.post(
         return res
           .status(409)
           .json({ success: false, message: 'La propuesta ya fue enviada o está siendo procesada' });
-      const platform = proposal.platform || 'whatsapp';
-      const recipient = recipientFromProposal(proposal);
-      if (!recipient) {
+      const conversation: any = await Conversation.findOne({ _id: proposal.conversationId, userId: req.userId }).lean();
+      let route;
+      try {
+        route = ProposalRoutingService.resolve(proposal, conversation);
+      } catch (error) {
+        const routingError = error instanceof ProposalRoutingError
+          ? error
+          : new ProposalRoutingError('No fue posible validar el canal de la propuesta', 'PROPOSAL_ROUTING_ERROR');
         await AssistedProposal.updateOne(
           { _id: proposal._id },
           {
             status: 'failed',
             failedAt: new Date(),
-            errorMessage: 'Destinatario oficial no disponible',
+            errorMessage: routingError.message,
           }
         );
         return res
-          .status(400)
+          .status(409)
           .json({
             success: false,
-            message: 'La propuesta no conserva un destinatario oficial válido',
+            message: routingError.message,
+            code: routingError.code,
           });
       }
+      const { channel: platform, recipient } = route;
       const deliveryStatus = await MessagingService.send({
         userId: req.userId as string,
         leadId: proposal.leadId._id.toString(),
@@ -302,9 +297,14 @@ router.post(
             message: `${platform} rechazó el mensaje; la propuesta permanece disponible para revisión`,
           });
       }
+      const proposalStatus = ProposalRoutingService.proposalStatus(deliveryStatus);
       await AssistedProposal.updateOne(
         { _id: proposal._id },
-        { status: 'sent', sentAt: new Date(), deliveryStatus }
+        {
+          status: proposalStatus,
+          deliveryStatus,
+          ...(proposalStatus === 'sent' ? { sentAt: new Date() } : {}),
+        }
       );
       const followUpScheduledAt = new Date();
       await Lead.updateOne(
@@ -327,7 +327,7 @@ router.post(
           text: proposal.text,
           platform,
           direction: 'outbound',
-          status: deliveryStatus === 'sent' ? 'sent' : 'pending',
+          status: deliveryStatus === 'sent' ? 'sent' : 'simulated',
           relatedMessageId: proposal.sourceEventId,
         }
       );

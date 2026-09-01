@@ -3,7 +3,7 @@ import { AppLayout } from '@components/AppLayout';
 import { Button, Card } from '@components/shared';
 import { useAuth } from '@context/AuthContext';
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CalendarCheck, CheckCircle2, Clock, RefreshCw, Youtube } from 'lucide-react';
+import { AlertTriangle, CalendarCheck, CheckCircle2, Clock, Radio, RefreshCw, Youtube } from 'lucide-react';
 import { youtubeService, type OperationalDiagnostics, type YouTubeStatus } from '@services/youtubeService';
 import { useNavigate } from 'react-router-dom';
 import { commercialContextService, type CommercialContextSummary } from '@services/commercialContextService';
@@ -141,6 +141,31 @@ export const SettingsPage = () => {
         )}
 
         <Card className="lg:col-span-2" hover={false}>
+          <div className="space-y-5">
+            <div>
+              <p className="text-sm uppercase tracking-[0.3em] text-dark-500">Canales e integraciones</p>
+              <h2 className="text-2xl font-semibold text-white">Estado real de proveedores</h2>
+              <p className="mt-1 text-dark-400">Modos efectivos y actividad registrada, sin exponer credenciales.</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {diagnostics?.integrations.map(integration => <div key={integration.key} className="rounded-3xl border border-dark-700 bg-dark-900 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3"><Radio className={integration.connected ? 'text-emerald-400' : 'text-dark-500'} size={20} /><p className="font-medium text-white">{integration.label}</p></div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${integration.mode === 'live' ? 'bg-emerald-500/15 text-emerald-300' : integration.mode === 'mock' ? 'bg-amber-500/15 text-amber-300' : 'bg-dark-700 text-dark-300'}`}>{integration.mode === 'live' ? 'LIVE' : integration.mode}</span>
+                </div>
+                <p className="mt-3 text-sm text-dark-300">{integration.connected ? 'Conectado' : 'Sin conexión LIVE'}</p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-dark-400">
+                  <p>Inbound: <span className="text-white">{integration.inbound}</span></p>
+                  <p>Outbound: <span className="text-white">{integration.outbound}</span></p>
+                </div>
+                <p className="mt-3 text-xs text-dark-500">Última actividad: {formatDiagnosticDate(integration.lastActivityAt)}</p>
+              </div>)}
+              {!diagnosticsLoading && !diagnostics?.integrations?.length && <p className="text-dark-400">No fue posible obtener el estado de integraciones.</p>}
+            </div>
+          </div>
+        </Card>
+
+        <Card className="lg:col-span-2" hover={false}>
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div className="flex items-start gap-4">
               <div className="rounded-2xl bg-red-500/15 p-3 text-red-400"><Youtube size={28} /></div>
@@ -193,9 +218,9 @@ export const SettingsPage = () => {
                   <p className="mt-1 text-sm text-dark-400">Último sondeo: {formatDiagnosticDate(diagnostics.youtube.lastPolledAt)}</p>
                 </div>
                 <div className="rounded-3xl bg-dark-900 p-5">
-                  <div className="flex items-center gap-3 text-primary-400"><RefreshCw size={21} /><span className="font-medium">Respuestas</span></div>
-                  <p className="mt-3 text-2xl font-semibold text-white">{diagnostics.youtube.replies?.replies ?? 0} detectadas</p>
-                  <p className="mt-1 text-sm text-dark-400">{diagnostics.youtube.replies?.activeThreads ?? 0} hilos activos · {diagnostics.youtube.replies?.processed ?? 0} nuevas</p>
+                  <div className="flex items-center gap-3 text-primary-400"><RefreshCw size={21} /><span className="font-medium">Último ciclo de respuestas</span></div>
+                  <p className="mt-3 text-2xl font-semibold text-white">{diagnostics.youtube.replies?.replies ?? 0} encontradas</p>
+                  <p className="mt-1 text-sm text-dark-400">{diagnostics.youtube.replies?.activeThreads ?? 0} hilos activos · {diagnostics.youtube.replies?.processed ?? 0} respuestas nuevas procesadas</p>
                 </div>
                 <div className="rounded-3xl bg-dark-900 p-5">
                   <div className="flex items-center gap-3 text-emerald-400"><CalendarCheck size={21} /><span className="font-medium">Agenda</span></div>

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useMemo, useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@components/AppLayout';
 import { Card, Button, Badge } from '@components/shared';
 import { Modal } from '@components/advanced';
@@ -12,6 +12,7 @@ import type { ILead } from '@types';
  * Página de Leads (CRM)
  */
 export const LeadsPage = () => {
+  const navigate = useNavigate();
   const [leads, setLeads] = useState<ILead[]>([]);
   const [page] = useState(1);
   const [selectedLead, setSelectedLead] = useState<ILead | null>(null);
@@ -24,6 +25,7 @@ export const LeadsPage = () => {
   const [feedback, setFeedback] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const searchTerm = searchParams.get('buscar')?.trim() ?? '';
+  const [filters, setFilters] = useState({ platform: '', interestLevel: '', status: '', minScore: '', maxScore: '', sortBy: 'score_desc' });
 
   const visibleLeads = useMemo(() => {
     if (!searchTerm) return leads;
@@ -73,6 +75,17 @@ export const LeadsPage = () => {
     setGeneratedMessage('');
   };
 
+  const applyFilters = async () => {
+    try {
+      setLeads(await leadService.advancedSearch({
+        platform: filters.platform || undefined, interestLevel: filters.interestLevel || undefined,
+        status: filters.status || undefined, searchTerm: searchTerm || undefined,
+        minScore: filters.minScore === '' ? undefined : Number(filters.minScore),
+        maxScore: filters.maxScore === '' ? undefined : Number(filters.maxScore), sortBy: filters.sortBy,
+      }));
+    } catch { setFeedback('No fue posible aplicar los filtros.'); }
+  };
+
   const createLead = async () => {
     if (!form.username.trim()) { setFeedback('El identificador del prospecto es obligatorio.'); return; }
     try { const lead = await leadService.createLead({ ...form, platform: 'manual', status: 'new', interestLevel: 'cold', score: 0, tags: ['manual'] }); setLeads(current => [lead, ...current]); setCreateOpen(false); setForm({ username: '', fullName: '', bio: '' }); setFeedback('Prospecto agregado correctamente.'); }
@@ -90,6 +103,17 @@ export const LeadsPage = () => {
           <Button variant="primary" onClick={() => setCreateOpen(true)}>+ Agregar Lead</Button>
         </div>
         {feedback && <p className="rounded-2xl border border-primary-500/20 bg-primary-500/10 p-4 text-sm text-primary-200">{feedback}</p>}
+        <Card hover={false}>
+          <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-7">
+            <FilterSelect label="Canal" value={filters.platform} options={['', 'youtube', 'whatsapp', 'instagram', 'facebook', 'tiktok', 'manual']} onChange={platform => setFilters({ ...filters, platform })} />
+            <FilterSelect label="Interés" value={filters.interestLevel} options={['', 'cold', 'warm', 'hot']} onChange={interestLevel => setFilters({ ...filters, interestLevel })} />
+            <FilterSelect label="Estado" value={filters.status} options={['', 'new', 'contacted', 'conversation_started', 'interested', 'presentation_sent', 'follow_up', 'hot_prospect', 'registered', 'rejected']} onChange={status => setFilters({ ...filters, status })} />
+            <FilterNumber label="Score mínimo" value={filters.minScore} onChange={minScore => setFilters({ ...filters, minScore })} />
+            <FilterNumber label="Score máximo" value={filters.maxScore} onChange={maxScore => setFilters({ ...filters, maxScore })} />
+            <FilterSelect label="Orden" value={filters.sortBy} options={['score_desc', 'score_asc', 'recent']} labels={{ score_desc: 'Score mayor', score_asc: 'Score menor', recent: 'Más recientes' }} onChange={sortBy => setFilters({ ...filters, sortBy })} />
+            <Button className="self-end" variant="secondary" onClick={() => void applyFilters()}>Aplicar filtros</Button>
+          </div>
+        </Card>
         {searchTerm && (
           <div className="flex flex-col gap-3 rounded-2xl border border-primary-500/20 bg-primary-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-primary-100">Resultados para <span className="font-semibold">“{searchTerm}”</span>: {visibleLeads.length}</p>
@@ -162,8 +186,12 @@ export const LeadsPage = () => {
           </div>
         </div>
       </Modal>
-      <Modal isOpen={detailsOpen} onClose={() => setDetailsOpen(false)} title="Detalles del prospecto" size="lg"><div className="space-y-4 text-dark-200"><p><span className="text-dark-400">Nombre:</span> {selectedLead?.fullName || selectedLead?.username}</p><p><span className="text-dark-400">Canal:</span> {selectedLead?.platform}</p><p><span className="text-dark-400">Score:</span> {selectedLead?.score}</p><p><span className="text-dark-400">Estado:</span> {selectedLead?.status}</p><p><span className="text-dark-400">Descripción:</span> {selectedLead?.bio || 'Sin descripción'}</p><div className="flex justify-end"><Button variant="secondary" onClick={() => setDetailsOpen(false)}>Cerrar</Button></div></div></Modal>
+      <Modal isOpen={detailsOpen} onClose={() => setDetailsOpen(false)} title="Detalles del prospecto" size="lg"><div className="space-y-4 text-dark-200"><p><span className="text-dark-400">Nombre:</span> {selectedLead?.fullName || selectedLead?.username}</p><p><span className="text-dark-400">Canal:</span> {selectedLead?.platform}</p><p><span className="text-dark-400">Score:</span> {selectedLead?.score}</p><p><span className="text-dark-400">Estado:</span> {leadStatusLabel(selectedLead?.status)}</p><div><p className="text-dark-400">Descripción completa:</p><p className="mt-1 whitespace-pre-wrap break-words">{selectedLead?.bio || 'Sin descripción'}</p></div><div className="flex justify-end gap-3"><Button variant="secondary" onClick={() => setDetailsOpen(false)}>Cerrar</Button><Button onClick={() => navigate('/crm')}>Abrir en CRM</Button></div></div></Modal>
       <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title="Agregar prospecto" size="lg"><div className="space-y-4"><input value={form.username} onChange={event => setForm({ ...form, username: event.target.value })} placeholder="Identificador o usuario" className="w-full rounded-2xl border border-dark-600 bg-dark-900 px-4 py-3 text-white" /><input value={form.fullName} onChange={event => setForm({ ...form, fullName: event.target.value })} placeholder="Nombre completo" className="w-full rounded-2xl border border-dark-600 bg-dark-900 px-4 py-3 text-white" /><textarea value={form.bio} onChange={event => setForm({ ...form, bio: event.target.value })} placeholder="Notas o descripción" className="min-h-28 w-full rounded-2xl border border-dark-600 bg-dark-900 p-4 text-white" /><div className="flex justify-end gap-3"><Button variant="secondary" onClick={() => setCreateOpen(false)}>Cancelar</Button><Button onClick={() => void createLead()}>Guardar prospecto</Button></div></div></Modal>
     </AppLayout>
   );
 };
+
+const leadStatusLabel = (status?: string) => ({ new: 'Nuevo', contacted: 'Contactado', qualified: 'Calificado', registered: 'Registrado', rejected: 'No interesado' }[status || ''] || status || 'Sin estado');
+const FilterSelect = ({ label, value, options, labels = {}, onChange }: { label: string; value: string; options: string[]; labels?: Record<string, string>; onChange: (value: string) => void }) => <label className="text-xs text-dark-400">{label}<select value={value} onChange={event => onChange(event.target.value)} className="mt-1 w-full rounded-xl border border-dark-700 bg-dark-900 px-3 py-2 text-sm text-white">{options.map(option => <option key={option} value={option}>{labels[option] || option || 'Todos'}</option>)}</select></label>;
+const FilterNumber = ({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) => <label className="text-xs text-dark-400">{label}<input type="number" min="0" max="100" value={value} onChange={event => onChange(event.target.value)} className="mt-1 w-full rounded-xl border border-dark-700 bg-dark-900 px-3 py-2 text-sm text-white" /></label>;

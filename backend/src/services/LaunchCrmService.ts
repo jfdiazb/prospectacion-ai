@@ -80,8 +80,8 @@ export class LaunchCrmService {
           'fullName username platform currentChannel score interestLevel normalizedIntent qualification status tags'
         )
         .lean(),
-      Meeting.find({ userId, $or: [{ _id: { $in: meetingIds } }, { leadId: { $in: leadIds } }] })
-        .select('leadId status scheduledFor scheduledAt provider topic')
+      Meeting.find({ userId, $or: [{ _id: { $in: meetingIds } }, { launchId, leadId: { $in: leadIds } }] })
+        .select('leadId launchId launchParticipantId status scheduledFor scheduledAt provider topic')
         .sort({ createdAt: -1 })
         .lean(),
       LaunchAction.find({ userId, launchId, status: { $in: ['pending', 'processing'] } })
@@ -102,7 +102,7 @@ export class LaunchCrmService {
       lead: leads.find(lead => lead._id.toString() === item.leadId.toString()),
       meeting:
         meetings.find(meeting => meeting._id.toString() === item.meetingId?.toString()) ||
-        meetings.find(meeting => meeting.leadId?.toString() === item.leadId.toString()),
+        meetings.find(meeting => meeting.launchId?.toString() === launchId && meeting.launchParticipantId?.toString() === item._id.toString()),
       pendingAction: actions.find(
         action => action.participantId.toString() === item._id.toString()
       ),

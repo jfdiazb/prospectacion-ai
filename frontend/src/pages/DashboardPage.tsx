@@ -76,13 +76,13 @@ export const DashboardPage = () => {
     () => [
       { name: 'Nuevos', value: stats?.newLeads ?? 0, color: chartColors.secondary },
       { name: 'Calientes', value: stats?.hotLeads ?? 0, color: chartColors.accent },
-      { name: 'Convertidos', value: stats?.registeredLeads ?? 0, color: chartColors.green },
+      { name: 'Convertidos', value: stats?.convertedLeads ?? 0, color: chartColors.green },
     ],
     [stats],
   );
 
   const conversionRate = stats
-    ? Math.min(100, Math.round((stats.registeredLeads / Math.max(stats.totalLeads, 1)) * 100))
+    ? Math.min(100, Math.round((stats.convertedLeads / Math.max(stats.totalLeads, 1)) * 100))
     : 0;
 
   return (
@@ -133,8 +133,8 @@ export const DashboardPage = () => {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium uppercase tracking-[0.24em] text-amber-300">Conversiones</p>
-                  <h3 className="mt-3 text-4xl font-semibold text-white">{stats.registeredLeads}</h3>
-                  <p className="mt-2 text-sm text-dark-300">Tasa de conversión estimada {conversionRate}%.</p>
+                  <h3 className="mt-3 text-4xl font-semibold text-white">{stats.convertedLeads}</h3>
+                  <p className="mt-2 text-sm text-dark-300">Clientes o socios confirmados · tasa {conversionRate}%.</p>
                 </div>
                 <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white/10 text-amber-200 shadow-lg shadow-amber-500/10">
                   <Target className="h-6 w-6" />

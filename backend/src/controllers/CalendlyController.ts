@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import Meeting from '../models/Meeting';
 import Activity from '../models/Activity';
 import Task from '../models/Task';
+import { LaunchAttributionService } from '../services/LaunchAttributionService';
 
 type CalendlyPayload = {
   event?: string;
@@ -42,7 +43,9 @@ export class CalendlyController {
     if (body.event === 'invitee.canceled') {
       const changed = meeting.status !== 'cancelled';
       meeting.status = 'cancelled';
+      meeting.set('outcome', { type: 'cancelled', actor: 'prospect', reason: 'calendly_cancelled', recordedAt: new Date(), recordedBy: 'calendly_webhook' });
       await meeting.save();
+      await LaunchAttributionService.syncMeetingOutcome(meeting);
       await Task.updateMany({ 'metadata.meetingId': meeting._id.toString(), status: 'pending' }, { $set: { status: 'cancelled' } });
       if (changed) await Activity.create({ userId: meeting.userId, leadId: meeting.leadId, conversationId: meeting.conversationId,
         type: 'meeting_requested', description: 'El prospecto canceló la reserva en Calendly', metadata: { meetingId: meeting._id } });
