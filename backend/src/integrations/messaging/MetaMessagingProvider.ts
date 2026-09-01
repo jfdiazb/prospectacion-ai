@@ -18,7 +18,7 @@ export class MetaMessagingProvider implements MessagingProvider {
     const metaRecipient = request.recipient;
     const endpoint = request.recipient.type === 'facebook_comment'
       ? `https://graph.facebook.com/${version}/${encodeURIComponent(request.recipient.commentId)}/private_replies`
-      : `https://graph.facebook.com/${version}/${encodeURIComponent(accountId!)}/messages`;
+      : `${isFacebook ? 'https://graph.facebook.com' : 'https://graph.instagram.com'}/${version}/${encodeURIComponent(accountId!)}/messages`;
     let destination: { comment_id: string } | { id: string } | undefined;
     if (metaRecipient.type === 'comment' || metaRecipient.type === 'instagram_comment') destination = { comment_id: metaRecipient.commentId };
     else if (metaRecipient.type === 'facebook_user') destination = { id: metaRecipient.pageScopedId };
