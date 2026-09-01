@@ -283,6 +283,8 @@ describe('Phase 4 Meta consolidation', () => {
   });
 
   test('rejects an invalid signed webhook before persistence', async () => {
+    const info = jest.spyOn(console, 'info').mockImplementation();
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
     process.env.META_APP_SECRET = 'secret';
     const body = Buffer.from(JSON.stringify(instagramComment('signed')));
     const req: any = {
@@ -300,5 +302,46 @@ describe('Phase 4 Meta consolidation', () => {
     await MetaController.receive(req, res);
     expect(res.status).toHaveBeenCalledWith(401);
     expect(await InboundEvent.countDocuments({})).toBe(0);
+    const observations = [...info.mock.calls, ...warn.mock.calls]
+      .filter(([message]) => message === 'Meta webhook observability')
+      .map(([, observation]) => observation as any);
+    expect(observations.map(item => item.code)).toEqual(['received', 'signature_invalid']);
+    expect(new Set(observations.map(item => item.correlationId)).size).toBe(1);
+    expect(JSON.stringify(observations)).not.toContain('sha256=');
+    expect(JSON.stringify(observations)).not.toContain('signed');
+  });
+
+  test('emits one sanitized fingerprint through persistence, CRM interaction and proposal', async () => {
+    const info = jest.spyOn(console, 'info').mockImplementation();
+    const sensitiveText = 'Quiero más información privada';
+    const accepted = await MetaIngestionService.acceptPayload(
+      ownerA.toString(),
+      instagramComment('sensitive-comment-id', sensitiveText, 'sensitive-user-id'),
+      'meta_req_test_safe'
+    );
+    await MetaIngestionService.processAccepted(ownerA.toString(), accepted[0]);
+
+    const observations = info.mock.calls
+      .filter(([message]) => message === 'Meta webhook observability')
+      .map(([, observation]) => observation as any);
+    expect(observations.map(item => item.code)).toEqual(
+      expect.arrayContaining([
+        'normalized',
+        'new_event',
+        'persist_ok',
+        'interaction_created',
+        'proposal_created',
+        'completed',
+      ])
+    );
+    expect(new Set(observations.map(item => item.correlationId))).toEqual(
+      new Set(['meta_req_test_safe'])
+    );
+    expect(new Set(observations.map(item => item.eventFingerprint).filter(Boolean)).size).toBe(1);
+    const serialized = JSON.stringify(observations);
+    expect(serialized).not.toContain(sensitiveText);
+    expect(serialized).not.toContain('sensitive-comment-id');
+    expect(serialized).not.toContain('sensitive-user-id');
+    expect(await OutboundMessage.countDocuments({})).toBe(0);
   });
 });

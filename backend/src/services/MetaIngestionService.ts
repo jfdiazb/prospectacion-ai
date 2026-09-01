@@ -8,15 +8,29 @@ import { MetaWebhookNormalizer, type NormalizedMetaEvent } from '../integrations
 import { AutomationEngineService } from './AutomationEngineService';
 import { CommercialContextService } from './CommercialContextService';
 import { MetaLaunchAdapter } from './MetaLaunchAdapter';
+import { metaEventFingerprint, metaWebhookCorrelationId, observeMeta } from './MetaObservability';
+
+type AcceptedMetaEvent = {
+  id: string;
+  event: NormalizedMetaEvent;
+  correlationId: string;
+  eventFingerprint: string;
+};
 
 export class MetaIngestionService {
   static async acceptPayload(
     userId: string,
-    payload: unknown
-  ): Promise<Array<{ id: string; event: NormalizedMetaEvent }>> {
-    const accepted: Array<{ id: string; event: NormalizedMetaEvent }> = [];
+    payload: unknown,
+    requestCorrelationId?: string
+  ): Promise<AcceptedMetaEvent[]> {
+    const correlationId = requestCorrelationId ?? metaWebhookCorrelationId(Buffer.from(JSON.stringify(payload)));
+    const accepted: AcceptedMetaEvent[] = [];
     const commercialContext: any = await CommercialContextService.getActive(userId);
-    for (const event of MetaWebhookNormalizer.normalizePayload(payload)) {
+    const normalized = MetaWebhookNormalizer.normalizePayload(payload);
+    const detectedPlatform = (payload as any)?.object === 'instagram' ? 'instagram' : (payload as any)?.object === 'page' ? 'facebook' : 'unknown';
+    observeMeta({ correlationId, stage: 'normalization', code: normalized.length ? 'normalized' : 'normalized_zero', platform: detectedPlatform, normalizedCount: normalized.length });
+    for (const event of normalized) {
+      const eventFingerprint = metaEventFingerprint(correlationId, event.externalEventId);
       const configuredMaxAge = Number(process.env.META_INBOUND_MAX_AGE_MS || 600000);
       const maxAgeMs = Number.isFinite(configuredMaxAge)
         ? Math.max(60000, configuredMaxAge)
@@ -25,8 +39,10 @@ export class MetaIngestionService {
         !Number.isFinite(event.occurredAt.getTime()) ||
         Date.now() - event.occurredAt.getTime() > maxAgeMs ||
         event.occurredAt.getTime() > Date.now() + 60000
-      )
+      ) {
+        observeMeta({ correlationId, eventFingerprint, stage: 'normalization', code: 'stale_event', platform: event.platform });
         continue;
+      }
       const duplicate: any = await InboundEvent.findOne({
         userId,
         externalEventId: event.externalEventId,
@@ -40,7 +56,10 @@ export class MetaIngestionService {
           (duplicate.processingState === 'processing' &&
             duplicate.processingStartedAt &&
             duplicate.processingStartedAt <= new Date(now.getTime() - 5 * 60 * 1000)));
-      if (duplicate && !recoverable) continue;
+      if (duplicate && !recoverable) {
+        observeMeta({ correlationId, eventFingerprint, stage: 'idempotency', code: 'duplicate', platform: event.platform });
+        continue;
+      }
       if (recoverable) {
         const reclaimed: any = await InboundEvent.findOneAndUpdate(
           { _id: duplicate._id },
@@ -50,9 +69,11 @@ export class MetaIngestionService {
           },
           { new: true }
         );
-        accepted.push({ id: reclaimed._id.toString(), event });
+        observeMeta({ correlationId, eventFingerprint, stage: 'idempotency', code: 'retry_reclaimed', platform: event.platform });
+        accepted.push({ id: reclaimed._id.toString(), event, correlationId, eventFingerprint });
         continue;
       }
+      observeMeta({ correlationId, eventFingerprint, stage: 'idempotency', code: 'new_event', platform: event.platform });
       const existingLead = await Lead.exists({
         userId,
         username: event.externalUserId,
@@ -63,8 +84,10 @@ export class MetaIngestionService {
         !existingLead &&
         !MetaWebhookNormalizer.matchesInitialIntent(event.content, commercialContext) &&
         !(await MetaLaunchAdapter.hasMappedContent(userId, event))
-      )
+      ) {
+        observeMeta({ correlationId, eventFingerprint, stage: 'persistence', code: 'eligibility_filtered', platform: event.platform });
         continue;
+      }
       try {
         const inbound: any = await InboundEvent.create({
           userId,
@@ -92,9 +115,13 @@ export class MetaIngestionService {
           processingAttempts: 1,
           processedAt: event.occurredAt,
         });
-        accepted.push({ id: inbound._id.toString(), event });
+        observeMeta({ correlationId, eventFingerprint, stage: 'persistence', code: 'persist_ok', platform: event.platform });
+        accepted.push({ id: inbound._id.toString(), event, correlationId, eventFingerprint });
       } catch (error: any) {
-        if (error?.code !== 11000) throw error;
+        if (error?.code !== 11000) {
+          observeMeta({ correlationId, eventFingerprint, stage: 'persistence', code: 'persist_failed', platform: event.platform }, 'error');
+          throw error;
+        }
         const now = new Date();
         const reclaimed: any = await InboundEvent.findOneAndUpdate(
           {
@@ -114,7 +141,12 @@ export class MetaIngestionService {
           },
           { new: true }
         );
-        if (reclaimed) accepted.push({ id: reclaimed._id.toString(), event });
+        if (reclaimed) {
+          observeMeta({ correlationId, eventFingerprint, stage: 'idempotency', code: 'retry_reclaimed', platform: event.platform });
+          accepted.push({ id: reclaimed._id.toString(), event, correlationId, eventFingerprint });
+        } else {
+          observeMeta({ correlationId, eventFingerprint, stage: 'idempotency', code: 'duplicate', platform: event.platform });
+        }
       }
     }
     return accepted;
@@ -122,9 +154,9 @@ export class MetaIngestionService {
 
   static async processAccepted(
     userId: string,
-    accepted: { id: string; event: NormalizedMetaEvent }
+    accepted: AcceptedMetaEvent
   ): Promise<void> {
-    const { id, event } = accepted;
+    const { id, event, correlationId, eventFingerprint } = accepted;
     let conversationId: string | undefined;
     try {
       let lead: any = await Lead.findOne({
@@ -181,6 +213,9 @@ export class MetaIngestionService {
           { _id: id, userId },
           { $set: { conversationRecordedAt: new Date() } }
         );
+        observeMeta({ correlationId, eventFingerprint, stage: 'crm_interaction', code: 'interaction_created', platform: event.platform });
+      } else {
+        observeMeta({ correlationId, eventFingerprint, stage: 'crm_interaction', code: 'interaction_already_recorded', platform: event.platform });
       }
       try {
         await MetaLaunchAdapter.ingest(userId, event, {
@@ -205,6 +240,7 @@ export class MetaIngestionService {
         platform: event.platform,
         recipient: event.recipient,
       });
+      observeMeta({ correlationId, eventFingerprint, stage: 'proposal', code: 'proposal_created', platform: event.platform });
       const recipient =
         event.recipient.type === 'instagram_user'
           ? { type: event.recipient.type, externalId: event.recipient.instagramScopedId }
@@ -244,6 +280,7 @@ export class MetaIngestionService {
         { _id: id, userId },
         { $set: { processingState: 'completed', processedAt: new Date() } }
       );
+      observeMeta({ correlationId, eventFingerprint, stage: 'processing', code: 'completed', platform: event.platform });
     } catch (error) {
       await InboundEvent.updateOne(
         { _id: id, userId },
@@ -266,10 +303,13 @@ export class MetaIngestionService {
           }
         );
       console.error('Meta asynchronous event processing failed', {
+        correlationId,
+        eventFingerprint,
         platform: event.platform,
         eventType: event.eventType,
         errorType: error instanceof Error ? error.name : 'unknown',
       });
+      observeMeta({ correlationId, eventFingerprint, stage: 'processing', code: 'process_failed', platform: event.platform }, 'error');
     }
   }
 }
