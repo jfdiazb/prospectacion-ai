@@ -92,7 +92,8 @@ describe('Phase 4 Meta consolidation', () => {
   test('supports configured phrases without partial-word matches', () => {
     process.env.META_INITIAL_INTENT_PHRASES = 'asesoría personalizada';
     expect(MetaWebhookNormalizer.matchesInitialIntent('Quiero asesoría personalizada')).toBe(true);
-    expect(MetaWebhookNormalizer.matchesInitialIntent('informacion')).toBe(false);
+    expect(MetaWebhookNormalizer.matchesInitialIntent('INFO')).toBe(true);
+    expect(MetaWebhookNormalizer.matchesInitialIntent('informacion')).toBe(true);
     expect(MetaWebhookNormalizer.matchesInitialIntent('desinformacion')).toBe(false);
   });
 

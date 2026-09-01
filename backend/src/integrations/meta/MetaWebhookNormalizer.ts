@@ -41,7 +41,6 @@ export class MetaWebhookNormalizer {
       .split(',')
       .map(normalize)
       .filter(Boolean);
-    if (configured.length) return configured;
     const contextual =
       context?.intentTerms
         ?.flatMap(group => group.phrases ?? [])
@@ -56,6 +55,7 @@ export class MetaWebhookNormalizer {
         ].map(normalize);
     return [
       ...new Set([
+        ...configured,
         ...contextual,
         ...bootstrap,
         'info',
