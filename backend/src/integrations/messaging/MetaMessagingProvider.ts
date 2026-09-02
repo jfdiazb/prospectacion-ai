@@ -14,11 +14,13 @@ export class MetaMessagingProvider implements MessagingProvider {
     const isFacebook = request.recipient.type === 'facebook_user' || request.recipient.type === 'facebook_comment';
     const accessToken = isFacebook ? process.env.META_PAGE_ACCESS_TOKEN : process.env.META_ACCESS_TOKEN;
     const accountId = isFacebook ? process.env.META_PAGE_ID : process.env.META_IG_USER_ID;
-    if (!accessToken || (!accountId && request.recipient.type !== 'facebook_comment')) throw new MessagingProviderError('Credenciales del canal Meta no configuradas', 'META_CONFIGURATION_ERROR');
+    if (!accessToken || (isFacebook && !accountId && request.recipient.type !== 'facebook_comment')) throw new MessagingProviderError('Credenciales del canal Meta no configuradas', 'META_CONFIGURATION_ERROR');
     const metaRecipient = request.recipient;
     const endpoint = request.recipient.type === 'facebook_comment'
       ? `https://graph.facebook.com/${version}/${encodeURIComponent(request.recipient.commentId)}/private_replies`
-      : `${isFacebook ? 'https://graph.facebook.com' : 'https://graph.instagram.com'}/${version}/${encodeURIComponent(accountId!)}/messages`;
+      : isFacebook
+        ? `https://graph.facebook.com/${version}/${encodeURIComponent(accountId!)}/messages`
+        : `https://graph.instagram.com/${version}/me/messages`;
     let destination: { comment_id: string } | { id: string } | undefined;
     if (metaRecipient.type === 'comment' || metaRecipient.type === 'instagram_comment') destination = { comment_id: metaRecipient.commentId };
     else if (metaRecipient.type === 'facebook_user') destination = { id: metaRecipient.pageScopedId };

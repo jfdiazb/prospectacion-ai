@@ -51,7 +51,7 @@ describe('MetaMessagingProvider', () => {
     await expect(provider.sendMessage({ text: 'Hola', recipient: { type: 'comment', commentId: 'comment-1' } }))
       .resolves.toEqual({ externalMessageId: 'meta-message-1', simulated: false });
     expect(post).toHaveBeenCalledWith(
-      'https://graph.instagram.com/v23.0/ig-business-1/messages',
+      'https://graph.instagram.com/v23.0/me/messages',
       { recipient: { comment_id: 'comment-1' }, message: { text: 'Hola' } },
       expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer test-token-never-logged' }) }),
     );
