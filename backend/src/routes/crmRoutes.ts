@@ -21,6 +21,7 @@ import DuplicateCandidate from '../models/DuplicateCandidate';
 import IdentityAudit from '../models/IdentityAudit';
 import { LaunchActionService } from '../services/LaunchActionService';
 import { ProposalRoutingError, ProposalRoutingService } from '../services/ProposalRoutingService';
+import OutboundMessage from '../models/OutboundMessage';
 
 const router = Router();
 router.use(authMiddleware, apiLimiter);
@@ -272,11 +273,25 @@ router.post(
           });
       }
       const { channel: platform, recipient } = route;
+      const baseSourceEventId = `proposal:${proposal._id}`;
+      let messagingSourceEventId = baseSourceEventId;
+      if (platform === 'instagram' && proposal.deliveryStatus === 'duplicate') {
+        const failedAttempt = await OutboundMessage.findOne({
+          userId: req.userId,
+          conversationId: proposal.conversationId,
+          sourceEventId: baseSourceEventId,
+          channel: 'instagram',
+          deliveryStatus: 'failed',
+          recipientId: proposal.recipient.externalId,
+          errorCode: { $nin: ['META_TIMEOUT', 'MESSAGING_UNKNOWN_ERROR', 'META_UNKNOWN_ERROR'] },
+        }).select('_id');
+        if (failedAttempt) messagingSourceEventId = `${baseSourceEventId}:controlled-retry:1`;
+      }
       const deliveryStatus = await MessagingService.send({
         userId: req.userId as string,
         leadId: proposal.leadId._id.toString(),
         conversationId: proposal.conversationId.toString(),
-        sourceEventId: `proposal:${proposal._id}`,
+        sourceEventId: messagingSourceEventId,
         text: proposal.text,
         recipient,
       });
