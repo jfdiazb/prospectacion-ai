@@ -201,6 +201,7 @@ export const CrmPage = () => {
           <div className="space-y-3">
             {conversations.slice(0, 8).map(conversation => {
               const lastMessage = conversation.messages?.[conversation.messages.length - 1];
+              const latestInboundMessage = conversation.messages?.slice().reverse().find(message => message.sender === 'lead');
               const isExpanded = expandedConversation === conversation._id;
               return (
                 <div key={conversation._id} className="rounded-2xl bg-dark-900 p-4">
@@ -219,8 +220,8 @@ export const CrmPage = () => {
                   <p className={`mt-1 text-xs font-semibold ${conversation.controlMode === 'handoff_requested' ? 'text-amber-300' : conversation.controlMode === 'human_controlled' ? 'text-blue-300' : 'text-emerald-300'}`}>
                     {conversation.controlMode === 'handoff_requested' ? 'ALMA solicita intervención' : conversation.controlMode === 'human_controlled' ? 'Control humano' : 'ALMA activa'}
                   </p>
-                  {lastMessage && (
-                    <p className="text-sm text-dark-400 truncate">{lastMessage.sender === 'ai' ? 'ALMA:' : lastMessage.sender === 'lead' ? 'Lead:' : 'Usuario:'} {lastMessage.text}</p>
+                  {(latestInboundMessage || lastMessage) && (
+                    <p className="text-sm text-dark-400 truncate">{latestInboundMessage ? 'Último inbound:' : lastMessage?.sender === 'ai' ? 'ALMA:' : 'Usuario:'} {(latestInboundMessage || lastMessage)?.text}</p>
                   )}
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button size="sm" variant="secondary" onClick={() => setExpandedConversation(isExpanded ? null : conversation._id)}>
