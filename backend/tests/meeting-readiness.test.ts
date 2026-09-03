@@ -22,6 +22,16 @@ describe('ALMA qualification to meeting readiness', () => {
     expect(readiness(texts)).toMatchObject({ ready: true, reason: 'qualified_discovery', evidence: expect.arrayContaining(['declared_interest', 'declared_need_or_goal', 'prospect_context', 'next_step_openness', 'discovery_conversation']) });
   });
 
+
+  test('case D2 allows a meeting after sustained multi-turn discovery without requiring the prospect to ask for the next step', () => {
+    const texts = [
+      'Me interesa conocer la oportunidad de negocio',
+      'Quiero generar ingresos adicionales y aprender a conseguir clientes',
+      'Actualmente estoy empezando desde cero y no tengo experiencia',
+    ];
+    expect(readiness(texts)).toMatchObject({ ready: true, reason: 'qualified_discovery', evidence: expect.arrayContaining(['declared_interest', 'declared_need_or_goal', 'prospect_context', 'discovery_conversation', 'sustained_engagement']) });
+  });
+
   test('case E keeps the explicit meeting fast path', () => {
     expect(readiness(['Quiero agendar una llamada para conocer el negocio']))
       .toEqual({ ready: true, reason: 'explicit_request', evidence: ['explicit_meeting_intent'] });

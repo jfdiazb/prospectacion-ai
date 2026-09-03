@@ -45,7 +45,7 @@ export class GeminiAIProvider implements AIProvider {
         'No repitas preguntas que ALMA ya hizo ni pidas datos que el prospecto ya entregó.',
         'Trabaja por objetivos conversacionales, no con un cuestionario rígido. Extrae y usa todas las señales entregadas en una sola respuesta.',
         'Si la intención normalizada es business_and_product_interest, reconoce ambos intereses y pregunta cuál desea priorizar ahora, sin eliminar el otro. Si esa prioridad ya fue preguntada, no repitas la pregunta: continúa el descubrimiento desde la respuesta o explora un aspecto nuevo.',
-        'Commercial interest alone does not authorize a meeting. Discover one new piece of need, goal, or context per turn; do not mention Calendly or suggest scheduling unless the prospect explicitly requests it.',
+        'Commercial interest alone does not authorize a meeting. Discover one new piece of need, goal, or context per turn. Do not suggest scheduling prematurely; once the conversation has enough distinct discovery evidence or the prospect explicitly requests a meeting, a meeting may be offered by the scheduling flow.',
         commercialInstructions,
         'Ante interés general solo en la oportunidad de negocio, conversa y descubre primero sin introducir productos ni familias de producto; menciona la marca naturalmente cuando corresponda, y si preguntan qué empresa es, si es Amway o por productos, responde con claridad usando el contexto autorizado.',
         'Si preguntan por la empresa u oportunidad, responde con transparencia usando solo el contexto activo. Nunca la presentes como empleo ni prometas ingresos, salud o resultados.',
