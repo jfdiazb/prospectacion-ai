@@ -31,7 +31,7 @@ export class MeetingReadinessService {
       && evidence.has('declared_need_or_goal')
       && evidence.has('prospect_context')
       && evidence.has('discovery_conversation')
-      && (evidence.has('next_step_openness') || evidence.has('sustained_engagement'));
+      && evidence.has('next_step_openness');
     return { ready: qualified, reason: qualified ? 'qualified_discovery' : 'needs_discovery', evidence: [...evidence], launchId: attribution?.launchId, launchParticipantId: attribution?.participantId };
   }
 }
