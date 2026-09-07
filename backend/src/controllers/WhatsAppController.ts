@@ -96,6 +96,11 @@ export class WhatsAppController {
 
   private static async processMessage(message: any, metadata: any): Promise<void> {
     const normalized = WhatsAppInboundNormalizer.normalize(message, metadata);
+    console.info('WHATSAPP DEBUG', {
+  from: message?.from,
+  receivedPhoneNumberId: metadata?.phone_number_id,
+  configuredPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
+});
     if (!normalized) {
       console.info('WhatsApp webhook ignored', {
         hasMessage: Boolean(message),
