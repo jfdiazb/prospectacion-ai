@@ -6,7 +6,7 @@ const containsPhrase = (text: string, phrase: string) => ` ${text} `.includes(` 
 
 export class IntentNormalizationService {
   static analyze(texts: string[], context?: CommercialContextLike | null) {
-    const text = normalizeCommercialText(texts.join(' '));
+    const text = normalizeCommercialText(texts.at(-1) ?? '');
     const currentText = normalizeCommercialText(texts.at(-1) ?? '');
     const explicitMeeting = /\b(quiero|podemos|quisiera|agendemos|programar|tener|necesito|deseo)\b.{0,45}\b(reunion|reunirnos|llamada|agendar|agenda|videollamada|asesoria|horarios?)\b|\bpodemos hablar(?:\s+(?:hoy|manana|esta semana))?\b|\b(agendar|agenda|programar|reservar)\b/.test(currentText);
     const rejection = /\b(no me interesa|no quiero|deja de escribir|no contactar|stop)\b/.test(text);
