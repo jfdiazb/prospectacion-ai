@@ -1,0 +1,10 @@
+import { analyzeWhatsAppConversation } from '../src/services/WhatsAppQualificationService';
+
+describe('WhatsApp conversational qualification', () => {
+  test('extracts multiple signals from a single Spanish answer', () => { const r = analyzeWhatsAppConversation(['Estoy buscando trabajo, fui vendedor cinco años y me gusta mucho el fitness']); expect(r.signals.employmentSituation).toBe('buscando_oportunidad'); expect(r.signals.commercialExperience).toBeGreaterThan(80); expect(r.signals.nutritionAffinity).toBeGreaterThan(80); });
+  test('keeps five independent weighted dimensions', () => { const r = analyzeWhatsAppConversation(['Busco una nueva oportunidad, tengo experiencia en ventas, fitness, quiero emprender y me interesa conocer']); expect(r.score).toBeGreaterThanOrEqual(70); expect(r.signals).toEqual(expect.objectContaining({ need: expect.any(Number), commercialExperience: expect.any(Number), nutritionAffinity: expect.any(Number), entrepreneurshipOpenness: expect.any(Number), interest: expect.any(Number) })); });
+  test('recognizes meeting intent without authorizing a meeting', () => { const r = analyzeWhatsAppConversation(['Me interesa, podemos hablar en una reunión']); expect(r.signals.meetingIntent).toBe('high'); expect(r.status).toBe('hot_prospect'); });
+  test.each(['No me interesa', 'No quiero Amway', 'No quiero un negocio'])(`respects rejection: %s`, text => { const r = analyzeWhatsAppConversation([text]); expect(r.score).toBe(0); expect(r.status).toBe('rejected'); expect(r.signals.meetingIntent).toBe('none'); });
+  test('does not present traditional employment seeker as business candidate', () => { const r = analyzeWhatsAppConversation(['Solo busco empleo con salario y contrato']); expect(r.score).toBe(0); expect(r.signals.rejectionReason).toBe('solo_empleo_tradicional'); });
+  test('detects product sales and direct declarations', () => { const r = analyzeWhatsAppConversation(['Tengo experiencia en venta de productos y suplementos']); expect(r.signals.productSalesAffinity).toBe('confirmada_por_prospecto'); });
+});
