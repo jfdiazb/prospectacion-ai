@@ -1,0 +1,32 @@
+import mongoose, { Schema } from 'mongoose';
+
+const inboundEventSchema = new Schema({
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  externalEventId: { type: String, required: true },
+  channel: { type: String, enum: ['youtube', 'instagram', 'facebook', 'whatsapp', 'tiktok'], required: true },
+  eventType: { type: String, required: true },
+  senderId: { type: String, required: true },
+  recipientId: String,
+  messageId: String,
+  commentId: String,
+  parentId: String,
+  accountId: String,
+  eventTimestamp: Date,
+  rawPayload: Schema.Types.Mixed,
+  text: String,
+  mediaId: String,
+  matchedKeyword: String,
+  processingState: { type: String, enum: ['processing', 'completed', 'failed'] },
+  processingStartedAt: Date,
+  processingAttempts: { type: Number, default: 0 },
+  retryAfter: Date,
+  processingFailedAt: Date,
+  conversationRecordedAt: Date,
+  processedAt: { type: Date, default: Date.now },
+}, { timestamps: true });
+
+inboundEventSchema.index({ userId: 1, createdAt: -1 });
+inboundEventSchema.index({ userId: 1, externalEventId: 1 }, { unique: true });
+inboundEventSchema.index({ userId: 1, channel: 1, processingState: 1, retryAfter: 1 });
+
+export default mongoose.model('InboundEvent', inboundEventSchema);

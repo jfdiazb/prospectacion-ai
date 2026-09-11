@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # MongoDB
+  mongodb:
+    image: mongo:6
+    container_name: prospectacion_mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - prospectacion_network
+
+  # Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: prospectacion_backend
+    ports:
+      - "5001:5001"
+    environment:
+      NODE_ENV: development
+      MONGO_URI: mongodb://admin:password@mongodb:27017/prospectacion-ai
+      JWT_SECRET: ${JWT_SECRET:-change-this-development-secret-32-chars}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      CORS_ORIGIN: http://localhost:3000
+      FRONTEND_URL: http://localhost:3000
+      CRM_OWNER_ID: ${CRM_OWNER_ID:-}
+      VERIFY_TOKEN: ${VERIFY_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      WHATSAPP_AUTO_REPLY_ENABLED: ${WHATSAPP_AUTO_REPLY_ENABLED:-false}
+    depends_on:
+      - mongodb
+    networks:
+      - prospectacion_network
+    volumes:
+      - ./backend/src:/app/src
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: prospectacion_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: http://localhost:5001/api/v1
+    depends_on:
+      - backend
+    networks:
+      - prospectacion_network
+    volumes:
+      - ./frontend/src:/app/src
+
+volumes:
+  mongodb_data:
+
+networks:
+  prospectacion_network:
+    driver: bridge

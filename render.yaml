@@ -1,0 +1,120 @@
+services:
+  - type: web
+    name: alma-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/v1/readiness
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.0
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: AI_MODE
+        value: live
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: REAL_OUTBOUND_ENABLED
+        value: "false"
+      - key: INSTAGRAM_REAL_OUTBOUND_ENABLED
+        value: "true"
+      - key: YOUTUBE_POLLING_ENABLED
+        value: "false"
+      - key: YOUTUBE_MESSAGING_MODE
+        value: mock
+      - key: YOUTUBE_INGESTION_MODE
+        value: live
+      - key: YOUTUBE_HUNTER_MODE
+        value: live
+      - key: YOUTUBE_HUNTER_USER_DAILY_SEARCH_LIMIT
+        value: "25"
+      - key: YOUTUBE_POLL_OVERLAP_MS
+        value: "3600000"
+      - key: YOUTUBE_REPLY_POLL_INTERVAL_MS
+        value: "120000"
+      - key: YOUTUBE_REPLY_ACTIVE_DAYS
+        value: "7"
+      - key: YOUTUBE_REPLY_MAX_THREADS
+        value: "8"
+      - key: ZOOM_MODE
+        value: mock
+      - key: SCHEDULING_MODE
+        value: calendly
+      - key: MEETING_AVAILABLE_DAYS
+        value: "1,2,3,4,5"
+      - key: MEETING_START_TIME
+        value: "19:30"
+      - key: MEETING_END_TIME
+        value: "20:30"
+      - key: MEETING_DURATION_MINUTES
+        value: "30"
+      - key: MEETING_TIMEZONE
+        value: America/Bogota
+      - key: MEETING_BUFFER_BEFORE_MINUTES
+        value: "0"
+      - key: MEETING_BUFFER_AFTER_MINUTES
+        value: "0"
+      - key: MEETING_HORIZON_DAYS
+        value: "14"
+      - key: MEETING_MAX_OPTIONS
+        value: "3"
+      - key: CALENDLY_BOOKING_URL
+        sync: false
+      - key: CALENDLY_WEBHOOK_SIGNING_KEY
+        sync: false
+      - key: CALENDLY_WEBHOOK_SECRET
+        sync: false
+      - key: CALENDLY_PERSONAL_ACCESS_TOKEN
+        sync: false
+      - key: CALENDLY_POLL_INTERVAL_MS
+        value: 120000
+      - key: CALENDLY_LOOKAHEAD_DAYS
+        value: 90
+      - key: CALENDLY_TIMEOUT_MS
+        value: 10000
+      - key: INSTAGRAM_MESSAGING_MODE
+        value: live
+      - key: FACEBOOK_MESSAGING_MODE
+        value: mock
+      - key: META_AUTO_SEND_ENABLED
+        value: "false"
+      - key: WHATSAPP_MESSAGING_MODE
+        value: mock
+      - key: WHATSAPP_AUTO_REPLY_ENABLED
+        value: "false"
+      - key: WHATSAPP_REPLY_MODE
+        value: assisted
+      - key: WHATSAPP_INBOUND_MAX_AGE_MS
+        value: "600000"
+      - key: WHATSAPP_ACTIVATION_ALLOWLIST
+        sync: false
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_WABA_ID
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+      - key: VERIFY_TOKEN
+        sync: false
+      - key: META_MOCK_MODE
+        value: "false"
+      - key: TIKTOK_API_APPROVED
+        value: "false"
+      - key: TIKTOK_INGESTION_ENABLED
+        value: "false"
+      - key: TIKTOK_MESSAGING_ENABLED
+        value: "false"
+      - key: AUTOMATION_WORKER_ENABLED
+        value: "true"
+      - key: AUTOMATION_WORKER_INTERVAL_MS
+        value: "30000"
