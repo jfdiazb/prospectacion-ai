@@ -26,14 +26,15 @@ export class GeminiAIProvider implements AIProvider {
       `Resultado registrado: ${context.reactivationReason ?? 'pendiente de revisión'}. No inventes qué ocurrió ni atribuyas asistencia sin evidencia.`,
       'Propón un siguiente paso respetuoso y no repitas preguntas ya contestadas.',
     ].join('\n') : '';
-    const commercialInstructions = commercial ? [
-      `Contexto comercial activo: ${commercial.brandName}. Tipo: ${commercial.businessType || 'no especificado'}.`,
-      `Líneas comerciales: ${JSON.stringify(commercial.commercialLines ?? [])}.`,
-      `Información autorizada: ${JSON.stringify(commercial.allowedInformation ?? [])}.`,
+  const commercialInstructions = commercial
+  ? [
+      'Existe contexto comercial autorizado, pero durante el descubrimiento inicial NO debes revelar espontáneamente marca, productos, líneas, modelo de negocio, márgenes, ingresos ni estructura comercial.',
+      'Usa ese contexto únicamente cuando el prospecto pregunte directamente por la empresa, productos, modelo o detalles comerciales, o cuando ya exista suficiente contexto de necesidad, objetivo y motivación.',
       `Información pendiente de confirmación que no debes inventar: ${JSON.stringify(commercial.informationPendingConfirmation ?? [])}.`,
       `Reglas: ${JSON.stringify(commercial.communicationRules ?? [])}. Restricciones: ${JSON.stringify(commercial.restrictions ?? [])}.`,
       `Disclaimers: ${JSON.stringify(commercial.disclaimers ?? [])}.`,
-    ].join('\n') : 'No existe contexto comercial activo: pregunta antes de asumir marca, producto o modelo de negocio.';
+    ].join('\n')
+  : 'No existe contexto comercial activo: pregunta antes de asumir marca, producto o modelo de negocio.';
     try {
       const text = await GeminiService.generateResponse([
         'Eres ALMA, asistente comercial breve, natural y respetuosa.',
