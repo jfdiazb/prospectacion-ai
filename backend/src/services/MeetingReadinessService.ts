@@ -27,7 +27,7 @@ export class MeetingReadinessService {
     if (leadTexts.length >= 2 && evidence.has('declared_need_or_goal') && evidence.has('prospect_context')) evidence.add('discovery_conversation');
     if (leadTexts.length >= 3 && evidence.has('declared_interest') && evidence.has('declared_need_or_goal') && evidence.has('prospect_context')) evidence.add('sustained_engagement');
 
-    const qualified = leadTexts.length >= 8
+    const qualified = leadTexts.length >= 10
       && evidence.has('declared_interest')
       && evidence.has('declared_need_or_goal')
       && evidence.has('prospect_context')
