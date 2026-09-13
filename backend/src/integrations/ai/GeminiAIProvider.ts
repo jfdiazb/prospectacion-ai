@@ -62,9 +62,13 @@ export class GeminiAIProvider implements AIProvider {
         `Mensaje actual: ${JSON.stringify(context.incomingText)}`,
       ].join('\n'));
       return { text, aiProviderUsed: 'gemini' };
-    } catch {
-      console.warn('Gemini reply generation failed; using safe fallback', { platform: context.platform, intent: context.intent });
-      return new MockAIProvider().generateReply(context);
+    } catch (error) {
+  console.error('Gemini reply generation failed:', error);
+  console.warn('Gemini reply generation failed; using safe fallback', {
+    platform: context.platform,
+    intent: context.intent,
+  });
+  return new MockAIProvider().generateReply(context);
     }
   }
 }
