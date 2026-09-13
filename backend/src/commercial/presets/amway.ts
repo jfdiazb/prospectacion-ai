@@ -13,7 +13,10 @@ export const AMWAY_INITIAL_CONTEXT = {
     { intent: 'product_sales_interest', phrases: ['vender productos', 'vender los productos', 'vender algunos productos', 'vendiendo estos productos', 'venderlos', 'venta de productos', 'comercializar productos', 'comercializarlos', 'distribuir productos', 'ofrecer estos productos', 'he vendido productos', 'vender por redes sociales'], tags: ['interes_venta_productos'] },
   ],
   qualificationCriteria: ['necesidad declarada', 'tipo de interés', 'apertura a conocer información', 'intención explícita de reunión'],
-  communicationRules: ['Preguntar antes de asumir si el interés es negocio, productos o ambos.', 'Mencionar la marca con transparencia cuando corresponda explicar la oportunidad.'],
+  communicationRules: [
+  'No asumir si el interés es negocio, productos o ambos. Durante el descubrimiento inicial, explorar primero la necesidad, motivación u objetivo del prospecto sin forzar una elección entre estas opciones.',
+  'Mencionar la marca con transparencia cuando corresponda explicar la oportunidad.'
+],
   allowedInformation: ['Nombre de la marca activa', 'Existencia de líneas de negocio y productos', 'Familia Nutrilite como parte de la configuración activa'],
   informationPendingConfirmation: ['Plan de compensación', 'precios', 'catálogo', 'requisitos', 'políticas', 'declaraciones de ingresos', 'detalles oficiales de productos'],
   restrictions: ['No presentar la oportunidad como empleo.', 'No prometer ingresos ni resultados.', 'No hacer afirmaciones médicas.', 'No insistir ante rechazo.'],
