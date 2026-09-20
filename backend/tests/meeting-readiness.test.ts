@@ -81,4 +81,57 @@ describe('ALMA qualification to meeting readiness', () => {
   test('case G remains eligible for discovery follow-up instead of a meeting', () => {
     expect(readiness(['Quiero más información'])).toMatchObject({ ready: false, reason: 'needs_discovery' });
   });
+
+  test('the real WhatsApp discovery is enough to offer a meeting without sending Calendly', () => {
+    const texts = [
+      'Quiero información para generar ingresos adicionales',
+      'Podría dedicar 5 horas semanales',
+      'Me gustaría generar unos $500.000 adicionales al mes',
+      'Me gustaría aprender a vender productos por internet utilizando las redes sociales y la inteligencia artificial',
+      'Utilizo Facebook, Instagram y WhatsApp',
+      'Tengo poca experiencia vendiendo, pero quiero aprender a generar ingresos adicionales utilizando estas herramientas',
+    ];
+    const conversation = texts.map(text => ({ sender: 'lead' as const, text }));
+    const result = MeetingReadinessService.evaluate(texts, analyzeWhatsAppConversation(texts), undefined, conversation);
+
+    expect(result).toMatchObject({
+      ready: true,
+      reason: 'qualified_discovery',
+      evidence: expect.arrayContaining([
+        'declared_interest',
+        'declared_need_or_goal',
+        'prospect_context',
+        'discovery_conversation',
+        'guidance_interest',
+      ]),
+    });
+    expect(MeetingReadinessService.shouldStartScheduling(result)).toBe(false);
+    expect(MeetingReadinessService.shouldOfferMeeting(result, conversation)).toBe(true);
+    const response = MeetingReadinessService.meetingOfferFor(result, conversation, texts);
+    expect(response).toMatch(/programáramos una reunión/i);
+    expect(response).toMatch(/redes sociales y la inteligencia artificial/i);
+    expect(response).not.toMatch(/calendly|https?:\/\//i);
+    expect(response).not.toMatch(/contenido|formatos/i);
+  });
+
+  test('does not repeat a meeting offer after an explicit decline', () => {
+    const offer = MeetingReadinessService.meetingOffer();
+    const texts = ['Quiero aprender a vender productos y generar ingresos', 'No, prefiero recibir información por aquí'];
+    const conversation = [
+      { sender: 'lead' as const, text: texts[0] },
+      { sender: 'ai' as const, text: offer },
+      { sender: 'lead' as const, text: texts[1] },
+    ];
+    const result = MeetingReadinessService.evaluate(texts, analyzeWhatsAppConversation(texts), undefined, conversation);
+    expect(result).toEqual({ ready: false, reason: 'meeting_declined', evidence: ['explicit_meeting_decline'] });
+    expect(MeetingReadinessService.shouldOfferMeeting(result, conversation)).toBe(false);
+    expect(MeetingReadinessService.shouldStartScheduling(result)).toBe(false);
+  });
+
+  test('a greeting alone starts discovery without offering or scheduling a meeting', () => {
+    const result = readiness(['Hola']);
+    expect(result).toMatchObject({ ready: false, reason: 'needs_discovery' });
+    expect(MeetingReadinessService.shouldOfferMeeting(result)).toBe(false);
+    expect(MeetingReadinessService.shouldStartScheduling(result)).toBe(false);
+  });
 });

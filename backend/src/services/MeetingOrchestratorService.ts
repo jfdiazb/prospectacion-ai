@@ -7,7 +7,7 @@ import { MeetingLifecycleService } from './MeetingLifecycleService';
 import { AutomationEngineService } from './AutomationEngineService';
 import { LaunchAttributionService } from './LaunchAttributionService';
 
-type MeetingContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; wantsMeeting: boolean; meetingReadiness?: 'explicit_request' | 'explicit_acceptance' | 'qualified_discovery' | 'needs_discovery'; launchId?: string; launchParticipantId?: string; platform?: 'instagram' | 'facebook' | 'youtube' | 'whatsapp' };
+type MeetingContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; wantsMeeting: boolean; meetingReadiness?: 'explicit_request' | 'explicit_acceptance' | 'qualified_discovery' | 'meeting_declined' | 'needs_discovery'; launchId?: string; launchParticipantId?: string; platform?: 'instagram' | 'facebook' | 'youtube' | 'whatsapp' };
 type MeetingOutcome = { handled: boolean; reply?: string };
 
 const TIMEZONE_ALIASES: Record<string, string> = {

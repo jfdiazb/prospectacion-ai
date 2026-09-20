@@ -41,8 +41,12 @@ export class AssistedResponseService {
     await LaunchAttributionService.recordReadiness(context.userId, launchAttribution, meetingReadiness, ['warm', 'hot'].includes(applied.current.interestLevel));
     const history = recent.slice(-10).filter((m: any) => ['lead', 'ai'].includes(m.sender)).map((m: any) => ({ sender: m.sender as 'lead' | 'ai', text: String(m.text).slice(0, 1000) }));
     const memory = await ConversationService.getOrInitializeAIMemory(context.conversationId, context.userId);
-    const ai = getAIProvider();
-    const generated = await ai.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent: qualification.intent, normalizedIntent: qualification.normalizedIntent, platform: context.platform, history: history.slice(0, -1), askedTopics: memory.askedTopics,
+    const qualifiedMeetingOffer = !handoffReason
+      ? MeetingReadinessService.meetingOfferFor(meetingReadiness, recent, leadTexts)
+      : undefined;
+    const shouldOfferMeeting = Boolean(qualifiedMeetingOffer);
+    const ai = shouldOfferMeeting ? null : getAIProvider();
+    const generated = shouldOfferMeeting ? null : await ai!.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent: qualification.intent, normalizedIntent: qualification.normalizedIntent, platform: context.platform, history: history.slice(0, -1), askedTopics: memory.askedTopics,
       commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines, allowedInformation: commercialContext.allowedInformation, informationPendingConfirmation: commercialContext.informationPendingConfirmation, communicationRules: commercialContext.communicationRules, restrictions: commercialContext.restrictions, disclaimers: commercialContext.disclaimers } : undefined });
     const meetingOutcome = await MeetingOrchestratorService.process({
       userId: context.userId, leadId: context.leadId, conversationId: context.conversationId,
@@ -53,7 +57,9 @@ export class AssistedResponseService {
     });
     const deduplicated = meetingOutcome.reply
       ? { text: meetingOutcome.reply, usedFallback: false }
-      : AlmaService.avoidRepeatedResponse(generated.text, history.slice(0, -1), memory, context.text);
+      : shouldOfferMeeting
+        ? { text: qualifiedMeetingOffer!, usedFallback: false }
+        : AlmaService.avoidRepeatedResponse(generated!.text, history.slice(0, -1), memory, context.text);
     await ConversationService.reserveAIResponse(context.conversationId, context.userId, deduplicated.text);
     const schedulingMeeting: any = meetingOutcome.reply ? await Meeting.findOne({ userId: context.userId, conversationId: context.conversationId }).sort({ createdAt: -1 }) : null;
     const conversationState: any = schedulingMeeting ? await Conversation.findOne({ _id: context.conversationId, userId: context.userId }).select('lastMessage') : null;

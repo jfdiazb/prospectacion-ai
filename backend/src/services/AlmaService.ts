@@ -106,10 +106,14 @@ export class AlmaService {
     const automationAlreadySent = Boolean(context.automation && aiMemory.responseFingerprints.includes(
       ConversationService.fingerprintAIText(context.automation.response)));
     if (automationAlreadySent) context.automation = undefined;
-    const aiProvider = context.automation ? null : getAIProvider();
-    const aiResult = context.automation ? null : await aiProvider!.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent, normalizedIntent: qualification.normalizedIntent, platform: context.platform, history, askedTopics: aiMemory.askedTopics,
+    const qualifiedMeetingOffer = !context.automation
+      ? MeetingReadinessService.meetingOfferFor(meetingReadiness, recentMessages, leadTexts)
+      : undefined;
+    const shouldOfferMeeting = Boolean(qualifiedMeetingOffer);
+    const aiProvider = context.automation || shouldOfferMeeting ? null : getAIProvider();
+    const aiResult = context.automation || shouldOfferMeeting ? null : await aiProvider!.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent, normalizedIntent: qualification.normalizedIntent, platform: context.platform, history, askedTopics: aiMemory.askedTopics,
       commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines, allowedInformation: commercialContext.allowedInformation, informationPendingConfirmation: commercialContext.informationPendingConfirmation, communicationRules: commercialContext.communicationRules, restrictions: commercialContext.restrictions, disclaimers: commercialContext.disclaimers } : undefined });
-    const generatedResponse = context.automation?.response ?? aiResult!.text;
+    const generatedResponse = context.automation?.response ?? qualifiedMeetingOffer ?? aiResult!.text;
     const meetingOutcome = await MeetingOrchestratorService.process({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: context.text, wantsMeeting, meetingReadiness: meetingReadiness.reason, launchId: launchAttribution?.launchId, launchParticipantId: launchAttribution?.participantId, platform: context.platform });
     let deduplication = meetingOutcome.reply ? { text: meetingOutcome.reply, deduplicated: false }
       : this.avoidRepeatedResponse(generatedResponse, history, aiMemory, context.text);
@@ -132,7 +136,7 @@ export class AlmaService {
     await ConversationService.addMessage(context.conversationId, context.userId, { sender: 'ai', text: response, platform: context.platform });
     const deliveryStatus = await MessagingService.send({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: response, recipient: context.recipient });
     if (context.automation && deliveryStatus !== 'duplicate') await AutomationService.recordExecution(context.automation.flowId, context.userId, deliveryStatus !== 'failed');
-    await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'message_generated', description: context.automation ? 'ALMA ejecutó una automatización por palabra clave' : 'ALMA generó y procesó una respuesta saliente', metadata: context.automation ? { automationFlowId: context.automation.flowId, responseSource: 'automation' } : aiProviderUsed ? { aiProvider: aiProvider!.name, aiProviderUsed } : { responseSource: 'meeting_orchestrator' } });
+    await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'message_generated', description: context.automation ? 'ALMA ejecutó una automatización por palabra clave' : 'ALMA generó y procesó una respuesta saliente', metadata: context.automation ? { automationFlowId: context.automation.flowId, responseSource: 'automation' } : shouldOfferMeeting ? { responseSource: 'qualified_meeting_offer' } : aiProviderUsed ? { aiProvider: aiProvider!.name, aiProviderUsed } : { responseSource: 'meeting_orchestrator' } });
     return response;
   }
 

@@ -2,7 +2,7 @@ import { MeetingLifecycleService } from './MeetingLifecycleService';
 
 export type MeetingReadiness = {
   ready: boolean;
-  reason: 'explicit_request' | 'explicit_acceptance' | 'qualified_discovery' | 'needs_discovery';
+  reason: 'explicit_request' | 'explicit_acceptance' | 'qualified_discovery' | 'meeting_declined' | 'needs_discovery';
   evidence: string[];
   launchId?: string;
   launchParticipantId?: string;
@@ -31,7 +31,31 @@ export class MeetingReadinessService {
     const previousAI = [...preceding].reverse().find(turn => turn.sender === 'ai' || turn.sender === 'user');
     if (!previousAI) return false;
     const question = normalize(previousAI.text);
-    return /\b(quieres|deseas|aceptas|te gustaria|podemos)\b.{0,90}\b(agend(?:ar|emos)|program(?:ar|emos)|reserv(?:ar|emos)|coordin(?:ar|emos))\b.{0,60}\b(reunion|llamada|cita|asesoria)\b|\b(agendamos|programamos|reservamos|coordinamos)\b.{0,60}\b(reunion|llamada|cita|asesoria)\b/.test(question);
+    return this.isExplicitMeetingOffer(question);
+  }
+
+  static isExplicitMeetingOffer(text: string): boolean {
+    const normalized = normalize(text);
+    return /\b(quieres|deseas|aceptas|te gustaria|podemos)\b.{0,90}\b(agend(?:ar|emos|aramos)|program(?:ar|emos|aramos)|reserv(?:ar|emos|aramos)|coordin(?:ar|emos|aramos))\b.{0,60}\b(reunion|llamada|cita|asesoria)\b|\b(agendamos|programamos|reservamos|coordinamos)\b.{0,60}\b(reunion|llamada|cita|asesoria)\b/.test(normalized);
+  }
+
+  static shouldOfferMeeting(readiness: MeetingReadiness, conversation: ConversationTurn[] = []): boolean {
+    return readiness.reason === 'qualified_discovery' &&
+      !conversation.some(turn => (turn.sender === 'ai' || turn.sender === 'user') && this.isExplicitMeetingOffer(turn.text));
+  }
+
+  static meetingOffer(leadTexts: string[] = []): string {
+    const context = normalize(leadTexts.join(' '));
+    const focus = /redes sociales|facebook|instagram|whatsapp/.test(context) && /inteligencia artificial|\bia\b/.test(context)
+      ? 'cómo aprovechar tus redes sociales y la inteligencia artificial para desarrollar una actividad comercial'
+      : /ingresos? adicionales?|tiempos libres|horas? semanales?/.test(context)
+        ? 'cómo desarrollar una actividad comercial alineada con tus objetivos y el tiempo que tienes disponible'
+        : 'cómo aprovechar tus recursos e intereses para desarrollar esta actividad';
+    return `¡Excelente! Con lo que me cuentas, podemos explorar ${focus}. ¿Te gustaría que programáramos una reunión para explicarte cómo funciona?`;
+  }
+
+  static meetingOfferFor(readiness: MeetingReadiness, conversation: ConversationTurn[] = [], leadTexts: string[] = []): string | undefined {
+    return this.shouldOfferMeeting(readiness, conversation) ? this.meetingOffer(leadTexts) : undefined;
   }
 
   static evaluate(
@@ -59,6 +83,21 @@ export class MeetingReadinessService {
         ready: true,
         reason: 'explicit_acceptance',
         evidence: ['explicit_meeting_acceptance'],
+        launchId: attribution?.launchId,
+        launchParticipantId: attribution?.participantId,
+      };
+    }
+
+    const previousAI = [...conversationTurns].reverse().find(turn => turn.sender === 'ai' || turn.sender === 'user');
+    if (
+      previousAI &&
+      this.isExplicitMeetingOffer(previousAI.text) &&
+      /^(no|no gracias|prefiero|ahora no|todavia no)\b/.test(normalize(current).replace(/[^a-z0-9]+/g, ' ').trim())
+    ) {
+      return {
+        ready: false,
+        reason: 'meeting_declined',
+        evidence: ['explicit_meeting_decline'],
         launchId: attribution?.launchId,
         launchParticipantId: attribution?.participantId,
       };
@@ -92,7 +131,7 @@ export class MeetingReadinessService {
     }
 
     if (
-      /\b(ya (?:vendo|trabajo|tengo|hago)|tengo (?:un )?negocio|estoy empezando|desde cero|sin experiencia|nunca he|actualmente|por redes|clientes|prospectos|seguimiento|cierre)\b/.test(
+      /\b(ya (?:vendo|trabajo|tengo|hago)|tengo (?:un )?negocio|estoy empezando|desde cero|(?:poca|algo de|sin) experiencia|nunca he|actualmente|por redes|redes sociales|facebook|instagram|whatsapp|inteligencia artificial|\d+ horas? semanales?|tiempos libres|clientes|prospectos|seguimiento|cierre)\b/.test(
         conversation
       )
     ) {
@@ -109,6 +148,9 @@ export class MeetingReadinessService {
 
     if (/\b(me gustaria|quiero|estoy dispuesto|estoy abierta|estoy abierto|podemos)\b.{0,45}\b(siguiente paso|solucion|alternativa|opcion|como empezar|como avanzar|que me expliques)\b|\b(siguiente paso|como puedo empezar|como puedo avanzar)\b/.test(conversation)) {
       evidence.add('next_step_openness');
+    }
+    if (/\b(quiero|me gustaria|necesito)\b.{0,55}\b(aprender|orientacion|orientarme|conocer como funciona|saber como funciona|empezar)\b/.test(conversation)) {
+      evidence.add('guidance_interest');
     }
 
     if (
@@ -127,7 +169,7 @@ export class MeetingReadinessService {
       evidence.has('declared_need_or_goal') &&
       evidence.has('prospect_context') &&
       evidence.has('discovery_conversation') &&
-      (evidence.has('next_step_openness') || evidence.has('sustained_engagement'));
+      (evidence.has('next_step_openness') || evidence.has('guidance_interest') || evidence.has('sustained_engagement'));
 
     return {
       ready: qualified,
