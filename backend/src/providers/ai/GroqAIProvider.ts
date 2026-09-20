@@ -1,44 +1,53 @@
-import type { AIProvider, AIReplyContext, AIReplyResult } from './AIProvider';
-import { GeminiService } from '../../services/GeminiService';
-import { MockAIProvider } from './MockAIProvider';
+import type { AIProvider, AIReplyContext, AIReplyResult } from '../../integrations/ai/AIProvider';
+import { GroqService } from '../../services/GroqService';
 
-export class GeminiAIProvider implements AIProvider {
-  readonly name = 'gemini';
+export class GroqAIProvider implements AIProvider {
+  readonly name = 'groq';
 
   async generateReply(context: AIReplyContext): Promise<AIReplyResult> {
     const history = context.history.length ? JSON.stringify(context.history) : '[]';
+
     const channelInstruction = context.platform === 'youtube'
       ? 'La conversación ocurre en un hilo público de YouTube: no solicites datos privados y haz como máximo una pregunta breve.'
       : context.platform === 'whatsapp'
         ? 'La conversación ocurre en el WhatsApp privado y oficial del negocio: responde de forma natural, breve y conversacional, con una sola pregunta útil a la vez.'
         : `La conversación ocurre por mensajería privada de ${context.platform === 'instagram' ? 'Instagram' : 'Facebook'}: responde de forma natural, breve y conversacional.`;
+
     const commercial = context.commercialContext;
-    const purposeInstructions = context.purpose === 'reactivation' ? [
-      'Objetivo: redactar una propuesta de reactivación asistida, no una respuesta automática.',
-      'Referencia de forma natural un interés o necesidad real del historial; no uses un saludo genérico ni preguntes simplemente si sigue interesado.',
-      'No repitas preguntas ya realizadas o contestadas. No presiones, no inventes datos y ofrece una continuación fácil de rechazar.',
-      `Motivo interno de reactivación: ${context.reactivationReason ?? 'inactividad comercial elegible'}.`,
-    ].join('\n') : context.purpose === 'meeting_reminder' ? [
-      'Objetivo: redactar un recordatorio asistido de una reunión ya programada.',
-      'Incluye fecha/zona entregada en el motivo, no inventes enlaces ni detalles y permite reprogramar sin presión.',
-    ].join('\n') : context.purpose === 'meeting_followup' ? [
-      'Objetivo: redactar seguimiento asistido posterior a una reunión.',
-      `Resultado registrado: ${context.reactivationReason ?? 'pendiente de revisión'}. No inventes qué ocurrió ni atribuyas asistencia sin evidencia.`,
-      'Propón un siguiente paso respetuoso y no repitas preguntas ya contestadas.',
-    ].join('\n') : '';
-  const commercialInstructions = commercial
+
+    const purposeInstructions = context.purpose === 'reactivation'
+      ? [
+          'Objetivo: redactar una propuesta de reactivación asistida, no una respuesta automática.',
+          'Referencia de forma natural un interés o necesidad real del historial; no uses un saludo genérico ni preguntes simplemente si sigue interesado.',
+          'No repitas preguntas ya realizadas o contestadas. No presiones, no inventes datos y ofrece una continuación fácil de rechazar.',
+          `Motivo interno de reactivación: ${context.reactivationReason ?? 'inactividad comercial elegible'}.`,
+        ].join('\n')
+      : context.purpose === 'meeting_reminder'
+        ? [
+            'Objetivo: redactar un recordatorio asistido de una reunión ya programada.',
+            'Incluye fecha/zona entregada en el motivo, no inventes enlaces ni detalles y permite reprogramar sin presión.',
+          ].join('\n')
+        : context.purpose === 'meeting_followup'
+          ? [
+              'Objetivo: redactar seguimiento asistido posterior a una reunión.',
+              `Resultado registrado: ${context.reactivationReason ?? 'pendiente de revisión'}. No inventes qué ocurrió ni atribuyas asistencia sin evidencia.`,
+              'Propón un siguiente paso respetuoso y no repitas preguntas ya contestadas.',
+            ].join('\n')
+          : '';
+
+    const commercialInstructions = commercial
       ? [
           `Contexto comercial activo: ${commercial.brandName}.`,
           `Información autorizada: ${JSON.stringify(commercial.allowedInformation ?? [])}.`,
           'Existe contexto comercial autorizado, pero durante el descubrimiento inicial NO debes revelar espontáneamente marca, productos, líneas, modelo de negocio, márgenes, ingresos ni estructura comercial.',
-      'Usa ese contexto únicamente cuando el prospecto pregunte directamente por la empresa, productos, modelo o detalles comerciales, o cuando ya exista suficiente contexto de necesidad, objetivo y motivación.',
-      `Información pendiente de confirmación que no debes inventar: ${JSON.stringify(commercial.informationPendingConfirmation ?? [])}.`,
-      `Reglas: ${JSON.stringify(commercial.communicationRules ?? [])}. Restricciones: ${JSON.stringify(commercial.restrictions ?? [])}.`,
-      `Disclaimers: ${JSON.stringify(commercial.disclaimers ?? [])}.`,
-    ].join('\n')
-  : 'No existe contexto comercial activo: pregunta antes de asumir marca, producto o modelo de negocio.';
-    try {
-      const text = await GeminiService.generateResponse([
+          'Usa ese contexto únicamente cuando el prospecto pregunte directamente por la empresa, productos, modelo o detalles comerciales, o cuando ya exista suficiente contexto de necesidad, objetivo y motivación.',
+          `Información pendiente de confirmación que no debes inventar: ${JSON.stringify(commercial.informationPendingConfirmation ?? [])}.`,
+          `Reglas: ${JSON.stringify(commercial.communicationRules ?? [])}. Restricciones: ${JSON.stringify(commercial.restrictions ?? [])}.`,
+          `Disclaimers: ${JSON.stringify(commercial.disclaimers ?? [])}.`,
+        ].join('\n')
+      : 'No existe contexto comercial activo: pregunta antes de asumir marca, producto o modelo de negocio.';
+
+    const prompt = [
         'Eres ALMA, asistente comercial breve, natural y respetuosa.',
         channelInstruction,
         purposeInstructions,
@@ -49,7 +58,6 @@ export class GeminiAIProvider implements AIProvider {
         'No repitas preguntas que ALMA ya hizo ni pidas datos que el prospecto ya entregó.',
         'Si el mensaje actual expresa solo INFO, interés general o una solicitud de información, no asumas intención de registro, compra, apertura de cuenta, precio preferencial ni inscripción. No ofrezcas registro o inscripción hasta que el prospecto lo solicite explícitamente.',
         'Trabaja por objetivos conversacionales, no con un cuestionario rígido. Extrae y usa todas las señales entregadas en una sola respuesta.',
-        'Ante interés general, descubre primero sin introducir productos, marca ni modelo de negocio.',
         'Si la intención normalizada es business_and_product_interest, reconoce que existe interés en más de un aspecto, pero NO preguntes cuál priorizar ni presentes una elección entre productos y negocio. Continúa el descubrimiento explorando de forma natural la necesidad, objetivo o motivación del prospecto.',
         'Commercial interest alone does not authorize a meeting. Discover one new piece of need, goal, or context per turn. Do not suggest scheduling prematurely; once the conversation has enough distinct discovery evidence or the prospect explicitly requests a meeting, a meeting may be offered by the scheduling flow.',
         commercialInstructions,
@@ -64,15 +72,13 @@ export class GeminiAIProvider implements AIProvider {
         `Historial anterior (JSON): ${history}`,
         `Temas que ALMA ya preguntó y no debe volver a preguntar: ${JSON.stringify(context.askedTopics ?? [])}`,
         `Mensaje actual: ${JSON.stringify(context.incomingText)}`,
-      ].join('\n'));
-      return { text, aiProviderUsed: 'gemini' };
-    } catch (error) {
-  console.error('Gemini reply generation failed:', error);
-  console.warn('Gemini reply generation failed; using safe fallback', {
-    platform: context.platform,
-    intent: context.intent,
-  });
-  return new MockAIProvider().generateReply(context);
-    }
+      ].join('\n');
+
+    const text = await GroqService.generateResponse(prompt);
+
+    return {
+      text,
+      aiProviderUsed: 'groq',
+    };
   }
 }

@@ -2,19 +2,25 @@ export interface AIReplyContext {
   incomingText: string;
   isNewLead: boolean;
   intent: string;
-  platform: 'youtube' | 'whatsapp' | 'instagram' | 'facebook';
+  platform: 'youtube' | 'whatsapp' | 'instagram' | 'facebook' | 'tiktok';
   history: Array<{ sender: 'lead' | 'ai'; text: string }>;
   askedTopics?: string[];
   normalizedIntent?: string;
   purpose?: 'conversation' | 'follow_up' | 'reactivation' | 'meeting_reminder' | 'meeting_followup';
   reactivationReason?: string;
   commercialContext?: {
-    brandName: string; businessType?: string; commercialLines?: string[]; allowedInformation?: string[];
-    informationPendingConfirmation?: string[]; communicationRules?: string[]; restrictions?: string[]; disclaimers?: string[];
+    brandName: string;
+    businessType?: string;
+    commercialLines?: string[];
+    allowedInformation?: string[];
+    informationPendingConfirmation?: string[];
+    communicationRules?: string[];
+    restrictions?: string[];
+    disclaimers?: string[];
   };
 }
 
-export type AIProviderUsed = 'gemini' | 'mock';
+export type AIProviderUsed = 'groq' | 'gemini' | 'mock';
 
 export interface AIReplyResult {
   text: string;

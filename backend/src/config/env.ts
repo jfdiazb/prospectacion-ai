@@ -15,8 +15,15 @@ export const validateServerEnvironment = (): void => {
   }
   const aiMode = process.env.AI_MODE;
   if (aiMode && !['mock', 'live'].includes(aiMode)) throw new Error('AI_MODE debe ser mock o live');
-  if (aiMode === 'live' && !process.env.GEMINI_API_KEY?.trim())
-    throw new Error('GEMINI_API_KEY es obligatoria cuando AI_MODE=live');
+  const aiProvider = process.env.AI_PROVIDER?.trim().toLowerCase();
+  if (aiProvider && !['groq', 'gemini'].includes(aiProvider))
+    throw new Error('AI_PROVIDER debe ser groq o gemini');
+  if (aiMode === 'live') {
+    const selectedAIProvider = aiProvider || (process.env.GROQ_API_KEY ? 'groq' : 'gemini');
+    const requiredAIKey = selectedAIProvider === 'groq' ? 'GROQ_API_KEY' : 'GEMINI_API_KEY';
+    if (!process.env[requiredAIKey]?.trim())
+      throw new Error(`${requiredAIKey} es obligatoria cuando AI_MODE=live y AI_PROVIDER=${selectedAIProvider}`);
+  }
   const ownerId = process.env.CRM_OWNER_ID?.trim();
   if (ownerId && !/^[0-9a-fA-F]{24}$/.test(ownerId))
     throw new Error(

@@ -3,6 +3,8 @@ import { GeminiAIProvider } from '../src/integrations/ai/GeminiAIProvider';
 import { GeminiService } from '../src/services/GeminiService';
 import { AlmaService } from '../src/services/AlmaService';
 import { ConversationService } from '../src/services/ConversationService';
+import { GroqAIProvider } from '../src/providers/ai/GroqAIProvider';
+import { GroqService } from '../src/services/GroqService';
 
 describe('AI provider selection', () => {
   const originalEnv = process.env;
@@ -24,6 +26,22 @@ describe('AI provider selection', () => {
     delete process.env.AI_MODE;
     delete process.env.GEMINI_API_KEY;
     expect(getAIProvider().name).toBe('mock');
+  });
+
+  test('AI_MODE=live selects Groq when configured as the primary provider', () => {
+    process.env.AI_MODE = 'live';
+    process.env.AI_PROVIDER = 'groq';
+    process.env.GROQ_API_KEY = 'test-key';
+    expect(getAIProvider().name).toBe('groq');
+  });
+
+  test('Groq failures propagate instead of producing a simulated reply', async () => {
+    const generate = jest.spyOn(GroqService, 'generateResponse').mockRejectedValue(new Error('provider unavailable'));
+    const provider = new GroqAIProvider();
+    await expect(provider.generateReply({
+      incomingText: 'Quiero información', isNewLead: false, intent: 'discovery', platform: 'whatsapp', history: [],
+    })).rejects.toThrow('provider unavailable');
+    generate.mockRestore();
   });
 
   test('Gemini receives conversation history and an anti-repetition instruction', async () => {
