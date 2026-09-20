@@ -34,7 +34,7 @@ export class AssistedResponseService {
     if (!leadTexts.length || leadTexts[leadTexts.length - 1] !== context.text) leadTexts.push(context.text);
     const qualification = analyzeWhatsAppConversation(leadTexts, commercialContext);
     const launchAttribution = await LaunchAttributionService.resolve(context.userId, context.leadId, context.conversationId);
-    const meetingReadiness = MeetingReadinessService.evaluate(leadTexts, qualification, launchAttribution);
+    const meetingReadiness = MeetingReadinessService.evaluate(leadTexts, qualification, launchAttribution, recent);
     const handoffReason = AlmaService.detectHandoffReason(context.text);
     const applied = await QualificationApplicationService.apply({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, platform: context.platform, source: 'assisted_qualification', text: context.text, isNewLead: context.isNewLead, commercialContextId: commercialContext?._id, launchId: launchAttribution?.launchId, launchParticipantId: launchAttribution?.participantId, meetingReadiness, evaluation: qualification });
     await Lead.updateOne({ _id: context.leadId, userId: context.userId }, { $set: { currentChannel: context.platform } });
@@ -47,7 +47,7 @@ export class AssistedResponseService {
     const meetingOutcome = await MeetingOrchestratorService.process({
       userId: context.userId, leadId: context.leadId, conversationId: context.conversationId,
       sourceEventId: context.sourceEventId, text: context.text, platform: context.platform,
-      wantsMeeting: !handoffReason && meetingReadiness.ready,
+      wantsMeeting: !handoffReason && MeetingReadinessService.shouldStartScheduling(meetingReadiness),
       meetingReadiness: meetingReadiness.reason,
       launchId: launchAttribution?.launchId, launchParticipantId: launchAttribution?.participantId,
     });

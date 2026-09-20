@@ -29,7 +29,7 @@ services:
       - key: GROQ_TIMEOUT_MS
         value: "15000"
       - key: GROQ_MAX_TOKENS
-        value: "180"
+        value: "512"
       - key: GEMINI_API_KEY
         sync: false
       - key: REAL_OUTBOUND_ENABLED

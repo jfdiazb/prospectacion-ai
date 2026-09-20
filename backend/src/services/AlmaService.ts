@@ -73,8 +73,8 @@ export class AlmaService {
     if (!leadTexts.length || leadTexts[leadTexts.length - 1] !== context.text) leadTexts.push(context.text);
     const qualification = analyzeWhatsAppConversation(leadTexts, commercialContext);
     const launchAttribution = await LaunchAttributionService.resolve(context.userId, context.leadId, context.conversationId);
-    const meetingReadiness = MeetingReadinessService.evaluate(leadTexts, qualification, launchAttribution);
-    const wantsMeeting = meetingReadiness.ready;
+    const meetingReadiness = MeetingReadinessService.evaluate(leadTexts, qualification, launchAttribution, recentMessages);
+    const wantsMeeting = MeetingReadinessService.shouldStartScheduling(meetingReadiness);
     const applied = await QualificationApplicationService.apply({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, platform: context.platform, source: 'alma_autonomous_qualification', text: context.text, isNewLead: context.isNewLead, commercialContextId: commercialContext?._id, launchId: launchAttribution?.launchId, launchParticipantId: launchAttribution?.participantId, meetingReadiness, evaluation: qualification });
     const isRejected = applied.current.status === 'rejected';
     const score = applied.current.score;

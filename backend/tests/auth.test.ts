@@ -440,9 +440,9 @@ describe('Auth integration tests', () => {
     expect(rejected.status).toBe(401);
     expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(200);
     expect((await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, config)).status).toBe(200);
-    await waitUntil(async () => Boolean(await Lead.exists({ userId: owner!._id, phone: '573001234567' })));
+    await waitUntil(async () => (await InboundEvent.findOne({ externalEventId: eventId }))?.processingState === 'completed');
     const lead = await Lead.findOne({ userId: owner!._id, phone: '573001234567' });
-    expect(lead).toMatchObject({ platform: 'whatsapp', source: 'whatsapp_webhook' });
+    expect(lead).toMatchObject({ platform: 'whatsapp', source: 'whatsapp_webhook', currentChannel: 'whatsapp' });
     expect(await Conversation.countDocuments({ leadId: lead!._id })).toBe(1);
     expect(await InboundEvent.countDocuments({ externalEventId: eventId })).toBe(1);
     expect(await OutboundMessage.countDocuments({ sourceEventId: eventId })).toBe(0);

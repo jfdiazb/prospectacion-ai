@@ -2,11 +2,13 @@ import { MeetingLifecycleService } from './MeetingLifecycleService';
 
 export type MeetingReadiness = {
   ready: boolean;
-  reason: 'explicit_request' | 'qualified_discovery' | 'needs_discovery';
+  reason: 'explicit_request' | 'explicit_acceptance' | 'qualified_discovery' | 'needs_discovery';
   evidence: string[];
   launchId?: string;
   launchParticipantId?: string;
 };
+
+type ConversationTurn = { sender: 'lead' | 'ai' | 'user'; text: string };
 
 const normalize = (value: string) =>
   value
@@ -15,10 +17,28 @@ const normalize = (value: string) =>
     .toLocaleLowerCase('es');
 
 export class MeetingReadinessService {
+  static shouldStartScheduling(readiness: MeetingReadiness): boolean {
+    return readiness.reason === 'explicit_request' || readiness.reason === 'explicit_acceptance';
+  }
+
+  static explicitlyAcceptedMeeting(current: string, conversation: ConversationTurn[] = []): boolean {
+    const affirmative = normalize(current).replace(/[^a-z0-9]+/g, ' ').trim();
+    if (!/^(si|si por favor|claro|claro que si|de acuerdo|ok|vale|por supuesto|me gustaria|hagamoslo)$/.test(affirmative)) {
+      return false;
+    }
+    const currentIndex = [...conversation].map(turn => turn.text).lastIndexOf(current);
+    const preceding = currentIndex >= 0 ? conversation.slice(0, currentIndex) : conversation;
+    const previousAI = [...preceding].reverse().find(turn => turn.sender === 'ai' || turn.sender === 'user');
+    if (!previousAI) return false;
+    const question = normalize(previousAI.text);
+    return /\b(quieres|deseas|aceptas|te gustaria|podemos)\b.{0,90}\b(agend(?:ar|emos)|program(?:ar|emos)|reserv(?:ar|emos)|coordin(?:ar|emos))\b.{0,60}\b(reunion|llamada|cita|asesoria)\b|\b(agendamos|programamos|reservamos|coordinamos)\b.{0,60}\b(reunion|llamada|cita|asesoria)\b/.test(question);
+  }
+
   static evaluate(
     leadTexts: string[],
     qualification: any,
-    attribution?: { launchId: string; participantId: string }
+    attribution?: { launchId: string; participantId: string },
+    conversationTurns: ConversationTurn[] = []
   ): MeetingReadiness {
     const current = leadTexts.at(-1) ?? '';
 
@@ -29,6 +49,16 @@ export class MeetingReadinessService {
         ready: true,
         reason: 'explicit_request',
         evidence: ['explicit_meeting_intent'],
+        launchId: attribution?.launchId,
+        launchParticipantId: attribution?.participantId,
+      };
+    }
+
+    if (this.explicitlyAcceptedMeeting(current, conversationTurns)) {
+      return {
+        ready: true,
+        reason: 'explicit_acceptance',
+        evidence: ['explicit_meeting_acceptance'],
         launchId: attribution?.launchId,
         launchParticipantId: attribution?.participantId,
       };

@@ -14,6 +14,21 @@ import { WhatsAppOptOutService } from '../services/WhatsAppOptOutService';
 import { WhatsAppInboundDiagnosticsService } from '../services/WhatsAppInboundDiagnosticsService';
 
 export class WhatsAppController {
+  static isAutomaticReplyEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+    return env.WHATSAPP_REPLY_MODE === 'automatic' && env.WHATSAPP_AUTO_REPLY_ENABLED === 'true';
+  }
+
+  static asynchronousErrorDetails(error: unknown, messageId: unknown) {
+    const diagnostic = error as { name?: string; processingStage?: string; provider?: string };
+    const correlationId = crypto.createHash('sha256').update(String(messageId || 'missing')).digest('hex').slice(0, 16);
+    return {
+      stage: diagnostic?.processingStage || 'inbound_claim',
+      errorType: diagnostic?.name || 'unknown',
+      provider: diagnostic?.provider || 'whatsapp',
+      correlationId,
+    };
+  }
+
   static async inboundDiagnostics(req: AuthRequest, res: Response) {
     const from = new Date(String(req.query.from || ''));
     const to = new Date(String(req.query.to || ''));
@@ -79,9 +94,10 @@ export class WhatsAppController {
       await Promise.all(
         deliveries.map((delivery: { message: any; metadata: any }) =>
           WhatsAppController.processMessage(delivery.message, delivery.metadata).catch(error => {
-            console.error('WhatsApp asynchronous processing failed', {
-              errorType: error instanceof Error ? error.name : 'unknown',
-            });
+            console.error(
+              'WhatsApp asynchronous processing failed',
+              WhatsAppController.asynchronousErrorDetails(error, delivery.message?.id)
+            );
           })
         )
       );
@@ -139,6 +155,8 @@ export class WhatsAppController {
     console.info('WhatsApp webhook message accepted', {
       messageType: normalized.messageType,
       autoReplyEnabled: process.env.WHATSAPP_AUTO_REPLY_ENABLED === 'true',
+      replyMode: process.env.WHATSAPP_REPLY_MODE || 'assisted',
+      automaticProcessing: WhatsAppController.isAutomaticReplyEnabled(),
     });
     const userId = process.env.CRM_OWNER_ID;
     if (!userId) throw new Error('CRM_OWNER_ID no configurado');
@@ -154,8 +172,12 @@ export class WhatsAppController {
         inbound.processingState === 'failed' &&
         (!inbound.retryAfter || new Date(inbound.retryAfter) <= now);
       if (!staleProcessing && !retryableFailure) {
-        if (inbound.processingState === 'failed' || inbound.processingState === 'processing')
-          throw new Error('WhatsApp event is waiting for safe retry');
+        if (inbound.processingState === 'failed' || inbound.processingState === 'processing') {
+          console.info('WhatsApp webhook delivery deferred', {
+            reason: inbound.processingState === 'processing' ? 'already_processing' : 'retry_not_due',
+          });
+          return;
+        }
         console.info('WhatsApp webhook duplicate ignored');
         return;
       }
@@ -202,6 +224,8 @@ export class WhatsAppController {
       }
     }
 
+    let processingStage = 'lead_resolution';
+    let provider = 'whatsapp';
     try {
       let lead: any = await Lead.findOne({ phone: senderPhone, userId });
       const isNewLead = !lead;
@@ -217,10 +241,15 @@ export class WhatsAppController {
         lead = await Lead.findById(created._id);
       }
       if (!lead) throw new Error('No fue posible crear el lead de WhatsApp');
+      await Lead.updateOne(
+        { _id: lead._id, userId },
+        { $set: { currentChannel: 'whatsapp' } }
+      );
       const conversation = await ConversationService.getOrCreateConversation(
         userId,
         lead._id.toString()
       );
+      processingStage = 'conversation_persistence';
       if (!inbound.conversationRecordedAt) {
         await ConversationService.addMessage(conversation._id.toString(), userId, {
           sender: 'lead',
@@ -243,6 +272,7 @@ export class WhatsAppController {
           normalized.occurredAt
         );
       try {
+        processingStage = 'launch_adaptation';
         await WhatsAppLaunchAdapter.ingest(userId, normalized, {
           leadId: lead._id.toString(),
           conversationId: conversation._id.toString(),
@@ -267,9 +297,9 @@ export class WhatsAppController {
         return;
       }
 
-      const automaticEnabled =
-        process.env.WHATSAPP_REPLY_MODE === 'automatic' &&
-        process.env.WHATSAPP_AUTO_REPLY_ENABLED === 'true';
+      const automaticEnabled = WhatsAppController.isAutomaticReplyEnabled();
+      processingStage = automaticEnabled ? 'automatic_response' : 'assisted_proposal';
+      provider = automaticEnabled ? (process.env.AI_PROVIDER || 'ai') : 'assisted';
       if (automaticEnabled)
         await AlmaService.processMessage({
           userId,
@@ -291,6 +321,8 @@ export class WhatsAppController {
           sourceEventId: eventId,
         });
       const refreshed: any = await Lead.findOne({ _id: lead._id, userId }).lean();
+      processingStage = 'automation_events';
+      provider = 'automation';
       await AutomationEngineService.emitMessageEvents({
         eventId,
         userId,
@@ -316,6 +348,7 @@ export class WhatsAppController {
         { _id: inbound._id },
         { $set: { processingState: 'completed', processedAt: new Date() } }
       );
+      processingStage = 'completed';
       console.info('WhatsApp webhook processing completed', { isNewLead });
     } catch (error) {
       await InboundEvent.updateOne(
@@ -328,6 +361,9 @@ export class WhatsAppController {
           },
         }
       );
+      if (error && typeof error === 'object') {
+        Object.assign(error, { processingStage, provider });
+      }
       throw error;
     }
   }

@@ -19,7 +19,9 @@ describe('ALMA qualification to meeting readiness', () => {
       'Actualmente tengo un negocio y mi principal problema es el seguimiento',
       'Sí, estoy dispuesto a conocer una solución y el siguiente paso',
     ];
-    expect(readiness(texts)).toMatchObject({ ready: true, reason: 'qualified_discovery', evidence: expect.arrayContaining(['declared_interest', 'declared_need_or_goal', 'prospect_context', 'next_step_openness', 'discovery_conversation']) });
+    const result = readiness(texts);
+    expect(result).toMatchObject({ ready: true, reason: 'qualified_discovery', evidence: expect.arrayContaining(['declared_interest', 'declared_need_or_goal', 'prospect_context', 'next_step_openness', 'discovery_conversation']) });
+    expect(MeetingReadinessService.shouldStartScheduling(result)).toBe(false);
   });
 
 
@@ -35,6 +37,29 @@ describe('ALMA qualification to meeting readiness', () => {
   test('case E keeps the explicit meeting fast path', () => {
     expect(readiness(['Quiero agendar una llamada para conocer el negocio']))
       .toEqual({ ready: true, reason: 'explicit_request', evidence: ['explicit_meeting_intent'] });
+  });
+
+  test('a yes to a free-time discovery question does not become meeting intent', () => {
+    const texts = ['Busco generar ingresos adicionales', 'Sí'];
+    const conversation = [
+      { sender: 'lead' as const, text: texts[0] },
+      { sender: 'ai' as const, text: '¿Buscas una opción que puedas desarrollar en tus tiempos libres?' },
+      { sender: 'lead' as const, text: texts[1] },
+    ];
+    expect(MeetingReadinessService.evaluate(texts, analyzeWhatsAppConversation(texts), undefined, conversation))
+      .toMatchObject({ ready: false, reason: 'needs_discovery' });
+  });
+
+  test('a yes to an explicit meeting offer is recognized from conversational history', () => {
+    const texts = ['Quiero conocer cómo funciona el negocio', 'Sí, por favor'];
+    const conversation = [
+      { sender: 'lead' as const, text: texts[0] },
+      { sender: 'ai' as const, text: '¿Te gustaría que programemos una reunión para explicarte el siguiente paso?' },
+      { sender: 'lead' as const, text: texts[1] },
+    ];
+    const result = MeetingReadinessService.evaluate(texts, analyzeWhatsAppConversation(texts), undefined, conversation);
+    expect(result).toEqual({ ready: true, reason: 'explicit_acceptance', evidence: ['explicit_meeting_acceptance'] });
+    expect(MeetingReadinessService.shouldStartScheduling(result)).toBe(true);
   });
 
   test('case F does not carry stale meeting intent into a later discovery turn', () => {

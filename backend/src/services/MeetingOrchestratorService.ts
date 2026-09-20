@@ -7,7 +7,7 @@ import { MeetingLifecycleService } from './MeetingLifecycleService';
 import { AutomationEngineService } from './AutomationEngineService';
 import { LaunchAttributionService } from './LaunchAttributionService';
 
-type MeetingContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; wantsMeeting: boolean; meetingReadiness?: 'explicit_request' | 'qualified_discovery' | 'needs_discovery'; launchId?: string; launchParticipantId?: string; platform?: 'instagram' | 'facebook' | 'youtube' | 'whatsapp' };
+type MeetingContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; wantsMeeting: boolean; meetingReadiness?: 'explicit_request' | 'explicit_acceptance' | 'qualified_discovery' | 'needs_discovery'; launchId?: string; launchParticipantId?: string; platform?: 'instagram' | 'facebook' | 'youtube' | 'whatsapp' };
 type MeetingOutcome = { handled: boolean; reply?: string };
 
 const TIMEZONE_ALIASES: Record<string, string> = {
@@ -65,7 +65,7 @@ export class MeetingOrchestratorService {
     if (!meeting && !context.wantsMeeting) return { handled: false };
     if (!meeting) {
       if ((process.env.SCHEDULING_MODE || 'zoom') === 'calendly') {
-        const booking = this.buildCalendlyBookingUrl();
+        const booking = this.buildCalendlyBookingUrl(context.platform);
         if (!booking) {
           await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'meeting_requested', description: 'El prospecto solicitó una reunión; Calendly aún no está configurado' });
           return { handled: true, reply: '¡Gracias! La agenda está siendo configurada. Dejé tu solicitud registrada para ofrecerte un horario disponible.' };
@@ -182,14 +182,14 @@ export class MeetingOrchestratorService {
     await LaunchAttributionService.attachMeeting(context.userId, attribution, meeting?._id);
   }
 
-  private static buildCalendlyBookingUrl(): { url: string; token: string } | null {
+  private static buildCalendlyBookingUrl(platform?: MeetingContext['platform']): { url: string; token: string } | null {
     const configured = process.env.CALENDLY_BOOKING_URL?.trim();
     if (!configured) return null;
     try {
       const url = new URL(configured);
       if (url.protocol !== 'https:') return null;
       const token = crypto.randomBytes(24).toString('hex');
-      url.searchParams.set('utm_source', 'youtube');
+      url.searchParams.set('utm_source', platform || 'unknown');
       url.searchParams.set('utm_medium', 'alma');
       url.searchParams.set('utm_campaign', 'discovery_meeting');
       url.searchParams.set('utm_content', token);

@@ -1,6 +1,13 @@
 import { MeetingOrchestratorService } from '../src/services/MeetingOrchestratorService';
 
 describe('MeetingOrchestratorService detail extraction', () => {
+  const originalCalendlyUrl = process.env.CALENDLY_BOOKING_URL;
+
+  afterEach(() => {
+    if (originalCalendlyUrl === undefined) delete process.env.CALENDLY_BOOKING_URL;
+    else process.env.CALENDLY_BOOKING_URL = originalCalendlyUrl;
+  });
+
   test('extracts email, Latin date, 12-hour time and city timezone', () => {
     expect(MeetingOrchestratorService.extractDetails('Escribe a Ana.Test+alma@example.com el 20/08/2027 a las 3:30 pm en Bogotá')).toEqual({
       email: 'ana.test+alma@example.com', date: '2027-08-20', time: '15:30', timezone: 'America/Bogota',
@@ -26,5 +33,14 @@ describe('MeetingOrchestratorService detail extraction', () => {
     expect(MeetingOrchestratorService.activeScheduledMeetingFilter('conversation-1', now)).toEqual({
       conversationId: 'conversation-1', status: 'scheduled', scheduledFor: { $gt: now },
     });
+  });
+
+  test('attributes a Calendly link to the current conversation channel', () => {
+    process.env.CALENDLY_BOOKING_URL = 'https://calendly.com/example/discovery?utm_source=youtube';
+    const booking = (MeetingOrchestratorService as any).buildCalendlyBookingUrl('whatsapp');
+    const url = new URL(booking.url);
+    expect(url.searchParams.get('utm_source')).toBe('whatsapp');
+    expect(url.searchParams.get('utm_medium')).toBe('alma');
+    expect(booking.token).toMatch(/^[a-f0-9]{48}$/);
   });
 });
