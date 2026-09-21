@@ -32,10 +32,11 @@ export class AssistedResponseService {
     const recent = await ConversationService.getRecentMessages(context.conversationId, context.userId);
     const leadTexts = recent.filter((m: any) => m.sender === 'lead').map((m: any) => m.text).filter(Boolean);
     const commercialContext: any = await CommercialContextService.getActive(context.userId);
+    const priorCommercialMemory = await ConversationMemoryService.get(context.userId, context.conversationId);
     if (!leadTexts.length || leadTexts[leadTexts.length - 1] !== context.text) leadTexts.push(context.text);
     const qualification = analyzeWhatsAppConversation(leadTexts, commercialContext);
     const launchAttribution = await LaunchAttributionService.resolve(context.userId, context.leadId, context.conversationId);
-    const meetingReadiness = MeetingReadinessService.evaluate(leadTexts, qualification, launchAttribution, recent);
+    const meetingReadiness = MeetingReadinessService.evaluate(leadTexts, qualification, launchAttribution, recent, priorCommercialMemory.meetingEvidence);
     const handoffReason = AlmaService.detectHandoffReason(context.text);
     const applied = await QualificationApplicationService.apply({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, platform: context.platform, source: 'assisted_qualification', text: context.text, isNewLead: context.isNewLead, commercialContextId: commercialContext?._id, launchId: launchAttribution?.launchId, launchParticipantId: launchAttribution?.participantId, meetingReadiness, evaluation: qualification });
     await Lead.updateOne({ _id: context.leadId, userId: context.userId }, { $set: { currentChannel: context.platform } });

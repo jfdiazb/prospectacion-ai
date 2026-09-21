@@ -34,6 +34,24 @@ describe('ALMA qualification to meeting readiness', () => {
     expect(readiness(texts)).toMatchObject({ ready: true, reason: 'qualified_discovery', evidence: expect.arrayContaining(['declared_interest', 'declared_need_or_goal', 'prospect_context', 'discovery_conversation', 'sustained_engagement']) });
   });
 
+  test('keeps durable discovery evidence when early turns leave the recent-message window', () => {
+    const priorEvidence = ['declared_interest', 'declared_need_or_goal', 'prospect_context', 'discovery_conversation'];
+    const recentTexts = ['Sí, quiero aprender y conocer el siguiente paso'];
+    const result = MeetingReadinessService.evaluate(
+      recentTexts,
+      analyzeWhatsAppConversation(recentTexts),
+      undefined,
+      [{ sender: 'lead', text: recentTexts[0] }],
+      priorEvidence,
+    );
+
+    expect(result).toMatchObject({
+      ready: true,
+      reason: 'qualified_discovery',
+      evidence: expect.arrayContaining([...priorEvidence, 'next_step_openness']),
+    });
+  });
+
   test('case E keeps the explicit meeting fast path', () => {
     expect(readiness(['Quiero agendar una llamada para conocer el negocio']))
       .toEqual({ ready: true, reason: 'explicit_request', evidence: ['explicit_meeting_intent'] });

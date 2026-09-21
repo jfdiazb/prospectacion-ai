@@ -70,11 +70,12 @@ export class AlmaService {
     if (handoffReason) return await this.requestHumanHandoff(context, handoffReason);
     const recentMessages = await ConversationService.getRecentMessages(context.conversationId, context.userId);
     const commercialContext: any = await CommercialContextService.getActive(context.userId);
+    const priorCommercialMemory = await ConversationMemoryService.get(context.userId, context.conversationId);
     const leadTexts = recentMessages.filter((message: any) => message.sender === 'lead').map((message: any) => message.text).filter(Boolean);
     if (!leadTexts.length || leadTexts[leadTexts.length - 1] !== context.text) leadTexts.push(context.text);
     const qualification = analyzeWhatsAppConversation(leadTexts, commercialContext);
     const launchAttribution = await LaunchAttributionService.resolve(context.userId, context.leadId, context.conversationId);
-    const meetingReadiness = MeetingReadinessService.evaluate(leadTexts, qualification, launchAttribution, recentMessages);
+    const meetingReadiness = MeetingReadinessService.evaluate(leadTexts, qualification, launchAttribution, recentMessages, priorCommercialMemory.meetingEvidence);
     const wantsMeeting = MeetingReadinessService.shouldStartScheduling(meetingReadiness);
     const applied = await QualificationApplicationService.apply({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, platform: context.platform, source: 'alma_autonomous_qualification', text: context.text, isNewLead: context.isNewLead, commercialContextId: commercialContext?._id, launchId: launchAttribution?.launchId, launchParticipantId: launchAttribution?.participantId, meetingReadiness, evaluation: qualification });
     const isOptedOut = (applied.current.tags ?? []).includes('opt_out');
@@ -83,6 +84,14 @@ export class AlmaService {
     await LaunchAttributionService.recordReadiness(context.userId, launchAttribution, meetingReadiness, ['warm', 'hot'].includes(applied.current.interestLevel));
     await ConversationMemoryService.update({ userId: context.userId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, evaluation: qualification, meetingReadiness, status: applied.current.status });
     const commercialMemory = await ConversationMemoryService.get(context.userId, context.conversationId);
+    const requiredEvidence = ['declared_interest', 'declared_need_or_goal', 'prospect_context', 'discovery_conversation'];
+    console.info('ALMA meeting decision', {
+      event: 'alma_meeting_decision', channel: context.platform, score: applied.current.score,
+      status: applied.current.status, readiness: meetingReadiness.reason, evidence: meetingReadiness.evidence,
+      missingEvidence: requiredEvidence.filter(item => !meetingReadiness.evidence.includes(item)),
+      action: isOptedOut ? 'blocked_opt_out' : isRejected ? 'blocked_rejected'
+        : meetingReadiness.reason === 'qualified_discovery' ? 'offer' : wantsMeeting ? 'schedule' : 'continue_discovery',
+    });
     if (isOptedOut) return '';
 
     const intent = qualification.intent;
@@ -140,6 +149,11 @@ export class AlmaService {
 
     await ConversationService.addMessage(context.conversationId, context.userId, { sender: 'ai', text: response, platform: context.platform });
     const deliveryStatus = await MessagingService.send({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: response, recipient: context.recipient });
+    console.info('ALMA outbound decision', {
+      event: 'alma_outbound_decision', channel: context.platform, deliveryStatus,
+      responseSource: meetingOutcome.reply ? 'meeting_orchestrator' : shouldOfferMeeting ? 'qualified_meeting_offer' : context.automation ? 'automation' : 'ai',
+      meetingState: commercialMemory.bookingStatus || (shouldOfferMeeting ? 'offer_sent' : undefined),
+    });
     if (context.automation && deliveryStatus !== 'duplicate') await AutomationService.recordExecution(context.automation.flowId, context.userId, deliveryStatus !== 'failed');
     await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'message_generated', description: context.automation ? 'ALMA ejecutó una automatización por palabra clave' : 'ALMA generó y procesó una respuesta saliente', metadata: context.automation ? { automationFlowId: context.automation.flowId, responseSource: 'automation' } : shouldOfferMeeting ? { responseSource: 'qualified_meeting_offer' } : aiProviderUsed ? { aiProvider: aiProvider!.name, aiProviderUsed } : { responseSource: 'meeting_orchestrator' } });
     return response;

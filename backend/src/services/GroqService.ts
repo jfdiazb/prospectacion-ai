@@ -22,6 +22,7 @@ export class GroqService {
     const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
     const purpose = telemetry.purpose || 'conversation';
     const promptHash = crypto.createHash('sha256').update(prompt).digest('hex');
+    const startedAt = Date.now();
     let invocation: any;
     if (telemetry.userId && telemetry.sourceEventId) {
       const existing: any = await AIInvocation.findOne({ userId: telemetry.userId, sourceEventId: telemetry.sourceEventId, purpose }).lean();
@@ -46,7 +47,7 @@ export class GroqService {
         ],
       })
       .catch((error: any) => {
-        if (invocation) void AIInvocation.updateOne({ _id: invocation._id }, { $set: { status: 'failed', failedAt: new Date(), errorType: error?.name || 'Error' } });
+        if (invocation) void AIInvocation.updateOne({ _id: invocation._id }, { $set: { status: 'failed', failedAt: new Date(), errorType: error?.name || 'Error', latencyMs: Date.now() - startedAt, retryCount: 1 } });
         console.error('Groq request failed', {
           event: 'groq_request_failed',
           model,
@@ -59,10 +60,15 @@ export class GroqService {
       });
 
     const response = completion.choices[0]?.message?.content?.trim();
-    if (!response) throw new Error('Groq devolvió una respuesta vacía');
+    if (!response) {
+      if (invocation) await AIInvocation.updateOne({ _id: invocation._id }, { $set: { status: 'failed', failedAt: new Date(), errorType: 'empty_response', latencyMs: Date.now() - startedAt } });
+      throw new Error('Groq devolvió una respuesta vacía');
+    }
+    const reasoningTokens = (completion.usage as any)?.completion_tokens_details?.reasoning_tokens;
     if (invocation) await AIInvocation.updateOne({ _id: invocation._id }, { $set: {
       status: 'completed', responseText: response, completedAt: new Date(),
       promptTokens: completion.usage?.prompt_tokens, completionTokens: completion.usage?.completion_tokens, totalTokens: completion.usage?.total_tokens,
+      reasoningTokens, latencyMs: Date.now() - startedAt, retryCount: 0,
     } });
     console.info('Groq response generated', {
       event: 'groq_response_generated',
@@ -70,6 +76,8 @@ export class GroqService {
       promptTokens: completion.usage?.prompt_tokens,
       completionTokens: completion.usage?.completion_tokens,
       totalTokens: completion.usage?.total_tokens,
+      reasoningTokens,
+      latencyMs: Date.now() - startedAt,
     });
     return response;
   }

@@ -59,6 +59,7 @@ const conversationSchema = new Schema(
       needs: [{ type: String }],
       objections: [{ type: String }],
       answeredTopics: [{ type: String }],
+      meetingEvidence: [{ type: String }],
       commercialState: String,
       meetingInterest: { type: String, enum: ['unknown', 'offered', 'accepted', 'declined'], default: 'unknown' },
       lastMeetingOfferAt: Date,

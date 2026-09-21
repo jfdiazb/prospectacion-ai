@@ -50,9 +50,9 @@ router.get('/ai-usage', async (req: AuthRequest, res, next) => {
     };
     const [totals] = await AIInvocation.aggregate([
       { $match: match },
-      { $group: { _id: null, requests: { $sum: 1 }, promptTokens: { $sum: '$promptTokens' }, completionTokens: { $sum: '$completionTokens' }, totalTokens: { $sum: '$totalTokens' } } },
+      { $group: { _id: null, requests: { $sum: 1 }, promptTokens: { $sum: '$promptTokens' }, completionTokens: { $sum: '$completionTokens' }, totalTokens: { $sum: '$totalTokens' }, reasoningTokens: { $sum: '$reasoningTokens' }, averageLatencyMs: { $avg: '$latencyMs' }, retries: { $sum: '$retryCount' } } },
     ]);
-    res.json({ success: true, data: totals || { requests: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0 } });
+    res.json({ success: true, data: totals || { requests: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, reasoningTokens: 0, averageLatencyMs: 0, retries: 0 } });
   } catch (error) { next(error); }
 });
 

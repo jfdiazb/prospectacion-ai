@@ -20,6 +20,7 @@ export class ConversationMemoryService {
     const memory = {
       interests, needs, objections,
       answeredTopics: unique(previous.answeredTopics ?? []),
+      meetingEvidence: unique([...(previous.meetingEvidence ?? []), ...(context.meetingReadiness?.evidence ?? [])]),
       commercialState: context.status,
       meetingInterest,
       lastMeetingOfferAt: reason === 'qualified_discovery' ? new Date() : previous.lastMeetingOfferAt,

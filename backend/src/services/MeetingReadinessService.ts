@@ -8,6 +8,11 @@ export type MeetingReadiness = {
   launchParticipantId?: string;
 };
 
+const DISCOVERY_EVIDENCE = [
+  'declared_interest', 'declared_need_or_goal', 'prospect_context', 'comprehensive_single_turn',
+  'discovery_conversation', 'next_step_openness', 'guidance_interest', 'sustained_engagement',
+] as const;
+
 type ConversationTurn = { sender: 'lead' | 'ai' | 'user'; text: string };
 
 const normalize = (value: string) =>
@@ -62,7 +67,8 @@ export class MeetingReadinessService {
     leadTexts: string[],
     qualification: any,
     attribution?: { launchId: string; participantId: string },
-    conversationTurns: ConversationTurn[] = []
+    conversationTurns: ConversationTurn[] = [],
+    priorEvidence: string[] = []
   ): MeetingReadiness {
     const current = leadTexts.at(-1) ?? '';
 
@@ -104,7 +110,8 @@ export class MeetingReadinessService {
     }
 
     const conversation = normalize(leadTexts.join(' '));
-    const evidence = new Set<string>();
+    const allowedEvidence = new Set<string>(DISCOVERY_EVIDENCE);
+    const evidence = new Set<string>(priorEvidence.filter(item => allowedEvidence.has(item)));
 
     const normalizedIntent = String(
       qualification?.normalizedIntent || 'undetermined'

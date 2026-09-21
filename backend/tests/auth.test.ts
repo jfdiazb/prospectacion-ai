@@ -301,7 +301,7 @@ describe('Auth integration tests', () => {
     const firstUserId = first.data.data.user._id;
     const secondUserId = second.data.data.user._id;
     await AIInvocation.create([
-      { userId: firstUserId, sourceEventId: 'usage-1', purpose: 'conversation', model: 'test', promptHash: 'a', status: 'completed', promptTokens: 100, completionTokens: 25, totalTokens: 125 },
+      { userId: firstUserId, sourceEventId: 'usage-1', purpose: 'conversation', model: 'test', promptHash: 'a', status: 'completed', promptTokens: 100, completionTokens: 25, totalTokens: 125, reasoningTokens: 5, latencyMs: 200, retryCount: 0 },
       { userId: firstUserId, sourceEventId: 'usage-2', purpose: 'conversation', model: 'test', promptHash: 'b', status: 'failed', totalTokens: 999 },
       { userId: secondUserId, sourceEventId: 'usage-3', purpose: 'conversation', model: 'test', promptHash: 'c', status: 'completed', promptTokens: 500, completionTokens: 100, totalTokens: 600 },
     ]);
@@ -314,7 +314,7 @@ describe('Auth integration tests', () => {
     ]);
 
     expect(runtime.data.data).toEqual(expect.objectContaining({ webhookOwnerConfigured: true, webhookOwnerMatchesSession: true }));
-    expect(usage.data.data).toEqual({ _id: null, requests: 1, promptTokens: 100, completionTokens: 25, totalTokens: 125 });
+    expect(usage.data.data).toEqual({ _id: null, requests: 1, promptTokens: 100, completionTokens: 25, totalTokens: 125, reasoningTokens: 5, averageLatencyMs: 200, retries: 0 });
     delete process.env.CRM_OWNER_ID;
   });
 
@@ -568,6 +568,7 @@ describe('Auth integration tests', () => {
     expect(refreshedConversation.commercialMemory).toMatchObject({
       commercialState: 'interested', meetingInterest: 'offered', updatedThroughEventId: eventId,
       interests: expect.arrayContaining(['additional_income_interest']),
+      meetingEvidence: expect.arrayContaining(['declared_interest', 'declared_need_or_goal', 'prospect_context']),
     });
     expect(await Activity.findOne({ userId: owner!._id, leadId: existingLead._id, type: 'message_received', 'metadata.sourceEventId': eventId })).not.toBeNull();
 

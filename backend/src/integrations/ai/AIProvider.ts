@@ -10,7 +10,7 @@ export interface AIReplyContext {
   history: Array<{ sender: 'lead' | 'ai'; text: string }>;
   askedTopics?: string[];
   memory?: {
-    interests?: string[]; needs?: string[]; objections?: string[]; askedTopics?: string[];
+    interests?: string[]; needs?: string[]; objections?: string[]; askedTopics?: string[]; meetingEvidence?: string[];
     commercialState?: string; meetingInterest?: string; bookingStatus?: string; bookingProvider?: string;
   };
   normalizedIntent?: string;

@@ -7,7 +7,7 @@ export interface CrmConversation { _id: string; status: string; controlMode?: 'a
 export interface CrmTask { _id: string; title: string; description: string; type: 'follow_up' | 'meeting' | 'call' | 'email' | 'other'; status: 'pending' | 'completed' | 'cancelled'; dueDate?: string; priority?: 'low' | 'medium' | 'high'; leadId?: { username?: string; fullName?: string } }
 export interface DuplicateCandidate { _id: string; signals: string[]; leadAId: { _id: string; username?: string; platform?: string }; leadBId: { _id: string; username?: string; platform?: string } }
 export interface CrmRuntime { webhookOwnerMatchesSession: boolean; webhookOwnerConfigured: boolean; buildSha: string; automaticWhatsApp: boolean }
-export interface AiUsage { requests: number; promptTokens: number; completionTokens: number; totalTokens: number }
+export interface AiUsage { requests: number; promptTokens: number; completionTokens: number; totalTokens: number; reasoningTokens?: number; averageLatencyMs?: number; retries?: number }
 
 export const crmService = {
   async runtime(): Promise<CrmRuntime> { const response = await apiClient.get('/crm/runtime'); return response.data.data; },
