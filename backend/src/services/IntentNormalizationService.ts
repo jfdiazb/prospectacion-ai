@@ -9,7 +9,7 @@ export class IntentNormalizationService {
     const text = normalizeCommercialText(texts.join(' '));
     const currentText = normalizeCommercialText(texts.at(-1) ?? '');
     const explicitMeeting = /\b(quiero|podemos|quisiera|agendemos|programar|tener|necesito|deseo)\b.{0,45}\b(reunion|reunirnos|llamada|agendar|agenda|videollamada|asesoria|horarios?)\b|\bpodemos hablar(?:\s+(?:hoy|manana|esta semana))?\b|\b(agendar|agenda|programar|reservar)\b/.test(currentText);
-    const rejection = /\b(no me interesa|no quiero|deja de escribir|no contactar|stop)\b/.test(text);
+    const rejection = /\b(no me interesa|no quiero|deja de escribir|no contactar|stop)\b/.test(currentText);
     const matches = new Map<string, { phrases: string[]; tags: string[] }>();
     const genericTerms = [
       { intent: 'additional_income_interest', phrases: ['ingreso adicional', 'ingresos adicionales', 'ingreso extra', 'ingresos extra', 'generar ingresos', 'segunda fuente de ingresos', 'actividad adicional', 'trabajar desde casa'], tags: ['interes_ingresos_adicionales'] },

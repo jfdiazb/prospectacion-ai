@@ -7,4 +7,13 @@ describe('WhatsApp conversational qualification', () => {
   test.each(['No me interesa', 'No quiero Amway', 'No quiero un negocio'])(`respects rejection: %s`, text => { const r = analyzeWhatsAppConversation([text]); expect(r.score).toBe(0); expect(r.status).toBe('rejected'); expect(r.signals.meetingIntent).toBe('none'); });
   test('does not present traditional employment seeker as business candidate', () => { const r = analyzeWhatsAppConversation(['Solo busco empleo con salario y contrato']); expect(r.score).toBe(0); expect(r.signals.rejectionReason).toBe('solo_empleo_tradicional'); });
   test('detects product sales and direct declarations', () => { const r = analyzeWhatsAppConversation(['Tengo experiencia en venta de productos y suplementos']); expect(r.signals.productSalesAffinity).toBe('confirmada_por_prospecto'); });
+  test('a renewed explicit interest is not rejected by an older refusal', () => {
+    const r = analyzeWhatsAppConversation([
+      'No quiero continuar por ahora',
+      'Hola, quiero aprender a generar ingresos adicionales usando redes sociales e inteligencia artificial. Mi meta es ganar $500.000 adicionales al mes y puedo dedicar 5 horas semanales',
+    ]);
+    expect(r.normalizedIntent).not.toBe('rejection');
+    expect(r.status).not.toBe('rejected');
+    expect(r.score).toBeGreaterThan(0);
+  });
 });

@@ -76,9 +76,11 @@ export class AlmaService {
     const meetingReadiness = MeetingReadinessService.evaluate(leadTexts, qualification, launchAttribution, recentMessages);
     const wantsMeeting = MeetingReadinessService.shouldStartScheduling(meetingReadiness);
     const applied = await QualificationApplicationService.apply({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, platform: context.platform, source: 'alma_autonomous_qualification', text: context.text, isNewLead: context.isNewLead, commercialContextId: commercialContext?._id, launchId: launchAttribution?.launchId, launchParticipantId: launchAttribution?.participantId, meetingReadiness, evaluation: qualification });
+    const isOptedOut = (applied.current.tags ?? []).includes('opt_out');
     const isRejected = applied.current.status === 'rejected';
     const score = applied.current.score;
     await LaunchAttributionService.recordReadiness(context.userId, launchAttribution, meetingReadiness, ['warm', 'hot'].includes(applied.current.interestLevel));
+    if (isOptedOut) return '';
 
     const intent = qualification.intent;
     if (!isRejected) {
@@ -106,7 +108,7 @@ export class AlmaService {
     const automationAlreadySent = Boolean(context.automation && aiMemory.responseFingerprints.includes(
       ConversationService.fingerprintAIText(context.automation.response)));
     if (automationAlreadySent) context.automation = undefined;
-    const qualifiedMeetingOffer = !context.automation
+    const qualifiedMeetingOffer = !context.automation && !isRejected
       ? MeetingReadinessService.meetingOfferFor(meetingReadiness, recentMessages, leadTexts)
       : undefined;
     const shouldOfferMeeting = Boolean(qualifiedMeetingOffer);

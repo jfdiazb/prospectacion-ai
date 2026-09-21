@@ -39,9 +39,10 @@ export class AssistedResponseService {
     const applied = await QualificationApplicationService.apply({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, platform: context.platform, source: 'assisted_qualification', text: context.text, isNewLead: context.isNewLead, commercialContextId: commercialContext?._id, launchId: launchAttribution?.launchId, launchParticipantId: launchAttribution?.participantId, meetingReadiness, evaluation: qualification });
     await Lead.updateOne({ _id: context.leadId, userId: context.userId }, { $set: { currentChannel: context.platform } });
     await LaunchAttributionService.recordReadiness(context.userId, launchAttribution, meetingReadiness, ['warm', 'hot'].includes(applied.current.interestLevel));
+    if ((applied.current.tags ?? []).includes('opt_out')) return null;
     const history = recent.slice(-10).filter((m: any) => ['lead', 'ai'].includes(m.sender)).map((m: any) => ({ sender: m.sender as 'lead' | 'ai', text: String(m.text).slice(0, 1000) }));
     const memory = await ConversationService.getOrInitializeAIMemory(context.conversationId, context.userId);
-    const qualifiedMeetingOffer = !handoffReason
+    const qualifiedMeetingOffer = !handoffReason && applied.current.status !== 'rejected'
       ? MeetingReadinessService.meetingOfferFor(meetingReadiness, recent, leadTexts)
       : undefined;
     const shouldOfferMeeting = Boolean(qualifiedMeetingOffer);

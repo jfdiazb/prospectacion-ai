@@ -482,7 +482,7 @@ describe('Auth integration tests', () => {
     expect(conversation.messages.at(-1)).toMatchObject({ platform: 'whatsapp', direction: 'inbound' });
   });
 
-  test('auto-sends a meeting offer for the exact comprehensive WhatsApp message without calling the scheduling flow', async () => {
+  test('completes the automatic WhatsApp offer and Calendly acceptance flow with historical state', async () => {
     await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'whatsapp-automatic-qualified@example.com', password: 'password123', fullName: 'Automatic Qualified Owner' });
     const owner = await User.findOne({ email: 'whatsapp-automatic-qualified@example.com' });
     process.env.CRM_OWNER_ID = owner!._id.toString();
@@ -491,27 +491,69 @@ describe('Auth integration tests', () => {
     process.env.WHATSAPP_REPLY_MODE = 'automatic';
     process.env.WHATSAPP_AUTO_REPLY_ENABLED = 'true';
     process.env.WHATSAPP_MESSAGING_MODE = 'mock';
+    process.env.SCHEDULING_MODE = 'calendly';
+    const postAutomaticMessage = async (eventId: string, text: string) => {
+      const rawPayload = JSON.stringify({ entry: [{ changes: [{ value: {
+        metadata: { phone_number_id: 'automatic-qualified-phone-id', display_phone_number: '15550000000' },
+        messages: [{ id: eventId, from: '573006667777', timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: text } }],
+      } }] }] });
+      const signature = `sha256=${crypto.createHmac('sha256', process.env.WHATSAPP_APP_SECRET!).update(Buffer.from(rawPayload)).digest('hex')}`;
+      await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, { headers: { 'Content-Type': 'application/json', 'x-hub-signature-256': signature } });
+      await waitUntil(async () => (await InboundEvent.findOne({ userId: owner!._id, externalEventId: eventId }))?.processingState === 'completed');
+    };
+    await postAutomaticMessage('wamid.automatic-qualified-history', 'No me interesa esta propuesta por ahora');
+    const existingLead: any = await Lead.findOne({ userId: owner!._id, phone: '573006667777' });
+    const existingConversation: any = await Conversation.findOne({ userId: owner!._id, leadId: existingLead._id });
+    const syntheticHistory = Array.from({ length: 294 }, (_, index) => ({
+      sender: index % 2 === 0 ? 'lead' : 'ai',
+      text: index % 2 === 0 ? `Contexto histórico ${index}` : `Pregunta histórica ${index}`,
+      platform: 'whatsapp',
+      direction: index % 2 === 0 ? 'inbound' : 'outbound',
+      status: index % 2 === 0 ? 'received' : 'simulated',
+      timestamp: new Date(Date.now() - (294 - index) * 60000),
+    }));
+    await Conversation.updateOne({ _id: existingConversation._id }, {
+      $set: {
+        messages: [...syntheticHistory, ...existingConversation.messages.map((message: any) => message.toObject())],
+        aiAskedTopics: ['desired_outcome', 'main_obstacle', 'previous_attempts', 'support_needed'],
+        aiMemoryInitializedAt: new Date(),
+      },
+    });
+    expect((await Conversation.findById(existingConversation._id))!.messages).toHaveLength(296);
+    await Meeting.create({ userId: owner!._id, leadId: existingLead._id, conversationId: existingConversation._id, provider: 'calendly', status: 'pending_booking', topic: 'Reserva anterior', sourceEventId: 'historical-booking', bookingUrl: 'https://calendly.com/example/existing', bookingToken: 'historical-token' });
+
     const eventId = 'wamid.automatic-qualified-1';
     const text = 'Hola, quiero aprender a generar ingresos adicionales usando redes sociales e inteligencia artificial. Mi meta es ganar $500.000 adicionales al mes, puedo dedicar 5 horas semanales y utilizo Facebook, Instagram y WhatsApp';
-    const rawPayload = JSON.stringify({ entry: [{ changes: [{ value: {
-      metadata: { phone_number_id: 'automatic-qualified-phone-id', display_phone_number: '15550000000' },
-      messages: [{ id: eventId, from: '573006667777', timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: text } }],
-    } }] }] });
-    const signature = `sha256=${crypto.createHmac('sha256', process.env.WHATSAPP_APP_SECRET).update(Buffer.from(rawPayload)).digest('hex')}`;
-
-    await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, { headers: { 'Content-Type': 'application/json', 'x-hub-signature-256': signature } });
-    await waitUntil(async () => (await InboundEvent.findOne({ userId: owner!._id, externalEventId: eventId }))?.processingState === 'completed');
-    process.env.WHATSAPP_REPLY_MODE = 'assisted';
-    process.env.WHATSAPP_AUTO_REPLY_ENABLED = 'false';
+    await postAutomaticMessage(eventId, text);
 
     const outbound: any = await OutboundMessage.findOne({ userId: owner!._id, sourceEventId: eventId });
     expect(outbound).toMatchObject({ channel: 'whatsapp', provider: 'mock', deliveryStatus: 'simulated', simulatedDelivery: true });
     expect(outbound.text).toMatch(/programáramos una reunión/i);
     expect(outbound.text).not.toMatch(/calendly|https?:\/\/|tipo de contenido/i);
-    expect(await Meeting.countDocuments({ userId: owner!._id })).toBe(0);
+    expect(await Meeting.countDocuments({ userId: owner!._id })).toBe(1);
+    expect(await Meeting.findOne({ userId: owner!._id })).toMatchObject({ status: 'pending_booking', sourceEventId: 'historical-booking' });
     expect(await WhatsAppProposal.countDocuments({ userId: owner!._id, sourceEventId: eventId })).toBe(0);
     const activity: any = await Activity.findOne({ userId: owner!._id, leadId: outbound.leadId, type: 'message_generated' }).lean();
     expect(activity?.metadata?.responseSource).toBe('qualified_meeting_offer');
+    expect(await Lead.findById(existingLead._id)).toMatchObject({ status: 'interested' });
+
+    const acceptanceEventId = 'wamid.automatic-qualified-acceptance';
+    await postAutomaticMessage(acceptanceEventId, 'Sí, me gustaría programar la reunión');
+    const acceptanceOutbound: any = await OutboundMessage.findOne({ userId: owner!._id, sourceEventId: acceptanceEventId }).lean();
+    expect(acceptanceOutbound.text).toContain('https://calendly.com/example/existing');
+    expect(await Meeting.countDocuments({ userId: owner!._id })).toBe(1);
+
+    const duplicateAcceptanceEventId = 'wamid.automatic-qualified-acceptance-duplicate';
+    await postAutomaticMessage(duplicateAcceptanceEventId, 'Sí, me gustaría programar la reunión');
+    expect(await Meeting.countDocuments({ userId: owner!._id })).toBe(1);
+
+    const outboundCountBeforeOptOut = await OutboundMessage.countDocuments({ userId: owner!._id });
+    await postAutomaticMessage('wamid.automatic-qualified-optout', 'No quiero continuar, no me contactes');
+    await postAutomaticMessage('wamid.automatic-qualified-after-optout', text);
+    expect(await Lead.findById(existingLead._id)).toMatchObject({ status: 'rejected', tags: expect.arrayContaining(['opt_out']) });
+    expect(await OutboundMessage.countDocuments({ userId: owner!._id })).toBe(outboundCountBeforeOptOut);
+    process.env.WHATSAPP_REPLY_MODE = 'assisted';
+    process.env.WHATSAPP_AUTO_REPLY_ENABLED = 'false';
   });
 
   test('filters forged or stale WhatsApp deliveries and accepts signed contacts beyond the control allowlist', async () => {

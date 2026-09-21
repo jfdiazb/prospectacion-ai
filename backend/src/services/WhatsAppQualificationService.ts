@@ -10,9 +10,9 @@ const norm = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/
 export function analyzeWhatsAppConversation(texts: string[], context?: CommercialContextLike | null): { signals: ConversationalSignals; score: number; status: string; intent: string; normalizedIntent: string; tags: string[]; matchedPhrases: string[] } {
   const text = norm(texts.join(' '));
   const normalized = IntentNormalizationService.analyze(texts, context);
-  const onlySalary = /solo (?:estoy )?busco|solo quiero/.test(text) && /empleo|trabajo/.test(text) && /salario|contrato/.test(text);
-  const rejected = normalized.rejection || /no me interesa|no gracias|no quiero (?:amway|un negocio|continuar)|deja de escribir|\bstop\b/.test(text) || onlySalary;
   const currentText = norm(texts.at(-1) ?? '');
+  const onlySalary = /solo (?:estoy )?busco|solo quiero/.test(currentText) && /empleo|trabajo/.test(currentText) && /salario|contrato/.test(currentText);
+  const rejected = normalized.rejection || /no me interesa|no gracias|no quiero (?:amway|un negocio|continuar)|deja de escribir|\bstop\b/.test(currentText) || onlySalary;
   const meeting = /\b(quiero|podemos|quisiera|agendemos|programar|tener|necesito|deseo)\b.{0,45}\b(reunion|reunirnos|llamada|agendar|agenda|videollamada|asesoria|horarios?)\b|\bpodemos hablar(?:\s+(?:hoy|manana|esta semana))?\b|\b(agendar|agenda|programar|reservar)\b/.test(currentText);
   const interested = /me interesa|quiero conocer|explicame|quiero informacion|\binfo\b|como funciona/.test(text);
   const employment = /busco empleo|buscando trabajo|nueva oportunidad|open to work/.test(text);

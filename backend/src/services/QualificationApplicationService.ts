@@ -25,9 +25,10 @@ export class QualificationApplicationService {
       for (let attempt = 0; attempt < 4; attempt++) {
         previous = await Lead.findOne({ _id: context.leadId, userId: context.userId }).lean();
         if (!previous) throw new Error('Lead no disponible para calificación');
-        const rejected = context.evaluation.intent === 'rejection' || context.evaluation.normalizedIntent === 'rejection';
+        const optedOut = (previous.tags ?? []).includes('opt_out');
+        const rejected = optedOut || context.evaluation.intent === 'rejection' || context.evaluation.normalizedIntent === 'rejection';
         const interestLevel = QualificationPolicyService.temperature(context.evaluation.score, previous.interestLevel as LeadTemperature, rejected);
-        const status = QualificationPolicyService.status(context.evaluation.score, context.evaluation.intent, context.evaluation.signals?.meetingIntent, previous.status);
+        const status = optedOut ? 'rejected' : QualificationPolicyService.status(context.evaluation.score, context.evaluation.intent, context.evaluation.signals?.meetingIntent, previous.status);
         const intents = [...new Set([...(previous.normalizedIntents ?? []), ...(previous.qualification?.normalizedIntents ?? []), ...(context.evaluation.normalizedIntent === 'undetermined' ? [] : [context.evaluation.normalizedIntent])])].slice(-QualificationPolicyService.maxIntentHistory());
         const evaluatedAt = new Date();
         const update: any = { status, score: context.evaluation.score, interestLevel, lastContact: evaluatedAt,
