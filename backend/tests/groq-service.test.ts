@@ -25,7 +25,7 @@ describe('GroqService generation budget', () => {
     await expect(GroqService.generateResponse('Prompt seguro')).resolves.toBe('Respuesta comercial breve y completa.');
     expect(create).toHaveBeenCalledWith(expect.objectContaining({
       model: 'openai/gpt-oss-120b',
-      max_completion_tokens: 512,
+      max_completion_tokens: 384,
       reasoning_effort: 'low',
     }));
   });

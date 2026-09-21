@@ -54,6 +54,18 @@ const conversationSchema = new Schema(
     aiAskedTopics: [{ type: String }],
     aiResponseFingerprints: [{ type: String }],
     aiMemoryInitializedAt: Date,
+    commercialMemory: {
+      interests: [{ type: String }],
+      needs: [{ type: String }],
+      objections: [{ type: String }],
+      answeredTopics: [{ type: String }],
+      commercialState: String,
+      meetingInterest: { type: String, enum: ['unknown', 'offered', 'accepted', 'declined'], default: 'unknown' },
+      lastMeetingOfferAt: Date,
+      updatedThroughEventId: String,
+      updatedAt: Date,
+      version: { type: Number, default: 1 },
+    },
     aiAnalysis: {
       sentiment: String,
       intent: String,

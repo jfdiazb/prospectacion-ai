@@ -22,6 +22,7 @@ import { MessagingService } from '../src/services/MessagingService';
 import { MessagingProviderError, type MessagingProvider } from '../src/integrations/messaging';
 import WhatsAppProposal from '../src/models/WhatsAppProposal';
 import { WhatsAppAssistedService } from '../src/services/WhatsAppAssistedService';
+import AIInvocation from '../src/models/AIInvocation';
 
 const waitUntil = async (predicate: () => Promise<boolean>, timeout = 5000) => {
   const started = Date.now();
@@ -290,6 +291,33 @@ describe('Auth integration tests', () => {
     expect(await Meeting.findOne({ leadId: lead!._id })).toMatchObject({ status: 'cancelled' });
   });
 
+  test('CRM runtime and AI usage are authenticated and owner-scoped', async () => {
+    const first = await axios.post(`${baseURL}/api/v1/auth/register`, {
+      email: 'usage-owner@example.com', password: 'password123', fullName: 'Usage Owner',
+    });
+    const second = await axios.post(`${baseURL}/api/v1/auth/register`, {
+      email: 'other-owner@example.com', password: 'password123', fullName: 'Other Owner',
+    });
+    const firstUserId = first.data.data.user._id;
+    const secondUserId = second.data.data.user._id;
+    await AIInvocation.create([
+      { userId: firstUserId, sourceEventId: 'usage-1', purpose: 'conversation', model: 'test', promptHash: 'a', status: 'completed', promptTokens: 100, completionTokens: 25, totalTokens: 125 },
+      { userId: firstUserId, sourceEventId: 'usage-2', purpose: 'conversation', model: 'test', promptHash: 'b', status: 'failed', totalTokens: 999 },
+      { userId: secondUserId, sourceEventId: 'usage-3', purpose: 'conversation', model: 'test', promptHash: 'c', status: 'completed', promptTokens: 500, completionTokens: 100, totalTokens: 600 },
+    ]);
+
+    process.env.CRM_OWNER_ID = firstUserId;
+    const auth = { headers: { Authorization: `Bearer ${first.data.data.token}` } };
+    const [runtime, usage] = await Promise.all([
+      axios.get(`${baseURL}/api/v1/crm/runtime`, auth),
+      axios.get(`${baseURL}/api/v1/crm/ai-usage`, auth),
+    ]);
+
+    expect(runtime.data.data).toEqual(expect.objectContaining({ webhookOwnerConfigured: true, webhookOwnerMatchesSession: true }));
+    expect(usage.data.data).toEqual({ _id: null, requests: 1, promptTokens: 100, completionTokens: 25, totalTokens: 125 });
+    delete process.env.CRM_OWNER_ID;
+  });
+
   test('edits, sends once and supports human Facebook replies from the multichannel CRM', async () => {
     const register = await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'facebook-crm@example.com', password: 'password123', fullName: 'Facebook Owner' });
     const owner = await User.findOne({ email: 'facebook-crm@example.com' });
@@ -536,12 +564,19 @@ describe('Auth integration tests', () => {
     const activity: any = await Activity.findOne({ userId: owner!._id, leadId: outbound.leadId, type: 'message_generated' }).lean();
     expect(activity?.metadata?.responseSource).toBe('qualified_meeting_offer');
     expect(await Lead.findById(existingLead._id)).toMatchObject({ status: 'interested' });
+    const refreshedConversation: any = await Conversation.findById(existingConversation._id).lean();
+    expect(refreshedConversation.commercialMemory).toMatchObject({
+      commercialState: 'interested', meetingInterest: 'offered', updatedThroughEventId: eventId,
+      interests: expect.arrayContaining(['additional_income_interest']),
+    });
+    expect(await Activity.findOne({ userId: owner!._id, leadId: existingLead._id, type: 'message_received', 'metadata.sourceEventId': eventId })).not.toBeNull();
 
     const acceptanceEventId = 'wamid.automatic-qualified-acceptance';
     await postAutomaticMessage(acceptanceEventId, 'Sí, me gustaría programar la reunión');
     const acceptanceOutbound: any = await OutboundMessage.findOne({ userId: owner!._id, sourceEventId: acceptanceEventId }).lean();
     expect(acceptanceOutbound.text).toContain('https://calendly.com/example/existing');
     expect(await Meeting.countDocuments({ userId: owner!._id })).toBe(1);
+    expect(await Conversation.findById(existingConversation._id)).toMatchObject({ commercialMemory: { meetingInterest: 'accepted' } });
 
     const duplicateAcceptanceEventId = 'wamid.automatic-qualified-acceptance-duplicate';
     await postAutomaticMessage(duplicateAcceptanceEventId, 'Sí, me gustaría programar la reunión');

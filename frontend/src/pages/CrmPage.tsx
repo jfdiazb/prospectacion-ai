@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AppLayout } from '@components/AppLayout';
 import { Button, Card } from '@components/shared';
-import { crmService, type CrmActivity, type CrmConversation, type CrmMeeting, type CrmTask, type DuplicateCandidate } from '@services/crmService';
+import { crmService, type AiUsage, type CrmActivity, type CrmConversation, type CrmMeeting, type CrmRuntime, type CrmTask, type DuplicateCandidate } from '@services/crmService';
 import { leadService } from '@services/leadService';
 
 export const CrmPage = () => {
@@ -18,6 +18,9 @@ export const CrmPage = () => {
   const [proposalDrafts, setProposalDrafts] = useState<Record<string, string>>({});
   const [duplicateCandidates, setDuplicateCandidates] = useState<DuplicateCandidate[]>([]);
   const [changingOutcome, setChangingOutcome] = useState<string | null>(null);
+  const [runtime, setRuntime] = useState<CrmRuntime | null>(null);
+  const [aiUsage, setAiUsage] = useState<AiUsage | null>(null);
+  const [loadErrors, setLoadErrors] = useState<string[]>([]);
 
   const recordOutcome = async (meeting: CrmMeeting, outcome: 'follow_up' | 'not_interested' | 'client' | 'partner') => {
     if (!meeting.leadId?._id) return;
@@ -91,30 +94,40 @@ export const CrmPage = () => {
     } finally { setChangingControl(null); }
   };
 
-  useEffect(() => {
-    Promise.all([crmService.activities(), crmService.meetings(), crmService.conversations(), crmService.tasks(), crmService.duplicateCandidates()])
-      .then(([activityData, meetingData, conversationData, taskData, candidateData]) => {
-        setActivities(activityData);
-        setMeetings(meetingData);
-        setConversations(conversationData);
-        setDuplicateCandidates(candidateData);
-        // Ordenar tareas: prioridad (high, medium, low) y luego por dueDate asc
-        const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-        const sortedTasks = (taskData || []).slice().sort((a, b) => {
-          const pa = priorityOrder[a.priority || 'medium'];
-          const pb = priorityOrder[b.priority || 'medium'];
-          if (pa !== pb) return pa - pb;
-          const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
-          const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
-          return da - db;
-        });
-        setTasks(sortedTasks);
-      })
-      .finally(() => setLoading(false));
+  const refresh = useCallback(async () => {
+    const requests = [crmService.activities(), crmService.meetings(), crmService.conversations(), crmService.tasks(), crmService.duplicateCandidates(), crmService.runtime(), crmService.aiUsage()] as const;
+    const names = ['actividad', 'reuniones', 'conversaciones', 'tareas', 'duplicados', 'entorno', 'consumo IA'];
+    const results = await Promise.allSettled(requests);
+    setLoadErrors(results.flatMap((result, index) => result.status === 'rejected' ? [`No se pudo actualizar ${names[index]}.`] : []));
+    if (results[0].status === 'fulfilled') setActivities(results[0].value);
+    if (results[1].status === 'fulfilled') setMeetings(results[1].value);
+    if (results[2].status === 'fulfilled') setConversations(results[2].value);
+    if (results[4].status === 'fulfilled') setDuplicateCandidates(results[4].value);
+    if (results[5].status === 'fulfilled') setRuntime(results[5].value);
+    if (results[6].status === 'fulfilled') setAiUsage(results[6].value);
+    if (results[3].status === 'fulfilled') {
+      const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+      setTasks(results[3].value.slice().sort((a, b) => {
+        const priority = priorityOrder[a.priority || 'medium'] - priorityOrder[b.priority || 'medium'];
+        return priority || (a.dueDate ? new Date(a.dueDate).getTime() : Infinity) - (b.dueDate ? new Date(b.dueDate).getTime() : Infinity);
+      }));
+    }
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    void refresh();
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 20000);
+    return () => window.clearInterval(timer);
+  }, [refresh]);
 
   return (
     <AppLayout title="CRM" subtitle="Actividad real de captación, seguimiento y reuniones de ALMA.">
+      <div className="mb-6 space-y-2">
+        {runtime && !runtime.webhookOwnerMatchesSession && <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">El usuario de esta sesión no coincide con CRM_OWNER_ID. El webhook está guardando los datos bajo otro propietario; revisa la variable en Render sin reasignar registros.</div>}
+        {loadErrors.map(error => <div key={error} className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">{error}</div>)}
+        <div className="flex flex-wrap items-center gap-3 text-xs text-dark-400"><Button size="sm" variant="secondary" onClick={() => void refresh()}>Actualizar CRM</Button>{runtime && <span>Build: {runtime.buildSha} · WhatsApp automático: {runtime.automaticWhatsApp ? 'activo' : 'inactivo'}</span>}{aiUsage && <span>Groq: {aiUsage.requests} solicitudes · {aiUsage.totalTokens} tokens</span>}</div>
+      </div>
       <div className="grid gap-6 xl:grid-cols-3">
         <Card>
           <h2 className="mb-4 text-2xl font-semibold text-white">Posibles duplicados</h2>

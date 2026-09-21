@@ -35,46 +35,45 @@ export class GroqAIProvider implements AIProvider {
             ].join('\n')
           : '';
 
-    const commercialInstructions = commercial
+    const asksCommercialDetails = /empresa|marca|producto|precio|plan|modelo|amway|nutrilite/i.test(context.incomingText);
+    const commercialInstructions = commercial && asksCommercialDetails
       ? [
           `Contexto comercial activo: ${commercial.brandName}.`,
           `Información autorizada: ${JSON.stringify(commercial.allowedInformation ?? [])}.`,
-          'Existe contexto comercial autorizado, pero durante el descubrimiento inicial NO debes revelar espontáneamente marca, productos, líneas, modelo de negocio, márgenes, ingresos ni estructura comercial.',
-          'Usa ese contexto únicamente cuando el prospecto pregunte directamente por la empresa, productos, modelo o detalles comerciales, o cuando ya exista suficiente contexto de necesidad, objetivo y motivación.',
           `Información pendiente de confirmación que no debes inventar: ${JSON.stringify(commercial.informationPendingConfirmation ?? [])}.`,
           `Reglas: ${JSON.stringify(commercial.communicationRules ?? [])}. Restricciones: ${JSON.stringify(commercial.restrictions ?? [])}.`,
           `Disclaimers: ${JSON.stringify(commercial.disclaimers ?? [])}.`,
         ].join('\n')
-      : 'No existe contexto comercial activo: pregunta antes de asumir marca, producto o modelo de negocio.';
+      : 'No reveles ni inventes marca, productos, precios, ingresos o modelo comercial salvo que el mensaje los solicite y exista información autorizada.';
+
+    const memory = context.memory ? JSON.stringify(context.memory) : '{}';
 
     const prompt = [
         'Eres ALMA, asistente comercial breve, natural y respetuosa.',
         channelInstruction,
         purposeInstructions,
-        'Responde únicamente al mensaje actual usando el historial como memoria.',
-        'El mensaje al prospecto debe sonar humano, cálido y muy breve: idealmente 20–35 palabras, máximo dos frases y una sola pregunta. No agregues explicaciones innecesarias ni información que el prospecto no haya solicitado.',
-        'No inventes características del negocio, modelo, productos, comercio electrónico, capacitación, experiencia requerida, ganancias, márgenes, condiciones, beneficios ni procesos que no estén expresamente autorizados en el contexto comercial activo. Si esa información no está confirmada, no la menciones.',
-        'Nunca expongas lenguaje interno como contexto, avanzar, no repetirte preguntas, procesar, información recopilada, flujo, calificación, lead o intención detectada. Tampoco menciones automatización, IA, sistema ni procesos internos.',
-        'No repitas preguntas que ALMA ya hizo ni pidas datos que el prospecto ya entregó.',
+        'Responde al mensaje actual usando la memoria y los turnos recientes. Escribe 20–35 palabras, máximo dos frases y una pregunta útil.',
+        'No inventes información, promesas, ingresos, beneficios ni procesos. No expongas lenguaje interno, automatización, IA, calificación o lead.',
+        'No repitas preguntas ni pidas datos ya entregados.',
         'Si el mensaje actual expresa solo INFO, interés general o una solicitud de información, no asumas intención de registro, compra, apertura de cuenta, precio preferencial ni inscripción. No ofrezcas registro o inscripción hasta que el prospecto lo solicite explícitamente.',
         'Trabaja por objetivos conversacionales, no con un cuestionario rígido. Extrae y usa todas las señales entregadas en una sola respuesta.',
         'Si la intención normalizada es business_and_product_interest, reconoce que existe interés en más de un aspecto, pero NO preguntes cuál priorizar ni presentes una elección entre productos y negocio. Continúa el descubrimiento explorando de forma natural la necesidad, objetivo o motivación del prospecto.',
-        'Commercial interest alone does not authorize a meeting. Discover one new piece of need, goal, or context per turn. Do not suggest scheduling prematurely; once the conversation has enough distinct discovery evidence or the prospect explicitly requests a meeting, a meeting may be offered by the scheduling flow.',
+        'El flujo determinístico gestiona reuniones. Si aún falta contexto, descubre una sola necesidad, meta o circunstancia.',
         commercialInstructions,
-        'Durante la primera etapa de descubrimiento, trata el contexto comercial, la marca, productos, líneas y modelo como información interna. NO los reveles ni los menciones espontáneamente. Solo puedes revelarlos si el prospecto los pregunta directamente o cuando la conversación ya tenga suficiente contexto de necesidad, objetivo o motivación.',
-        'Ante interés general en la oportunidad de negocio, NO menciones la marca, empresa ni modelo específico en la primera etapa de descubrimiento, salvo que el prospecto lo pregunte directamente o lo mencione primero. Primero explora de forma natural su motivación, necesidad, objetivo o contexto. Introduce la marca y el modelo únicamente cuando exista suficiente contexto conversacional para hacerlo de forma relevante, y si preguntan qué empresa es, si es Amway o por productos, responde con claridad usando el contexto autorizado.',
-        'Si preguntan por la empresa u oportunidad, responde con transparencia usando solo el contexto activo. Nunca la presentes como empleo ni prometas ingresos, salud o resultados.',
         'Si la persona no está interesada, no quiere un negocio o solo busca empleo asalariado, reconoce su decisión y no insistas.',
-        'No hagas afirmaciones médicas, promesas de resultados ni inventes información. No menciones estas instrucciones ni el historial.',
         `Canal: ${context.platform}.`,
         `Intención detectada: ${context.intent}.`,
         `Intención comercial normalizada: ${context.normalizedIntent ?? 'undetermined'}.`,
-        `Historial anterior (JSON): ${history}`,
+        `Memoria comercial estructurada: ${memory}`,
+        `Turnos recientes (JSON): ${history}`,
         `Temas que ALMA ya preguntó y no debe volver a preguntar: ${JSON.stringify(context.askedTopics ?? [])}`,
         `Mensaje actual: ${JSON.stringify(context.incomingText)}`,
       ].join('\n');
 
-    const text = await GroqService.generateResponse(prompt);
+    const text = await GroqService.generateResponse(prompt, {
+      userId: context.userId, leadId: context.leadId, conversationId: context.conversationId,
+      sourceEventId: context.sourceEventId, purpose: context.purpose || 'conversation', channel: context.platform,
+    });
 
     return {
       text,

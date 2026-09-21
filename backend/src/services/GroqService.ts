@@ -1,7 +1,11 @@
 import OpenAI from 'openai';
+import crypto from 'crypto';
+import AIInvocation from '../models/AIInvocation';
+
+type Telemetry = { userId?: string; leadId?: string; conversationId?: string; sourceEventId?: string; purpose?: string; channel?: string };
 
 export class GroqService {
-  static async generateResponse(prompt: string): Promise<string> {
+  static async generateResponse(prompt: string, telemetry: Telemetry = {}): Promise<string> {
     const apiKey = process.env.GROQ_API_KEY;
 
     if (!apiKey) {
@@ -16,10 +20,23 @@ export class GroqService {
     });
 
     const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+    const purpose = telemetry.purpose || 'conversation';
+    const promptHash = crypto.createHash('sha256').update(prompt).digest('hex');
+    let invocation: any;
+    if (telemetry.userId && telemetry.sourceEventId) {
+      const existing: any = await AIInvocation.findOne({ userId: telemetry.userId, sourceEventId: telemetry.sourceEventId, purpose }).lean();
+      if (existing?.status === 'completed' && existing.responseText) return existing.responseText;
+      if (existing?.status === 'processing') throw new Error('La respuesta IA para este evento ya está en proceso');
+      invocation = await AIInvocation.findOneAndUpdate(
+        { userId: telemetry.userId, sourceEventId: telemetry.sourceEventId, purpose },
+        { $set: { leadId: telemetry.leadId, conversationId: telemetry.conversationId, channel: telemetry.channel, provider: 'groq', model, promptHash, status: 'processing' }, $unset: { failedAt: 1, errorType: 1 } },
+        { upsert: true, new: true }
+      );
+    }
     const completion = await client.chat.completions
       .create({
         model,
-        max_completion_tokens: Number(process.env.GROQ_MAX_TOKENS || 512),
+        max_completion_tokens: Number(process.env.GROQ_MAX_TOKENS || 384),
         reasoning_effort: 'low',
         messages: [
           {
@@ -29,6 +46,7 @@ export class GroqService {
         ],
       })
       .catch((error: any) => {
+        if (invocation) void AIInvocation.updateOne({ _id: invocation._id }, { $set: { status: 'failed', failedAt: new Date(), errorType: error?.name || 'Error' } });
         console.error('Groq request failed', {
           event: 'groq_request_failed',
           model,
@@ -42,6 +60,10 @@ export class GroqService {
 
     const response = completion.choices[0]?.message?.content?.trim();
     if (!response) throw new Error('Groq devolvió una respuesta vacía');
+    if (invocation) await AIInvocation.updateOne({ _id: invocation._id }, { $set: {
+      status: 'completed', responseText: response, completedAt: new Date(),
+      promptTokens: completion.usage?.prompt_tokens, completionTokens: completion.usage?.completion_tokens, totalTokens: completion.usage?.total_tokens,
+    } });
     console.info('Groq response generated', {
       event: 'groq_response_generated',
       model,

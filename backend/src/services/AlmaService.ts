@@ -13,6 +13,7 @@ import { analyzeWhatsAppConversation } from './WhatsAppQualificationService';
 import { QualificationApplicationService } from './QualificationApplicationService';
 import { MeetingReadinessService } from './MeetingReadinessService';
 import { LaunchAttributionService } from './LaunchAttributionService';
+import { ConversationMemoryService } from './ConversationMemoryService';
 
 type AlmaContext = { userId: string; leadId: string; conversationId: string; text: string; isNewLead: boolean; platform: 'instagram' | 'facebook' | 'youtube' | 'whatsapp'; sourceEventId: string; recipient: MessagingRecipient; automation?: { flowId: string; response: string } };
 
@@ -80,6 +81,8 @@ export class AlmaService {
     const isRejected = applied.current.status === 'rejected';
     const score = applied.current.score;
     await LaunchAttributionService.recordReadiness(context.userId, launchAttribution, meetingReadiness, ['warm', 'hot'].includes(applied.current.interestLevel));
+    await ConversationMemoryService.update({ userId: context.userId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, evaluation: qualification, meetingReadiness, status: applied.current.status });
+    const commercialMemory = await ConversationMemoryService.get(context.userId, context.conversationId);
     if (isOptedOut) return '';
 
     const intent = qualification.intent;
@@ -101,7 +104,7 @@ export class AlmaService {
     const latestMessage = recentMessages[recentMessages.length - 1];
     const previousMessages = latestMessage?.sender === 'lead' && latestMessage?.text === context.text
       ? recentMessages.slice(0, -1) : recentMessages;
-    const history = previousMessages.slice(-10)
+    const history = previousMessages.slice(-4)
       .filter((message: any) => (message.sender === 'lead' || message.sender === 'ai') && typeof message.text === 'string')
       .map((message: any) => ({ sender: message.sender as 'lead' | 'ai', text: message.text.slice(0, 1000) }));
     let aiMemory = await ConversationService.getOrInitializeAIMemory(context.conversationId, context.userId);
@@ -113,7 +116,7 @@ export class AlmaService {
       : undefined;
     const shouldOfferMeeting = Boolean(qualifiedMeetingOffer);
     const aiProvider = context.automation || shouldOfferMeeting ? null : getAIProvider();
-    const aiResult = context.automation || shouldOfferMeeting ? null : await aiProvider!.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent, normalizedIntent: qualification.normalizedIntent, platform: context.platform, history, askedTopics: aiMemory.askedTopics,
+    const aiResult = context.automation || shouldOfferMeeting ? null : await aiProvider!.generateReply({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, incomingText: context.text, isNewLead: context.isNewLead, intent, normalizedIntent: qualification.normalizedIntent, platform: context.platform, history, askedTopics: aiMemory.askedTopics, memory: commercialMemory,
       commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines, allowedInformation: commercialContext.allowedInformation, informationPendingConfirmation: commercialContext.informationPendingConfirmation, communicationRules: commercialContext.communicationRules, restrictions: commercialContext.restrictions, disclaimers: commercialContext.disclaimers } : undefined });
     const generatedResponse = context.automation?.response ?? qualifiedMeetingOffer ?? aiResult!.text;
     const meetingOutcome = await MeetingOrchestratorService.process({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: context.text, wantsMeeting, meetingReadiness: meetingReadiness.reason, launchId: launchAttribution?.launchId, launchParticipantId: launchAttribution?.participantId, platform: context.platform });

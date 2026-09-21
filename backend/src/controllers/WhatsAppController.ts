@@ -12,6 +12,7 @@ import { WhatsAppInboundNormalizer } from '../services/WhatsAppInboundNormalizer
 import { WhatsAppLaunchAdapter } from '../services/WhatsAppLaunchAdapter';
 import { WhatsAppOptOutService } from '../services/WhatsAppOptOutService';
 import { WhatsAppInboundDiagnosticsService } from '../services/WhatsAppInboundDiagnosticsService';
+import Activity from '../models/Activity';
 
 export class WhatsAppController {
   static isAutomaticReplyEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -256,6 +257,11 @@ export class WhatsAppController {
         });
         inbound.conversationRecordedAt = new Date();
         await inbound.save();
+        await Activity.create({
+          userId, leadId: lead._id, conversationId: conversation._id,
+          type: 'message_received', description: 'Mensaje recibido por WhatsApp',
+          metadata: { sourceEventId: eventId, channel: 'whatsapp', messageType: normalized.messageType },
+        });
       }
 
       const explicitOptOut = WhatsAppOptOutService.matches(text);

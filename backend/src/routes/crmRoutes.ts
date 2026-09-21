@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import { authMiddleware, type AuthRequest } from '../middlewares/auth';
 import { apiLimiter } from '../middlewares/rateLimiter';
 import Conversation from '../models/Conversation';
@@ -22,9 +23,38 @@ import IdentityAudit from '../models/IdentityAudit';
 import { LaunchActionService } from '../services/LaunchActionService';
 import { ProposalRoutingError, ProposalRoutingService } from '../services/ProposalRoutingService';
 import OutboundMessage from '../models/OutboundMessage';
+import AIInvocation from '../models/AIInvocation';
 
 const router = Router();
 router.use(authMiddleware, apiLimiter);
+
+router.get('/runtime', async (req: AuthRequest, res) => {
+  const configuredOwner = process.env.CRM_OWNER_ID?.trim();
+  res.json({ success: true, data: {
+    webhookOwnerMatchesSession: Boolean(configuredOwner && configuredOwner === req.userId),
+    webhookOwnerConfigured: Boolean(configuredOwner),
+    buildSha: (process.env.RENDER_GIT_COMMIT || process.env.BUILD_SHA || 'unknown').slice(0, 12),
+    automaticWhatsApp: process.env.WHATSAPP_REPLY_MODE === 'automatic' && process.env.WHATSAPP_AUTO_REPLY_ENABLED === 'true',
+  } });
+});
+
+router.get('/ai-usage', async (req: AuthRequest, res, next) => {
+  try {
+    const match: any = { userId: new mongoose.Types.ObjectId(req.userId), status: 'completed' };
+    if (req.query.conversationId) match.conversationId = new mongoose.Types.ObjectId(String(req.query.conversationId));
+    if (req.query.leadId) match.leadId = new mongoose.Types.ObjectId(String(req.query.leadId));
+    if (req.query.channel) match.channel = String(req.query.channel);
+    if (req.query.from || req.query.to) match.createdAt = {
+      ...(req.query.from ? { $gte: new Date(String(req.query.from)) } : {}),
+      ...(req.query.to ? { $lte: new Date(String(req.query.to)) } : {}),
+    };
+    const [totals] = await AIInvocation.aggregate([
+      { $match: match },
+      { $group: { _id: null, requests: { $sum: 1 }, promptTokens: { $sum: '$promptTokens' }, completionTokens: { $sum: '$completionTokens' }, totalTokens: { $sum: '$totalTokens' } } },
+    ]);
+    res.json({ success: true, data: totals || { requests: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0 } });
+  } catch (error) { next(error); }
+});
 
 router.get('/conversations', async (req: AuthRequest, res, next) => {
   try {

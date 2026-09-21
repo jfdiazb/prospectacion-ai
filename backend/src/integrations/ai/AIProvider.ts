@@ -1,10 +1,18 @@
 export interface AIReplyContext {
+  userId?: string;
+  leadId?: string;
+  conversationId?: string;
+  sourceEventId?: string;
   incomingText: string;
   isNewLead: boolean;
   intent: string;
   platform: 'youtube' | 'whatsapp' | 'instagram' | 'facebook' | 'tiktok';
   history: Array<{ sender: 'lead' | 'ai'; text: string }>;
   askedTopics?: string[];
+  memory?: {
+    interests?: string[]; needs?: string[]; objections?: string[]; askedTopics?: string[];
+    commercialState?: string; meetingInterest?: string; bookingStatus?: string; bookingProvider?: string;
+  };
   normalizedIntent?: string;
   purpose?: 'conversation' | 'follow_up' | 'reactivation' | 'meeting_reminder' | 'meeting_followup';
   reactivationReason?: string;

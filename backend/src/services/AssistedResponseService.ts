@@ -14,6 +14,7 @@ import { QualificationApplicationService } from './QualificationApplicationServi
 import Meeting from '../models/Meeting';
 import { MeetingReadinessService } from './MeetingReadinessService';
 import { LaunchAttributionService } from './LaunchAttributionService';
+import { ConversationMemoryService } from './ConversationMemoryService';
 
 type AssistedPlatform = 'whatsapp' | 'instagram' | 'facebook';
 type Context = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; isNewLead: boolean; platform: AssistedPlatform; recipient: MessagingRecipient };
@@ -39,15 +40,17 @@ export class AssistedResponseService {
     const applied = await QualificationApplicationService.apply({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, platform: context.platform, source: 'assisted_qualification', text: context.text, isNewLead: context.isNewLead, commercialContextId: commercialContext?._id, launchId: launchAttribution?.launchId, launchParticipantId: launchAttribution?.participantId, meetingReadiness, evaluation: qualification });
     await Lead.updateOne({ _id: context.leadId, userId: context.userId }, { $set: { currentChannel: context.platform } });
     await LaunchAttributionService.recordReadiness(context.userId, launchAttribution, meetingReadiness, ['warm', 'hot'].includes(applied.current.interestLevel));
+    await ConversationMemoryService.update({ userId: context.userId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, evaluation: qualification, meetingReadiness, status: applied.current.status });
+    const commercialMemory = await ConversationMemoryService.get(context.userId, context.conversationId);
     if ((applied.current.tags ?? []).includes('opt_out')) return null;
-    const history = recent.slice(-10).filter((m: any) => ['lead', 'ai'].includes(m.sender)).map((m: any) => ({ sender: m.sender as 'lead' | 'ai', text: String(m.text).slice(0, 1000) }));
+    const history = recent.slice(-4).filter((m: any) => ['lead', 'ai'].includes(m.sender)).map((m: any) => ({ sender: m.sender as 'lead' | 'ai', text: String(m.text).slice(0, 1000) }));
     const memory = await ConversationService.getOrInitializeAIMemory(context.conversationId, context.userId);
     const qualifiedMeetingOffer = !handoffReason && applied.current.status !== 'rejected'
       ? MeetingReadinessService.meetingOfferFor(meetingReadiness, recent, leadTexts)
       : undefined;
     const shouldOfferMeeting = Boolean(qualifiedMeetingOffer);
     const ai = shouldOfferMeeting ? null : getAIProvider();
-    const generated = shouldOfferMeeting ? null : await ai!.generateReply({ incomingText: context.text, isNewLead: context.isNewLead, intent: qualification.intent, normalizedIntent: qualification.normalizedIntent, platform: context.platform, history: history.slice(0, -1), askedTopics: memory.askedTopics,
+    const generated = shouldOfferMeeting ? null : await ai!.generateReply({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, incomingText: context.text, isNewLead: context.isNewLead, intent: qualification.intent, normalizedIntent: qualification.normalizedIntent, platform: context.platform, history: history.slice(0, -1), askedTopics: memory.askedTopics, memory: commercialMemory,
       commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines, allowedInformation: commercialContext.allowedInformation, informationPendingConfirmation: commercialContext.informationPendingConfirmation, communicationRules: commercialContext.communicationRules, restrictions: commercialContext.restrictions, disclaimers: commercialContext.disclaimers } : undefined });
     const meetingOutcome = await MeetingOrchestratorService.process({
       userId: context.userId, leadId: context.leadId, conversationId: context.conversationId,
