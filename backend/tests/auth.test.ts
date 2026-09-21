@@ -448,6 +448,40 @@ describe('Auth integration tests', () => {
     expect(await OutboundMessage.countDocuments({ sourceEventId: eventId })).toBe(0);
   });
 
+  test('offers a meeting through the signed WhatsApp webhook after sufficient discovery without sending Calendly', async () => {
+    await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'whatsapp-qualified@example.com', password: 'password123', fullName: 'Qualified WhatsApp Owner' });
+    const owner = await User.findOne({ email: 'whatsapp-qualified@example.com' });
+    process.env.CRM_OWNER_ID = owner!._id.toString();
+    process.env.WHATSAPP_APP_SECRET = 'whatsapp-qualified-secret';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = 'qualified-phone-number-id';
+    process.env.WHATSAPP_REPLY_MODE = 'assisted';
+    process.env.WHATSAPP_AUTO_REPLY_ENABLED = 'false';
+    process.env.WHATSAPP_MESSAGING_MODE = 'mock';
+    const sender = '573004445555';
+    const postMessage = async (eventId: string, text: string) => {
+      const rawPayload = JSON.stringify({ entry: [{ changes: [{ value: {
+        metadata: { phone_number_id: 'qualified-phone-number-id', display_phone_number: '15550000000' },
+        messages: [{ id: eventId, from: sender, timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: text } }],
+      } }] }] });
+      const signature = `sha256=${crypto.createHmac('sha256', process.env.WHATSAPP_APP_SECRET!).update(Buffer.from(rawPayload)).digest('hex')}`;
+      await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, { headers: { 'Content-Type': 'application/json', 'x-hub-signature-256': signature } });
+      await waitUntil(async () => (await InboundEvent.findOne({ userId: owner!._id, externalEventId: eventId }))?.processingState === 'completed');
+    };
+
+    await postMessage('wamid.qualified-1', 'Hola, quiero aprender a generar ingresos adicionales utilizando las redes sociales y la inteligencia artificial');
+    await postMessage('wamid.qualified-2', 'Quiero generar $500.000 adicionales al mes. Tengo poca experiencia vendiendo, pero utilizo Facebook, Instagram y WhatsApp y puedo dedicar 5 horas semanales');
+
+    const proposal: any = await WhatsAppProposal.findOne({ userId: owner!._id, sourceEventId: 'wamid.qualified-2' });
+    expect(proposal).toMatchObject({ platform: 'whatsapp', status: 'proposed', purpose: 'conversation_response' });
+    expect(proposal.text).toMatch(/programáramos una reunión/i);
+    expect(proposal.text).not.toMatch(/calendly|https?:\/\//i);
+    expect(await Meeting.countDocuments({ userId: owner!._id })).toBe(0);
+    expect(await OutboundMessage.countDocuments({ userId: owner!._id })).toBe(0);
+    const conversation: any = await Conversation.findOne({ userId: owner!._id, leadId: proposal.leadId });
+    expect(conversation.messages.filter((message: any) => message.sender === 'lead')).toHaveLength(2);
+    expect(conversation.messages.at(-1)).toMatchObject({ platform: 'whatsapp', direction: 'inbound' });
+  });
+
   test('filters forged or stale WhatsApp deliveries and accepts signed contacts beyond the control allowlist', async () => {
     await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'whatsapp-safety@example.com', password: 'password123', fullName: 'WhatsApp Safety Owner' });
     const owner = await User.findOne({ email: 'whatsapp-safety@example.com' });
