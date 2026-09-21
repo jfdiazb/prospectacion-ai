@@ -114,6 +114,28 @@ describe('ALMA qualification to meeting readiness', () => {
     expect(response).not.toMatch(/contenido|formatos/i);
   });
 
+  test('a comprehensive first WhatsApp message is sufficient discovery', () => {
+    const text = 'Hola, quiero aprender a generar ingresos adicionales usando redes sociales e inteligencia artificial. Mi meta es ganar $500.000 adicionales al mes, puedo dedicar 5 horas semanales y utilizo Facebook, Instagram y WhatsApp';
+    const conversation = [{ sender: 'lead' as const, text }];
+    const result = MeetingReadinessService.evaluate([text], analyzeWhatsAppConversation([text]), undefined, conversation);
+
+    expect(result).toMatchObject({
+      ready: true,
+      reason: 'qualified_discovery',
+      evidence: expect.arrayContaining(['comprehensive_single_turn', 'discovery_conversation']),
+    });
+    expect(MeetingReadinessService.shouldStartScheduling(result)).toBe(false);
+    expect(MeetingReadinessService.meetingOfferFor(result, conversation, [text])).toMatch(/programáramos una reunión/i);
+  });
+
+  test.each([
+    'Quiero generar $500.000 al mes',
+    'Quiero aprender a vender usando Instagram',
+    'Puedo dedicar 5 horas semanales a conocer la oportunidad',
+  ])('does not treat a partial first message as comprehensive discovery: %s', text => {
+    expect(readiness([text])).toMatchObject({ ready: false, reason: 'needs_discovery' });
+  });
+
   test('does not repeat a meeting offer after an explicit decline', () => {
     const offer = MeetingReadinessService.meetingOffer();
     const texts = ['Quiero aprender a vender productos y generar ingresos', 'No, prefiero recibir información por aquí'];

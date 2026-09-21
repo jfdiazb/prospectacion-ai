@@ -138,8 +138,25 @@ export class MeetingReadinessService {
       evidence.add('prospect_context');
     }
 
+    const currentTurn = normalize(current);
+    const singleTurnDimensions = [
+      /\b(?:meta|objetivo|ganar|generar|ingresos?)\b.{0,45}(?:\$|cop|pesos?)?\s*\d[\d.,]*|(?:\$|cop|pesos?)\s*\d[\d.,]*.{0,45}\b(?:mes|mensual|ingresos?)\b/.test(currentTurn),
+      /\b\d+(?:[.,]\d+)?\s*horas?\s*(?:por|a la)?\s*seman(?:a|ales)\b|\btiempo(?:s)? libres?\b/.test(currentTurn),
+      /\b(?:redes sociales|facebook|instagram|whatsapp|inteligencia artificial|\bia\b)\b/.test(currentTurn),
+      /\b(?:poca|algo de|sin|mucha) experiencia\b|\b(?:ya vendo|he vendido|nunca he vendido)\b/.test(currentTurn),
+    ].filter(Boolean).length;
     if (
-      leadTexts.length >= 2 &&
+      leadTexts.length === 1 &&
+      evidence.has('declared_interest') &&
+      evidence.has('declared_need_or_goal') &&
+      evidence.has('prospect_context') &&
+      singleTurnDimensions >= 3
+    ) {
+      evidence.add('comprehensive_single_turn');
+    }
+
+    if (
+      (leadTexts.length >= 2 || evidence.has('comprehensive_single_turn')) &&
       evidence.has('declared_need_or_goal') &&
       evidence.has('prospect_context')
     ) {
