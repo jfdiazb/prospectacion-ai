@@ -55,6 +55,7 @@ export class OperationalDiagnosticsService {
         : provider.error ? 'error'
           : inbound === 'live' && outbound === 'live' ? 'live'
             : inbound === 'live' || outbound === 'live' ? 'degraded'
+              : inbound === 'pending' || outbound === 'pending' ? 'pending'
               : provider.configured ? 'mock' : 'disabled';
       return {
         key,

@@ -41,10 +41,17 @@ La API oficial sí documenta lectura y respuesta a comentarios de videos propios
 - Lint backend: 0 errores y 615 advertencias históricas.
 - Advertencias no bloqueantes: bundle frontend de aproximadamente 898 kB y aviso de configuración futura de Vite.
 
+## Verificación de producción posterior
+
+- Render y Vercel desplegaron `b0a78c8` correctamente.
+- MongoDB Atlas confirmó evidencia real minimizada: WhatsApp 198 inbound completados/196 outbound enviados; Instagram 22/19; YouTube 37/50. Facebook y TikTok no tienen evidencia real persistida.
+- Groq registra 21 invocaciones completadas con `openai/gpt-oss-120b`, 18.369 tokens totales y latencia media aproximada de 676 ms; no aparecieron invocaciones fallidas en la agregación.
+- Existe una reunión Calendly programada con identificador externo pero sin `joinUrl`, consistente con el fallo de conexión Calendly→Zoom informado por el propietario.
+- Se reforzó `ReadinessService`: configuración/flags sin `InboundEvent` completado o `OutboundMessage` real enviado se reportan como `pending`, no como `live`. La verificación de Groq usa telemetría `AIInvocation` completada.
+
 ## Acciones externas necesarias
 
 1. TikTok: confirmar en TikTok for Business que la app tiene Accounts API/Organic API, scopes de comentarios y autorización de la cuenta; solicitar Business Messaging por separado si se requieren DM. Solo después implementar/configurar credenciales y transporte y ejecutar una prueba controlada.
 2. Render: revisar secretos y modos efectivos; no basta con activar flags. Desplegar este cambio requiere autorización del propietario.
 3. Calendly: abrir Integrations en Calendly, desconectar/reconectar Zoom con el propietario correcto, confirmar permisos de creación de reuniones y ejecutar una reserva de prueba controlada.
 4. Meta/WhatsApp/YouTube/Groq: ejecutar pruebas de humo autenticadas y de bajo impacto en producción antes de etiquetarlas LIVE.
-
