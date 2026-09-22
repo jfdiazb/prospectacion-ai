@@ -19,6 +19,8 @@ export class ReadinessService {
     const facebookMode = mode(process.env.FACEBOOK_MESSAGING_MODE || process.env.META_MESSAGING_MODE);
     const youtubeMode = mode(process.env.YOUTUBE_MESSAGING_MODE);
     const tiktokApproved = process.env.TIKTOK_API_APPROVED === 'true';
+    const tiktokIngestionRequested = process.env.TIKTOK_INGESTION_ENABLED === 'true';
+    const tiktokMessagingRequested = process.env.TIKTOK_MESSAGING_ENABLED === 'true';
     const globalRealOutboundEnabled =
       process.env.NODE_ENV !== 'production' || process.env.REAL_OUTBOUND_ENABLED === 'true';
     const effectiveOutbound = (channel: 'instagram' | 'facebook' | 'whatsapp' | 'youtube', configured: ChannelMode): ChannelMode => {
@@ -38,7 +40,17 @@ export class ReadinessService {
           instagram: { inbound: has('META_APP_SECRET', 'META_VERIFY_TOKEN'), outbound: effectiveOutbound('instagram', instagramMode), configured: instagramMode === 'mock' || has('META_ACCESS_TOKEN', 'META_IG_USER_ID'), automatic: process.env.META_AUTO_SEND_ENABLED === 'true' },
           facebook: { inbound: has('META_APP_SECRET', 'META_VERIFY_TOKEN'), outbound: effectiveOutbound('facebook', facebookMode), configured: facebookMode === 'mock' || has('META_PAGE_ACCESS_TOKEN', 'META_PAGE_ID'), automatic: process.env.META_AUTO_SEND_ENABLED === 'true' },
           youtube: { inbound: isYouTubePollingEnabled() ? 'live' : 'disabled', outbound: effectiveOutbound('youtube', youtubeMode), configured: youtubeMode === 'mock' || has('YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET', 'CRM_OWNER_ID') },
-          tiktok: { inbound: tiktokApproved && process.env.TIKTOK_INGESTION_ENABLED === 'true' ? 'live' : 'disabled', outbound: tiktokApproved && process.env.TIKTOK_MESSAGING_ENABLED === 'true' ? 'live' : 'disabled', configured: tiktokApproved },
+          // Flags express operator intent; they are not connectivity evidence. There is no
+          // authenticated TikTok transport, webhook/poller or outbound provider in ALMA yet.
+          tiktok: {
+            inbound: tiktokApproved && tiktokIngestionRequested ? 'pending' : 'disabled',
+            outbound: tiktokApproved && tiktokMessagingRequested ? 'pending' : 'disabled',
+            configured: false,
+            requested: tiktokApproved && (tiktokIngestionRequested || tiktokMessagingRequested),
+            reason: tiktokApproved && (tiktokIngestionRequested || tiktokMessagingRequested)
+              ? 'official_transport_not_configured'
+              : 'official_capability_not_enabled',
+          },
         },
       },
     };

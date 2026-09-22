@@ -44,16 +44,28 @@ export class OperationalDiagnosticsService {
     const providers: any = readiness.runtime.providers;
     const channel = (key: string, label: string) => {
       const provider = providers[key] || {};
-      const inbound = provider.inbound === true || provider.inbound === 'live' ? 'live' : provider.inbound === 'disabled' ? 'disabled' : 'disabled';
+      const inbound = provider.inbound === true || provider.inbound === 'live'
+        ? 'live'
+        : provider.inbound === 'pending' ? 'pending' : 'disabled';
+      const outbound = provider.outbound === 'live'
+        ? 'live'
+        : provider.outbound === 'mock' ? 'mock' : provider.outbound === 'pending' ? 'pending' : 'disabled';
+      const state = provider.reason === 'official_transport_not_configured'
+        ? 'pending'
+        : provider.error ? 'error'
+          : inbound === 'live' && outbound === 'live' ? 'live'
+            : inbound === 'live' || outbound === 'live' ? 'degraded'
+              : provider.configured ? 'mock' : 'disabled';
       return {
         key,
         label,
         connected: Boolean(provider.configured && (inbound === 'live' || provider.outbound === 'live')),
-        mode: provider.outbound === 'live' || inbound === 'live' ? 'live' : provider.configured ? 'mock' : 'disabled',
+        mode: state,
         inbound,
-        outbound: provider.outbound === 'live' ? 'live' : provider.outbound === 'mock' ? 'mock' : 'disabled',
+        outbound,
         automatic: Boolean(provider.automatic),
         lastActivityAt: inboundActivity[key],
+        reason: provider.reason,
       };
     };
     const integrations = [
@@ -65,8 +77,12 @@ export class OperationalDiagnosticsService {
       {
         key: 'calendly', label: 'Calendly',
         connected: Boolean(process.env.CALENDLY_PERSONAL_ACCESS_TOKEN && process.env.CALENDLY_BOOKING_URL),
-        mode: process.env.SCHEDULING_MODE === 'calendly' ? 'live' : 'disabled',
-        inbound: process.env.SCHEDULING_MODE === 'calendly' ? 'live' : 'disabled',
+        mode: process.env.SCHEDULING_MODE === 'calendly'
+          ? process.env.CALENDLY_PERSONAL_ACCESS_TOKEN && process.env.CALENDLY_BOOKING_URL ? 'live' : 'pending'
+          : 'disabled',
+        inbound: process.env.SCHEDULING_MODE === 'calendly'
+          ? process.env.CALENDLY_PERSONAL_ACCESS_TOKEN && process.env.CALENDLY_BOOKING_URL ? 'live' : 'pending'
+          : 'disabled',
         outbound: 'disabled', automatic: false, lastActivityAt: latestCalendly?.updatedAt,
       },
     ];
