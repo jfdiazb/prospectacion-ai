@@ -36,6 +36,8 @@ services:
         value: "false"
       - key: INSTAGRAM_REAL_OUTBOUND_ENABLED
         value: "true"
+      - key: FACEBOOK_REAL_OUTBOUND_ENABLED
+        value: "true"
       - key: YOUTUBE_POLLING_ENABLED
         value: "false"
       - key: YOUTUBE_MESSAGING_MODE
@@ -93,9 +95,17 @@ services:
       - key: INSTAGRAM_MESSAGING_MODE
         value: live
       - key: FACEBOOK_MESSAGING_MODE
-        value: mock
+        value: live
       - key: META_AUTO_SEND_ENABLED
         value: "false"
+      - key: META_APP_SECRET
+        sync: false
+      - key: META_VERIFY_TOKEN
+        sync: false
+      - key: META_PAGE_ID
+        sync: false
+      - key: META_PAGE_ACCESS_TOKEN
+        sync: false
       - key: WHATSAPP_MESSAGING_MODE
         value: mock
       - key: WHATSAPP_AUTO_REPLY_ENABLED

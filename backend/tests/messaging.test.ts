@@ -36,6 +36,28 @@ describe('production outbound kill switch', () => {
     expect(process.env.META_AUTO_SEND_ENABLED).toBe('false');
     expect(process.env.WHATSAPP_AUTO_REPLY_ENABLED).toBe('false');
   });
+
+  test('allows only Facebook through its isolated production switch', () => {
+    process.env = {
+      ...originalEnv,
+      NODE_ENV: 'production',
+      REAL_OUTBOUND_ENABLED: 'false',
+      INSTAGRAM_REAL_OUTBOUND_ENABLED: 'false',
+      FACEBOOK_REAL_OUTBOUND_ENABLED: 'true',
+      INSTAGRAM_MESSAGING_MODE: 'live',
+      FACEBOOK_MESSAGING_MODE: 'live',
+      WHATSAPP_MESSAGING_MODE: 'live',
+      YOUTUBE_MESSAGING_MODE: 'live',
+      META_AUTO_SEND_ENABLED: 'false',
+      WHATSAPP_AUTO_REPLY_ENABLED: 'false',
+    };
+
+    expect(getMessagingProvider('facebook').name).toBe('meta');
+    expect(getMessagingProvider('instagram').name).toBe('mock');
+    expect(getMessagingProvider('whatsapp').name).toBe('mock');
+    expect(getMessagingProvider('youtube').name).toBe('mock');
+    expect(process.env.META_AUTO_SEND_ENABLED).toBe('false');
+  });
 });
 
 describe('MetaMessagingProvider', () => {

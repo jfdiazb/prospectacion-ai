@@ -94,6 +94,9 @@ export const validateServerEnvironment = (): void => {
     );
   const facebookMessagingMode =
     process.env.FACEBOOK_MESSAGING_MODE || process.env.META_MESSAGING_MODE || 'mock';
+  const facebookRealOutboundEnabled = process.env.FACEBOOK_REAL_OUTBOUND_ENABLED;
+  if (facebookRealOutboundEnabled && !['true', 'false'].includes(facebookRealOutboundEnabled))
+    throw new Error('FACEBOOK_REAL_OUTBOUND_ENABLED debe ser true o false');
   if (!['mock', 'live'].includes(facebookMessagingMode))
     throw new Error('FACEBOOK_MESSAGING_MODE debe ser mock o live');
   if (facebookMessagingMode === 'live') {
@@ -103,6 +106,10 @@ export const validateServerEnvironment = (): void => {
     if (facebookMissing.length)
       throw new Error(`Faltan variables para Facebook live: ${facebookMissing.join(', ')}`);
   }
+  if (facebookRealOutboundEnabled === 'true' && facebookMessagingMode !== 'live')
+    throw new Error(
+      'FACEBOOK_MESSAGING_MODE debe ser live cuando FACEBOOK_REAL_OUTBOUND_ENABLED=true'
+    );
   const whatsappMessagingMode = process.env.WHATSAPP_MESSAGING_MODE || 'mock';
   if (!['mock', 'live'].includes(whatsappMessagingMode))
     throw new Error('WHATSAPP_MESSAGING_MODE debe ser mock o live');

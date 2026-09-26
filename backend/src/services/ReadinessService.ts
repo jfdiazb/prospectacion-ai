@@ -47,7 +47,10 @@ export class ReadinessService {
     const effectiveOutbound = (channel: 'instagram' | 'facebook' | 'whatsapp' | 'youtube', configured: ChannelMode): ChannelMode => {
       const isolatedInstagramEnabled =
         channel === 'instagram' && process.env.INSTAGRAM_REAL_OUTBOUND_ENABLED === 'true';
-      return configured === 'live' && (globalRealOutboundEnabled || isolatedInstagramEnabled)
+      const isolatedFacebookEnabled =
+        channel === 'facebook' && process.env.FACEBOOK_REAL_OUTBOUND_ENABLED === 'true';
+      return configured === 'live' &&
+        (globalRealOutboundEnabled || isolatedInstagramEnabled || isolatedFacebookEnabled)
         ? 'live'
         : 'mock';
     };
