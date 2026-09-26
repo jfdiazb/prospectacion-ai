@@ -95,8 +95,11 @@ export const validateServerEnvironment = (): void => {
   const facebookMessagingMode =
     process.env.FACEBOOK_MESSAGING_MODE || process.env.META_MESSAGING_MODE || 'mock';
   const facebookRealOutboundEnabled = process.env.FACEBOOK_REAL_OUTBOUND_ENABLED;
+  const facebookAutoSendEnabled = process.env.FACEBOOK_AUTO_SEND_ENABLED;
   if (facebookRealOutboundEnabled && !['true', 'false'].includes(facebookRealOutboundEnabled))
     throw new Error('FACEBOOK_REAL_OUTBOUND_ENABLED debe ser true o false');
+  if (facebookAutoSendEnabled && !['true', 'false'].includes(facebookAutoSendEnabled))
+    throw new Error('FACEBOOK_AUTO_SEND_ENABLED debe ser true o false');
   if (!['mock', 'live'].includes(facebookMessagingMode))
     throw new Error('FACEBOOK_MESSAGING_MODE debe ser mock o live');
   if (facebookMessagingMode === 'live') {

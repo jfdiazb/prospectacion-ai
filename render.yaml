@@ -38,6 +38,8 @@ services:
         value: "true"
       - key: FACEBOOK_REAL_OUTBOUND_ENABLED
         value: "true"
+      - key: FACEBOOK_AUTO_SEND_ENABLED
+        value: "false"
       - key: YOUTUBE_POLLING_ENABLED
         value: "false"
       - key: YOUTUBE_MESSAGING_MODE
