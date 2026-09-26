@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { useAuth } from '@context/AuthContext';
 import { ProtectedRoute } from '@components/ProtectedRoute';
@@ -17,9 +17,11 @@ import { YouTubeMonitorPage } from '@pages/YouTubeMonitorPage';
 import { PrivacyPolicyPage } from '@pages/PrivacyPolicyPage';
 import { DataDeletionPage } from '@pages/DataDeletionPage';
 import { LaunchesPage } from '@pages/LaunchesPage';
+import { LandingPage } from '@pages/LandingPage';
+import { TermsPage } from '@pages/TermsPage';
 
 function App() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isLoading } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -33,13 +35,12 @@ function App() {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route
-          path="/"
-          element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />}
-        />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/privacidad" element={<PrivacyPolicyPage />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
         <Route path="/eliminacion-datos" element={<DataDeletionPage />} />
         <Route
           path="/dashboard"
