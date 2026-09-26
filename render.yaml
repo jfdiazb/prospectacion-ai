@@ -30,6 +30,8 @@ services:
         value: "15000"
       - key: GROQ_MAX_TOKENS
         value: "512"
+      - key: AI_INVOCATION_LEASE_MS
+        value: "120000"
       - key: GEMINI_API_KEY
         sync: false
       - key: REAL_OUTBOUND_ENABLED
@@ -41,8 +43,12 @@ services:
       - key: FACEBOOK_AUTO_SEND_ENABLED
         value: "false"
       - key: YOUTUBE_POLLING_ENABLED
+        # Safe Blueprint default. ALMA V1 currently has an explicit Render dashboard override;
+        # keep false here so recreating the service cannot start polling unexpectedly.
         value: "false"
       - key: YOUTUBE_MESSAGING_MODE
+        # Safe Blueprint default; the current live override is documented in
+        # docs/ALMA_V1_RUNTIME_CONFIG.md and must be reconciled manually.
         value: mock
       - key: YOUTUBE_INGESTION_MODE
         value: live
@@ -99,6 +105,7 @@ services:
       - key: FACEBOOK_MESSAGING_MODE
         value: live
       - key: META_AUTO_SEND_ENABLED
+        # Safe Blueprint default; never enable automatic real messages from source control.
         value: "false"
       - key: META_APP_SECRET
         sync: false
@@ -111,6 +118,7 @@ services:
       - key: WHATSAPP_MESSAGING_MODE
         value: mock
       - key: WHATSAPP_AUTO_REPLY_ENABLED
+        # Safe Blueprint default; production's explicit override is documented separately.
         value: "false"
       - key: WHATSAPP_REPLY_MODE
         value: assisted

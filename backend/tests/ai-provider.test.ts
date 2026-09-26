@@ -7,8 +7,17 @@ import { GroqAIProvider } from '../src/providers/ai/GroqAIProvider';
 import { GroqService } from '../src/services/GroqService';
 
 describe('AI provider selection', () => {
-  const originalEnv = process.env;
+  const originalEnv = { ...process.env };
   afterEach(() => { process.env = { ...originalEnv }; });
+
+  test('the normal Jest runtime stays mock even when provider keys are present', () => {
+    expect(process.env.NODE_ENV).toBe('test');
+    expect(process.env.AI_MODE).toBe('mock');
+    process.env.GROQ_API_KEY = 'would-be-live-groq-key';
+    process.env.GEMINI_API_KEY = 'would-be-live-gemini-key';
+    process.env.AI_PROVIDER = 'groq';
+    expect(getAIProvider().name).toBe('mock');
+  });
 
   test('AI_MODE=mock overrides an available Gemini key', () => {
     process.env.AI_MODE = 'mock';
@@ -18,12 +27,16 @@ describe('AI provider selection', () => {
 
   test('AI_MODE=live selects Gemini explicitly', () => {
     process.env.AI_MODE = 'live';
+    process.env.AI_PROVIDER = 'gemini';
+    delete process.env.GROQ_API_KEY;
     process.env.GEMINI_API_KEY = 'test-key';
     expect(getAIProvider().name).toBe('gemini');
   });
 
   test('legacy selection remains compatible when AI_MODE is absent', () => {
     delete process.env.AI_MODE;
+    delete process.env.AI_PROVIDER;
+    delete process.env.GROQ_API_KEY;
     delete process.env.GEMINI_API_KEY;
     expect(getAIProvider().name).toBe('mock');
   });

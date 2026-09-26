@@ -24,6 +24,9 @@ export const validateServerEnvironment = (): void => {
     if (!process.env[requiredAIKey]?.trim())
       throw new Error(`${requiredAIKey} es obligatoria cuando AI_MODE=live y AI_PROVIDER=${selectedAIProvider}`);
   }
+  const aiInvocationLeaseMs = Number(process.env.AI_INVOCATION_LEASE_MS || 120000);
+  if (!Number.isFinite(aiInvocationLeaseMs) || aiInvocationLeaseMs < 30000 || aiInvocationLeaseMs > 900000)
+    throw new Error('AI_INVOCATION_LEASE_MS debe estar entre 30000 y 900000');
   const ownerId = process.env.CRM_OWNER_ID?.trim();
   if (ownerId && !/^[0-9a-fA-F]{24}$/.test(ownerId))
     throw new Error(

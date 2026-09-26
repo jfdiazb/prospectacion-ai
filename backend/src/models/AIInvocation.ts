@@ -18,6 +18,8 @@ const schema = new Schema({
   reasoningTokens: Number,
   latencyMs: Number,
   retryCount: { type: Number, default: 0 },
+  processingStartedAt: Date,
+  leaseClaimId: String,
   completedAt: Date,
   failedAt: Date,
   errorType: String,
