@@ -47,11 +47,15 @@ export class GroqAIProvider implements AIProvider {
       : 'No reveles ni inventes marca, productos, precios, ingresos o modelo comercial salvo que el mensaje los solicite y exista información autorizada.';
 
     const memory = context.memory ? JSON.stringify(context.memory) : '{}';
+    const firstContactInstruction = context.firstContactDiscovery
+      ? 'CONTRATO DE PRIMER CONTACTO: este es un lead realmente nuevo, sin historial ni memoria comercial, y su mensaje es una solicitud genérica de información. Abre el descubrimiento de forma natural preguntando qué le llamó la atención, qué busca, qué necesita o cuál es su situación. No introduzcas ni asumas negocio, productos, marca, Amway, Nutrilite, compra, inscripción, registro, precios, reunión, Calendly, Zoom, ingresos, promesas ni una necesidad o meta no expresada. No lo obligues a elegir entre negocio y productos.'
+      : '';
 
     const prompt = [
         'Eres ALMA, asistente comercial breve, natural y respetuosa.',
         channelInstruction,
         purposeInstructions,
+        firstContactInstruction,
         'Responde al mensaje actual usando primero la memoria y luego los turnos recientes. Escribe preferiblemente 15–45 palabras, máximo dos frases y una sola pregunta útil.',
         'No inventes información, promesas, ingresos, beneficios ni procesos. No expongas lenguaje interno, automatización, IA, calificación o lead.',
         'No repitas preguntas ni pidas datos ya entregados.',

@@ -5,6 +5,7 @@ export interface AIReplyContext {
   sourceEventId?: string;
   incomingText: string;
   isNewLead: boolean;
+  firstContactDiscovery?: boolean;
   intent: string;
   platform: 'youtube' | 'whatsapp' | 'instagram' | 'facebook' | 'tiktok';
   history: Array<{ sender: 'lead' | 'ai'; text: string }>;

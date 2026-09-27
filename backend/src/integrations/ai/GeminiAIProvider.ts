@@ -37,11 +37,15 @@ export class GeminiAIProvider implements AIProvider {
       `Disclaimers: ${JSON.stringify(commercial.disclaimers ?? [])}.`,
     ].join('\n')
   : 'No existe contexto comercial activo: pregunta antes de asumir marca, producto o modelo de negocio.';
+    const firstContactInstruction = context.firstContactDiscovery
+      ? 'CONTRATO DE PRIMER CONTACTO: este es un lead realmente nuevo, sin historial ni memoria comercial, y su mensaje es una solicitud genérica de información. Abre el descubrimiento de forma natural preguntando qué le llamó la atención, qué busca, qué necesita o cuál es su situación. No introduzcas ni asumas negocio, productos, marca, Amway, Nutrilite, compra, inscripción, registro, precios, reunión, Calendly, Zoom, ingresos, promesas ni una necesidad o meta no expresada. No lo obligues a elegir entre negocio y productos.'
+      : '';
     try {
       const text = await GeminiService.generateResponse([
         'Eres ALMA, asistente comercial breve, natural y respetuosa.',
         channelInstruction,
         purposeInstructions,
+        firstContactInstruction,
         'Responde únicamente al mensaje actual usando el historial como memoria.',
         'El mensaje al prospecto debe sonar humano, cálido y muy breve: idealmente 20–35 palabras, máximo dos frases y una sola pregunta. No agregues explicaciones innecesarias ni información que el prospecto no haya solicitado.',
         'No inventes características del negocio, modelo, productos, comercio electrónico, capacitación, experiencia requerida, ganancias, márgenes, condiciones, beneficios ni procesos que no estén expresamente autorizados en el contexto comercial activo. Si esa información no está confirmada, no la menciones.',

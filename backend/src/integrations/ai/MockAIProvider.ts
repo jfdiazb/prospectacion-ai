@@ -26,6 +26,7 @@ export class MockAIProvider implements AIProvider {
         ? `Retomo lo que me contaste sobre “${lastLead.slice(0, 120)}”. Si todavía es relevante para ti, podemos continuar desde allí con calma.`
         : 'Retomo nuestra conversación anterior. Si todavía te resulta útil, podemos continuar desde el punto donde quedó, sin compromiso.';
     }
+    if (context.firstContactDiscovery) return '¡Hola! Gracias por escribir. ¿Qué te llamó la atención o qué te gustaría encontrar en este momento?';
     if (context.intent === 'rejection') return 'Entendido. No te enviaré más seguimientos. Gracias por avisarme.';
     if (context.intent === 'meeting') return 'Perfecto. Para programar la reunión necesito tu correo, fecha y hora preferidas.';
     if (context.normalizedIntent === 'additional_income_interest') return 'Entiendo que buscas una forma de generar ingresos adicionales. Para orientarte sin asumir, ¿te interesa conocer una oportunidad de negocio, una actividad de venta de productos o primero explorar ambas opciones?';

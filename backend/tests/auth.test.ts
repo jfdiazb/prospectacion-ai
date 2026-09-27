@@ -23,6 +23,7 @@ import { MessagingProviderError, type MessagingProvider } from '../src/integrati
 import WhatsAppProposal from '../src/models/WhatsAppProposal';
 import { WhatsAppAssistedService } from '../src/services/WhatsAppAssistedService';
 import AIInvocation from '../src/models/AIInvocation';
+import { ConversationalSafetyService } from '../src/services/ConversationalSafetyService';
 
 const waitUntil = async (predicate: () => Promise<boolean>, timeout = 5000) => {
   const started = Date.now();
@@ -474,6 +475,48 @@ describe('Auth integration tests', () => {
     expect(await Conversation.countDocuments({ leadId: lead!._id })).toBe(1);
     expect(await InboundEvent.countDocuments({ externalEventId: eventId })).toBe(1);
     expect(await OutboundMessage.countDocuments({ sourceEventId: eventId })).toBe(0);
+  });
+
+  test('sends natural discovery for a genuinely new WhatsApp lead whose first message is INFO', async () => {
+    await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'first-contact-info@example.com', password: 'password123', fullName: 'First Contact Owner' });
+    const owner = await User.findOne({ email: 'first-contact-info@example.com' });
+    process.env.CRM_OWNER_ID = owner!._id.toString();
+    process.env.WHATSAPP_APP_SECRET = 'first-contact-info-secret';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = 'first-contact-info-phone-id';
+    process.env.WHATSAPP_REPLY_MODE = 'automatic';
+    process.env.WHATSAPP_AUTO_REPLY_ENABLED = 'true';
+    process.env.WHATSAPP_MESSAGING_MODE = 'mock';
+    const eventId = 'wamid.first-contact-info-1';
+    const sender = '573001010101';
+    const rawPayload = JSON.stringify({ entry: [{ changes: [{ value: {
+      metadata: { phone_number_id: 'first-contact-info-phone-id', display_phone_number: '15550000000' },
+      messages: [{ id: eventId, from: sender, timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: 'INFO' } }],
+    } }] }] });
+    const signature = `sha256=${crypto.createHmac('sha256', process.env.WHATSAPP_APP_SECRET).update(Buffer.from(rawPayload)).digest('hex')}`;
+    const response = await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, { headers: { 'Content-Type': 'application/json', 'x-hub-signature-256': signature } });
+    expect(response.status).toBe(200);
+    await waitUntil(async () => (await InboundEvent.findOne({ userId: owner!._id, externalEventId: eventId }))?.processingState === 'completed');
+
+    const lead: any = await Lead.findOne({ userId: owner!._id, phone: sender }).lean();
+    const conversation: any = await Conversation.findOne({ userId: owner!._id, leadId: lead?._id }).lean();
+    const outbound: any = await OutboundMessage.findOne({ userId: owner!._id, sourceEventId: eventId }).lean();
+    const leadMessages = conversation?.messages.filter((message: any) => message.sender === 'lead') ?? [];
+    const aiMessages = conversation?.messages.filter((message: any) => message.sender === 'ai') ?? [];
+    expect(lead).not.toBeNull();
+    expect(lead).toMatchObject({ platform: 'whatsapp', source: 'whatsapp_webhook', currentChannel: 'whatsapp' });
+    expect(conversation).not.toBeNull();
+    expect(leadMessages).toHaveLength(1);
+    expect(aiMessages).toHaveLength(1);
+    expect(outbound).toMatchObject({ channel: 'whatsapp', provider: 'mock', deliveryStatus: 'simulated', simulatedDelivery: true });
+    expect(outbound.text).toBe(aiMessages[0].text);
+    expect(outbound.text).toMatch(/qué te llamó la atención|qué te gustaría encontrar|qué buscas|qué necesitas|cuál es tu situación/i);
+    expect(outbound.text).not.toMatch(/negocio|producto|marca|amway|nutrilite|compr|inscrip|registr|precio|reunión|calendly|zoom|ingres|ganancia/i);
+    expect(outbound.text).not.toMatch(/https?:\/\//i);
+    expect(ConversationalSafetyService.detectPlaceholders(outbound.text)).toBe(false);
+    expect(await Meeting.countDocuments({ userId: owner!._id, conversationId: conversation._id })).toBe(0);
+    expect(conversation.commercialMemory?.meetingInterest ?? 'unknown').toBe('unknown');
+    process.env.WHATSAPP_REPLY_MODE = 'assisted';
+    process.env.WHATSAPP_AUTO_REPLY_ENABLED = 'false';
   });
 
   test('offers a meeting through the signed WhatsApp webhook after sufficient discovery without sending Calendly', async () => {

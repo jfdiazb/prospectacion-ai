@@ -55,10 +55,62 @@ describe('Behavioral/commercial production certification', () => {
   });
 
   test.each(corpus.cases)('corpus $id remains free of critical textual claims', scenario => {
+    expect(scenario.turns.length).toBeGreaterThan(0);
     for (const forbidden of scenario.forbidden ?? []) {
       const result = ConversationalSafetyService.validate({ text: forbidden, readiness: discovery });
       expect(result.allowed).toBe(false);
     }
+  });
+
+  const firstContactInformationVariants = [
+    'Info', 'INFO', 'info', 'Información', 'Quiero información', 'Me interesa',
+  ];
+  test.each(firstContactInformationVariants)('new empty first contact %s stays in natural discovery', message => {
+    const qualification = analyzeWhatsAppConversation([message]);
+    const readiness = MeetingReadinessService.evaluate([message], qualification, undefined, [{ sender: 'lead', text: message }]);
+    const firstContactDiscovery = ConversationalSafetyService.isFirstContactDiscovery({
+      isNewLead: true, currentMessage: message, hasPriorConversation: false,
+      commercialMemory: { interests: [], needs: [], objections: [], meetingEvidence: [], commercialState: 'new', meetingInterest: 'unknown' },
+    });
+    const result = ConversationalSafetyService.validate({
+      text: '¿Qué información específica te gustaría recibir sobre nuestro modelo de negocio o productos?',
+      readiness, firstContactDiscovery,
+    });
+    expect(firstContactDiscovery).toBe(true);
+    expect(readiness.reason).toBe('needs_discovery');
+    expect(MeetingReadinessService.shouldStartScheduling(readiness)).toBe(false);
+    expect(result.allowed).toBe(false);
+    expect(result.violations).toContain('premature_first_contact_commercial_framing');
+    expect(result.fallbackUsed).toBe(true);
+    expect(result.text).toMatch(/qué te llamó la atención|qué te gustaría encontrar|qué buscas|qué necesitas|cuál es tu situación/i);
+    expect(result.text).not.toMatch(/negocio|producto|marca|amway|nutrilite|compr|inscrip|registr|precio|reunión|calendly|zoom|ingres|ganancia/i);
+    expect(result.text).not.toMatch(/https?:\/\//i);
+    expect(ConversationalSafetyService.detectPlaceholders(result.text)).toBe(false);
+  });
+
+  test('allows a natural first-contact discovery opening without forcing commercial choices', () => {
+    const result = ConversationalSafetyService.validate({
+      text: '¡Hola! Gracias por escribir. ¿Qué te llamó la atención o qué te gustaría encontrar en este momento?',
+      readiness: discovery, firstContactDiscovery: true,
+    });
+    expect(result.allowed).toBe(true);
+    expect(result.fallbackUsed).toBe(false);
+    expect(result.violations).toEqual([]);
+  });
+
+  test('existing lead with legitimate commercial context is not reclassified as first contact', () => {
+    const firstContactDiscovery = ConversationalSafetyService.isFirstContactDiscovery({
+      isNewLead: false, currentMessage: 'INFO', hasPriorConversation: true,
+      commercialMemory: { interests: ['productos'], needs: ['bienestar'], commercialState: 'discovering' },
+    });
+    const result = ConversationalSafetyService.validate({
+      text: 'Retomando lo que conversamos, puedo ampliar la información sobre los productos que te interesaron.',
+      readiness: discovery, firstContactDiscovery, commercialInformationAuthorized: true,
+    });
+    expect(firstContactDiscovery).toBe(false);
+    expect(result.allowed).toBe(true);
+    expect(result.fallbackUsed).toBe(false);
+    expect(result.violations).not.toContain('premature_first_contact_commercial_framing');
   });
 
   test('Carlos cannot jump from discovery to scheduling or turn a date preference into booking evidence', () => {
