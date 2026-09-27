@@ -30,7 +30,7 @@ export class MeetingReadinessService {
 
   static explicitlyAcceptedMeeting(current: string, conversation: ConversationTurn[] = []): boolean {
     const affirmative = normalize(current).replace(/[^a-z0-9]+/g, ' ').trim();
-    const shortAcceptance = /^(si|si por favor|claro|claro que si|de acuerdo|ok|vale|por supuesto|me gustaria|hagamoslo)$/.test(affirmative);
+    const shortAcceptance = /^(?:si(?: por favor| claro| me gustaria)?|claro(?: que si| agendemos)?|de acuerdo|ok|vale|por supuesto|me gustaria|hagamoslo|agendemos|me interesa|quiero (?:la )?(?:reunion|llamada|cita|asesoria))$/.test(affirmative);
     const explicitAcceptance = /^(si|claro|de acuerdo|ok|vale|por supuesto)\b.{0,40}\b(me gustaria|quiero|podemos|hagamos)\b.{0,40}\b(agendar|programar|reservar|coordinar)\b.{0,30}\b(reunion|llamada|cita|asesoria)\b/.test(affirmative);
     if (!shortAcceptance && !explicitAcceptance) {
       return false;
@@ -72,12 +72,13 @@ export class MeetingReadinessService {
     qualification: any,
     attribution?: { launchId: string; participantId: string },
     conversationTurns: ConversationTurn[] = [],
-    priorEvidence: string[] = []
+    priorEvidence: string[] = [],
+    priorMeetingInterest: string = 'unknown'
   ): MeetingReadiness {
     const current = leadTexts.at(-1) ?? '';
 
     // Acceptance is authoritative only when it answers an explicit prior offer.
-    if (this.explicitlyAcceptedMeeting(current, conversationTurns)) {
+    if (priorMeetingInterest === 'offered' && this.explicitlyAcceptedMeeting(current, conversationTurns)) {
       return {
         ready: true,
         reason: 'explicit_acceptance',

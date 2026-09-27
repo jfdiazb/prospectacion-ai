@@ -635,6 +635,54 @@ describe('Auth integration tests', () => {
     process.env.WHATSAPP_AUTO_REPLY_ENABLED = 'false';
   });
 
+  test('turns the reproduced qualified offer and Si claro acceptance into one Calendly pending booking', async () => {
+    await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'whatsapp-calendly-acceptance@example.com', password: 'password123', fullName: 'Calendly Acceptance Owner' });
+    const owner = await User.findOne({ email: 'whatsapp-calendly-acceptance@example.com' });
+    process.env.CRM_OWNER_ID = owner!._id.toString();
+    process.env.WHATSAPP_APP_SECRET = 'whatsapp-calendly-acceptance-secret';
+    process.env.WHATSAPP_PHONE_NUMBER_ID = 'calendly-acceptance-phone-id';
+    process.env.WHATSAPP_REPLY_MODE = 'automatic';
+    process.env.WHATSAPP_AUTO_REPLY_ENABLED = 'true';
+    process.env.WHATSAPP_MESSAGING_MODE = 'mock';
+    process.env.SCHEDULING_MODE = 'calendly';
+    process.env.CALENDLY_BOOKING_URL = 'https://calendly.com/example/real-configured-flow';
+    const postAutomaticMessage = async (eventId: string, text: string) => {
+      const rawPayload = JSON.stringify({ entry: [{ changes: [{ value: {
+        metadata: { phone_number_id: 'calendly-acceptance-phone-id', display_phone_number: '15550000000' },
+        messages: [{ id: eventId, from: '573001112233', timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: text } }],
+      } }] }] });
+      const signature = `sha256=${crypto.createHmac('sha256', process.env.WHATSAPP_APP_SECRET!).update(Buffer.from(rawPayload)).digest('hex')}`;
+      await axios.post(`${baseURL}/api/v1/whatsapp/webhook`, rawPayload, { headers: { 'Content-Type': 'application/json', 'x-hub-signature-256': signature } });
+      await waitUntil(async () => (await InboundEvent.findOne({ userId: owner!._id, externalEventId: eventId }))?.processingState === 'completed');
+    };
+    const discovery = [
+      'Info',
+      'De que trata y cómo funciona',
+      'Generar ingresos adicionales',
+      'Manejar las redes sociales y obtener 1000000 de pesos mensuales',
+      'Cero y el celular',
+    ];
+    for (const [index, text] of discovery.entries()) await postAutomaticMessage(`wamid.calendly-discovery-${index + 1}`, text);
+
+    const offer: any = await OutboundMessage.findOne({ userId: owner!._id, sourceEventId: 'wamid.calendly-discovery-5' }).lean();
+    expect(offer.text).toMatch(/programáramos una reunión/i);
+    expect(await Meeting.countDocuments({ userId: owner!._id })).toBe(0);
+
+    await postAutomaticMessage('wamid.calendly-acceptance', 'Si claro.');
+    const acceptance: any = await OutboundMessage.findOne({ userId: owner!._id, sourceEventId: 'wamid.calendly-acceptance' }).lean();
+    const meeting: any = await Meeting.findOne({ userId: owner!._id }).lean();
+    expect(acceptance.text).toContain('https://calendly.com/example/real-configured-flow');
+    expect(meeting).toMatchObject({ provider: 'calendly', status: 'pending_booking', sourceEventId: 'wamid.calendly-acceptance' });
+    expect(await Conversation.findOne({ userId: owner!._id })).toMatchObject({ commercialMemory: { meetingInterest: 'accepted' } });
+
+    await postAutomaticMessage('wamid.calendly-after-acceptance', 'Gracias');
+    const later: any = await OutboundMessage.findOne({ userId: owner!._id, sourceEventId: 'wamid.calendly-after-acceptance' }).lean();
+    expect(await Meeting.countDocuments({ userId: owner!._id })).toBe(1);
+    expect(later.text).not.toContain('https://calendly.com/example/real-configured-flow');
+    process.env.WHATSAPP_REPLY_MODE = 'assisted';
+    process.env.WHATSAPP_AUTO_REPLY_ENABLED = 'false';
+  });
+
   test('filters forged or stale WhatsApp deliveries and accepts signed contacts beyond the control allowlist', async () => {
     await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'whatsapp-safety@example.com', password: 'password123', fullName: 'WhatsApp Safety Owner' });
     const owner = await User.findOne({ email: 'whatsapp-safety@example.com' });
