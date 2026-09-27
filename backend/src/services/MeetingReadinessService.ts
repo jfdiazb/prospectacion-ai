@@ -23,12 +23,16 @@ const normalize = (value: string) =>
 
 export class MeetingReadinessService {
   static shouldStartScheduling(readiness: MeetingReadiness): boolean {
-    return readiness.reason === 'explicit_request' || readiness.reason === 'explicit_acceptance';
+    // A direct request is useful evidence, but must not jump over discovery.
+    // Scheduling starts only after ALMA made a qualified offer and the prospect accepted it.
+    return readiness.reason === 'explicit_acceptance';
   }
 
   static explicitlyAcceptedMeeting(current: string, conversation: ConversationTurn[] = []): boolean {
     const affirmative = normalize(current).replace(/[^a-z0-9]+/g, ' ').trim();
-    if (!/^(si|si por favor|claro|claro que si|de acuerdo|ok|vale|por supuesto|me gustaria|hagamoslo)$/.test(affirmative)) {
+    const shortAcceptance = /^(si|si por favor|claro|claro que si|de acuerdo|ok|vale|por supuesto|me gustaria|hagamoslo)$/.test(affirmative);
+    const explicitAcceptance = /^(si|claro|de acuerdo|ok|vale|por supuesto)\b.{0,40}\b(me gustaria|quiero|podemos|hagamos)\b.{0,40}\b(agendar|programar|reservar|coordinar)\b.{0,30}\b(reunion|llamada|cita|asesoria)\b/.test(affirmative);
+    if (!shortAcceptance && !explicitAcceptance) {
       return false;
     }
     const currentIndex = [...conversation].map(turn => turn.text).lastIndexOf(current);
@@ -72,23 +76,24 @@ export class MeetingReadinessService {
   ): MeetingReadiness {
     const current = leadTexts.at(-1) ?? '';
 
-    // Solo considera solicitud explícita cuando realmente existe
-    // intención de agendar una reunión.
-    if (MeetingLifecycleService.hasSufficientIntent(current)) {
-      return {
-        ready: true,
-        reason: 'explicit_request',
-        evidence: ['explicit_meeting_intent'],
-        launchId: attribution?.launchId,
-        launchParticipantId: attribution?.participantId,
-      };
-    }
-
+    // Acceptance is authoritative only when it answers an explicit prior offer.
     if (this.explicitlyAcceptedMeeting(current, conversationTurns)) {
       return {
         ready: true,
         reason: 'explicit_acceptance',
         evidence: ['explicit_meeting_acceptance'],
+        launchId: attribution?.launchId,
+        launchParticipantId: attribution?.participantId,
+      };
+    }
+
+    // Solo considera solicitud explícita cuando realmente existe
+    // intención de agendar una reunión.
+    if (MeetingLifecycleService.hasSufficientIntent(current)) {
+      return {
+        ready: false,
+        reason: 'explicit_request',
+        evidence: ['explicit_meeting_intent'],
         launchId: attribution?.launchId,
         launchParticipantId: attribution?.participantId,
       };
@@ -177,8 +182,12 @@ export class MeetingReadinessService {
       evidence.add('guidance_interest');
     }
 
+    const informativeTurns = leadTexts.filter(text => {
+      const turn = normalize(text);
+      return turn.split(/\s+/).length >= 4 && !/^(info|hola|si|no|de que se trata|como funciona)/.test(turn);
+    }).length;
     if (
-      leadTexts.length >= 3 &&
+      informativeTurns >= 3 &&
       evidence.has('declared_interest') &&
       evidence.has('declared_need_or_goal') &&
       evidence.has('prospect_context')

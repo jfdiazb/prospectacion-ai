@@ -59,8 +59,22 @@ export class ReadinessService {
     const outboundStatus = (channel: keyof typeof verified, configured: ChannelMode) =>
       configured === 'mock' ? 'mock' : verified[channel].outbound ? 'live' : 'pending';
     const ai = getAIRuntimeStatus();
+    const technicalReady = database && essentialConfig;
+    const behavioralSuiteVersion = 'behavioral-commercial-v1';
+    const behavioralReady = process.env.BEHAVIORAL_CERTIFICATION_VERSION === behavioralSuiteVersion &&
+      process.env.BEHAVIORAL_CERTIFICATION_STATUS === 'passed';
     return {
-      ready: database && essentialConfig,
+      // `ready` remains the infrastructure health signal used by orchestrators.
+      // Release authorization is deliberately stricter and exposed as `goLive`.
+      ready: technicalReady,
+      technicalReady,
+      behavioralReady,
+      goLive: technicalReady && behavioralReady,
+      behavioralCertification: {
+        status: behavioralReady ? 'passed' : 'missing_or_stale',
+        suiteVersion: behavioralSuiteVersion,
+        releaseCommit: process.env.RELEASE_COMMIT || null,
+      },
       checks: { api: true, database, essentialConfig },
       runtime: {
         ai: { ...ai, verified: ai.provider === 'groq' ? aiVerified : ai.provider === 'mock' },

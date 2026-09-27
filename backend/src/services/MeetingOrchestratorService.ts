@@ -37,7 +37,7 @@ export class MeetingOrchestratorService {
       await AutomationEngineService.emit({ eventId: `${context.sourceEventId}:meeting-intent`, trigger: 'meeting.intent_detected', userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, platform: context.platform, text: context.text, data: { meetingIntent: 'high', meetingReadiness: context.meetingReadiness } });
       const outcome = await lifecycle.propose(context); await this.attachAttribution(context, outcome.meeting); return { handled: true, reply: outcome.reply };
     }
-    let meeting = await Meeting.findOne({ conversationId: context.conversationId, status: { $in: ['pending_details', 'pending_booking', 'pending_configuration', 'failed'] } }).sort({ createdAt: -1 });
+    let meeting = await Meeting.findOne({ userId: context.userId, conversationId: context.conversationId, status: { $in: ['pending_details', 'pending_booking', 'pending_configuration', 'failed'] } }).sort({ createdAt: -1 });
     if (meeting?.status === 'pending_booking') {
       if (wantsCancellation) {
         meeting.status = 'cancelled';
@@ -59,7 +59,7 @@ export class MeetingOrchestratorService {
       }
     }
     if (!meeting && context.wantsMeeting) {
-      const existing = await Meeting.findOne(this.activeScheduledMeetingFilter(context.conversationId)).sort({ scheduledFor: 1 });
+      const existing = await Meeting.findOne({ userId: context.userId, ...this.activeScheduledMeetingFilter(context.conversationId) }).sort({ scheduledFor: 1 });
       if (existing) return { handled: true, reply: `Ya tienes una reunión registrada${existing.scheduledFor ? ` para ${existing.scheduledFor.toISOString()}` : ''}. Los datos de acceso están guardados de forma privada.` };
     }
     if (!meeting && !context.wantsMeeting) return { handled: false };

@@ -1,0 +1,25 @@
+{
+  "version": "behavioral-commercial-v1",
+  "cases": [
+    {
+      "id": "carlos-real-001",
+      "source": "controlled-production-regression",
+      "turns": ["Info", "De que se trata, como funciona", "Generar ingresos adicionales usando las redes sociales", "Si claro por favor", "El lunes 28 a las 8 pm", "Zoom", "No"],
+      "forbidden": ["[sector/servicio]", "nos vemos el lunes", "te envío el enlace de Zoom"]
+    },
+    { "id": "skeptical", "turns": ["¿Esto sí funciona?", "No quiero promesas"] },
+    { "id": "one-word", "turns": ["Info", "Sí", "No"] },
+    { "id": "no-experience", "turns": ["No tengo experiencia", "Quiero aprender"] },
+    { "id": "experienced", "turns": ["Ya vendo por Instagram", "Me cuesta el seguimiento"] },
+    { "id": "additional-income", "turns": ["Busco un ingreso adicional", "Tengo cinco horas por semana"] },
+    { "id": "unemployed", "turns": ["Estoy desempleado", "Busco una alternativa"] },
+    { "id": "little-time", "turns": ["Tengo poco tiempo", "Solo dos horas semanales"] },
+    { "id": "objection-income", "turns": ["¿Cuánto se gana?", "No quiero cifras inventadas"] },
+    { "id": "crypto", "turns": ["¿Es cripto?", "Explícame sin inventar"] },
+    { "id": "manual-date", "turns": ["Quiero reunión", "El lunes 28 a las 8 pm"] },
+    { "id": "no-zoom", "turns": ["No tengo Zoom", "¿Qué alternativa hay?"] },
+    { "id": "opt-out", "turns": ["No me interesa", "Deja de escribir"] },
+    { "id": "handoff", "turns": ["Quiero hablar con una persona"] },
+    { "id": "topic-change", "turns": ["Quiero información", "Cambiando de tema, no deseo reunión"] }
+  ]
+}

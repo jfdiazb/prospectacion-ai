@@ -14,6 +14,7 @@ import { QualificationApplicationService } from './QualificationApplicationServi
 import { MeetingReadinessService } from './MeetingReadinessService';
 import { LaunchAttributionService } from './LaunchAttributionService';
 import { ConversationMemoryService } from './ConversationMemoryService';
+import { ConversationalSafetyService } from './ConversationalSafetyService';
 
 type AlmaContext = { userId: string; leadId: string; conversationId: string; text: string; isNewLead: boolean; platform: 'instagram' | 'facebook' | 'youtube' | 'whatsapp'; sourceEventId: string; recipient: MessagingRecipient; automation?: { flowId: string; response: string } };
 
@@ -138,7 +139,19 @@ export class AlmaService {
         throw new Error('No fue posible reservar una respuesta conversacional única');
       }
     }
-    const response = deduplication.text;
+    const asksCommercialDetails = /empresa|marca|producto|precio|plan|modelo|amway|nutrilite|de que se trata|cómo funciona|como funciona/i.test(context.text);
+    const commercialInformationAuthorized = Boolean(commercialContext?.allowedInformation?.length);
+    const safety = await ConversationalSafetyService.validateForConversation({
+      userId: context.userId, conversationId: context.conversationId, text: deduplication.text,
+      readiness: meetingReadiness, asksCommercialDetails, commercialInformationAuthorized,
+    });
+    const response = safety.text;
+    if (!safety.allowed) console.warn('ALMA conversational output blocked', {
+      event: 'alma_output_guardrail_blocked', conversationId: context.conversationId, leadId: context.leadId,
+      channel: context.platform, commercialState: commercialMemory.commercialState, readiness: meetingReadiness.reason,
+      bookingStatus: commercialMemory.bookingStatus, violations: safety.violations,
+      guardrailVersion: ConversationalSafetyService.version,
+    });
     const aiProviderUsed = meetingOutcome.reply ? undefined : aiResult?.aiProviderUsed;
     if (aiProviderUsed) console.info('ALMA AI response generated', {
       event: 'alma_ai_response_generated',
@@ -153,6 +166,7 @@ export class AlmaService {
       event: 'alma_outbound_decision', channel: context.platform, deliveryStatus,
       responseSource: meetingOutcome.reply ? 'meeting_orchestrator' : shouldOfferMeeting ? 'qualified_meeting_offer' : context.automation ? 'automation' : 'ai',
       meetingState: commercialMemory.bookingStatus || (shouldOfferMeeting ? 'offer_sent' : undefined),
+      guardrail: safety.allowed ? 'passed' : 'blocked', guardrailViolations: safety.violations,
     });
     if (context.automation && deliveryStatus !== 'duplicate') await AutomationService.recordExecution(context.automation.flowId, context.userId, deliveryStatus !== 'failed');
     await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'message_generated', description: context.automation ? 'ALMA ejecutó una automatización por palabra clave' : 'ALMA generó y procesó una respuesta saliente', metadata: context.automation ? { automationFlowId: context.automation.flowId, responseSource: 'automation' } : shouldOfferMeeting ? { responseSource: 'qualified_meeting_offer' } : aiProviderUsed ? { aiProvider: aiProvider!.name, aiProviderUsed } : { responseSource: 'meeting_orchestrator' } });

@@ -52,9 +52,10 @@ describe('ALMA qualification to meeting readiness', () => {
     });
   });
 
-  test('case E keeps the explicit meeting fast path', () => {
+  test('case E records direct meeting intent but does not skip discovery', () => {
     expect(readiness(['Quiero agendar una llamada para conocer el negocio']))
-      .toEqual({ ready: true, reason: 'explicit_request', evidence: ['explicit_meeting_intent'] });
+      .toEqual({ ready: false, reason: 'explicit_request', evidence: ['explicit_meeting_intent'] });
+    expect(MeetingReadinessService.shouldStartScheduling(readiness(['Quiero agendar una llamada para conocer el negocio']))).toBe(false);
   });
 
   test('a yes to a free-time discovery question does not become meeting intent', () => {
