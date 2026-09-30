@@ -46,6 +46,15 @@ export class MetaController {
       const payload = JSON.parse(rawBody.toString('utf8'));
       const platform = payload?.object === 'instagram' ? 'instagram' : payload?.object === 'page' ? 'facebook' : 'unknown';
       observeMeta({ correlationId, stage: 'platform', code: platform === 'unknown' ? 'platform_not_supported' : 'platform_detected', platform });
+      const configuredPageId = process.env.META_PAGE_ID?.trim();
+      if (
+        platform === 'facebook' &&
+        configuredPageId &&
+        (payload?.entry ?? []).some((entry: any) => String(entry?.id ?? '') !== configuredPageId)
+      ) {
+        observeMeta({ correlationId, stage: 'platform', code: 'facebook_page_mismatch', platform }, 'warn');
+        return res.status(403).json({ success: false, message: 'Página de Facebook no autorizada' });
+      }
       const ownerId = process.env.CRM_OWNER_ID;
       if (!ownerId) throw new Error('CRM_OWNER_ID no configurado');
       const accepted = await MetaIngestionService.acceptPayload(ownerId, payload, correlationId);

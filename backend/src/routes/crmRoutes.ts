@@ -305,12 +305,12 @@ router.post(
       const { channel: platform, recipient } = route;
       const baseSourceEventId = `proposal:${proposal._id}`;
       let messagingSourceEventId = baseSourceEventId;
-      if (platform === 'instagram' && proposal.deliveryStatus === 'duplicate') {
+      if (['instagram', 'facebook'].includes(platform) && proposal.deliveryStatus === 'duplicate') {
         const failedAttempt = await OutboundMessage.findOne({
           userId: req.userId,
           conversationId: proposal.conversationId,
           sourceEventId: baseSourceEventId,
-          channel: 'instagram',
+          channel: platform,
           deliveryStatus: 'failed',
           recipientId: proposal.recipient.externalId,
           errorCode: { $nin: ['META_TIMEOUT', 'MESSAGING_UNKNOWN_ERROR', 'META_UNKNOWN_ERROR'] },

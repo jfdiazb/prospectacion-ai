@@ -370,6 +370,23 @@ describe('Auth integration tests', () => {
     expect(await OutboundMessage.countDocuments({ conversationId: conversation._id })).toBe(2);
   });
 
+  test('allows one idempotent controlled retry after a deterministic Facebook private-reply failure', async () => {
+    const register = await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'facebook-retry@example.com', password: 'password123', fullName: 'Facebook Owner' });
+    const owner = await User.findOne({ email: 'facebook-retry@example.com' });
+    const lead = await Lead.create({ userId: owner!._id, username: 'facebook-user-retry', platform: 'facebook', currentChannel: 'facebook', source: 'facebook_post_comment' });
+    const conversation = await Conversation.create({ userId: owner!._id, leadId: lead._id, status: 'active', messages: [{ sender: 'lead', text: 'INFO', platform: 'facebook', direction: 'inbound', externalMessageId: 'meta:facebook:comment-retry-1' }], lastMessage: new Date() });
+    const proposal: any = await WhatsAppProposal.create({ userId: owner!._id, leadId: lead._id, conversationId: conversation._id, sourceEventId: 'meta:facebook:comment-retry-1', platform: 'facebook', recipient: { type: 'facebook_comment', externalId: 'comment-retry-1' }, text: 'Respuesta revisada.', originalText: 'Respuesta revisada.', status: 'failed', deliveryStatus: 'duplicate', errorMessage: 'facebook rechazó el envío' });
+    const baseSourceEventId = `proposal:${proposal._id}`;
+    await OutboundMessage.create({ userId: owner!._id, leadId: lead._id, conversationId: conversation._id, sourceEventId: baseSourceEventId, channel: 'facebook', messageType: 'private_reply', text: proposal.text, deliveryStatus: 'failed', provider: 'meta', recipientId: 'comment-retry-1', commentId: 'comment-retry-1', errorCode: '100', errorMessage: 'Unsupported post request' });
+    const auth = { headers: { Authorization: `Bearer ${register.data.data.token}` } };
+
+    const approved = await axios.post(`${baseURL}/api/v1/crm/conversations/${conversation._id}/proposals/${proposal._id}/send`, {}, auth);
+
+    expect(approved.data.data).toMatchObject({ status: 'simulated', deliveryStatus: 'simulated' });
+    expect(await OutboundMessage.findOne({ sourceEventId: `${baseSourceEventId}:controlled-retry:1` })).toMatchObject({ channel: 'facebook', messageType: 'private_reply', recipientId: 'comment-retry-1', deliveryStatus: 'simulated' });
+    expect(await OutboundMessage.countDocuments({ conversationId: conversation._id })).toBe(2);
+  });
+
   test('executes an active YouTube keyword automation once and continues the ALMA workflow', async () => {
     await axios.post(`${baseURL}/api/v1/auth/register`, { email: 'automation@example.com', password: 'password123', fullName: 'Automation Owner' });
     const owner = await User.findOne({ email: 'automation@example.com' });

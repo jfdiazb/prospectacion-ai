@@ -125,12 +125,15 @@ export class MetaWebhookNormalizer {
         const value = change?.value ?? {};
         const platform: MetaPlatform =
           value.platform === 'facebook' || payload?.object === 'page' ? 'facebook' : 'instagram';
-        const text = value.text ?? value.message?.text;
+        const text =
+          value.text ??
+          (typeof value.message === 'string' ? value.message : value.message?.text);
         const senderId = value.from?.id ?? value.sender?.id;
         const eventId = value.id ?? value.comment_id ?? value.message?.mid;
         if (!text || !senderId || !eventId) continue;
         const isComment =
           change.field === 'comments' ||
+          (change.field === 'feed' && (value.item === 'comment' || Boolean(value.comment_id))) ||
           Boolean(value.comment_id) ||
           Boolean(value.media?.id && !value.message);
         const eventType = isComment ? 'comment' : 'direct_message';

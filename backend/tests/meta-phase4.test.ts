@@ -60,6 +60,7 @@ describe('Phase 4 Meta consolidation', () => {
     ownerA = new mongoose.Types.ObjectId();
     ownerB = new mongoose.Types.ObjectId();
     delete process.env.META_INITIAL_INTENT_PHRASES;
+    delete process.env.META_PAGE_ID;
   });
   afterEach(async () => {
     jest.restoreAllMocks();
@@ -134,6 +135,36 @@ describe('Phase 4 Meta consolidation', () => {
       externalEventId: 'meta:facebook:same-id',
       eventType: 'direct_message',
       recipient: { type: 'facebook_user', pageScopedId: 'psid-1' },
+    });
+  });
+
+  test('normalizes the real Facebook Page feed comment shape', () => {
+    const event = MetaWebhookNormalizer.normalizePayload({
+      object: 'page',
+      entry: [{
+        id: 'page-1',
+        changes: [{
+          field: 'feed',
+          value: {
+            item: 'comment',
+            verb: 'add',
+            comment_id: 'comment-feed-1',
+            post_id: 'page-1_post-1',
+            message: 'Quiero información',
+            from: { id: 'fb-feed-user' },
+            created_time: Math.floor(Date.now() / 1000),
+          },
+        }],
+      }],
+    })[0];
+
+    expect(event).toMatchObject({
+      platform: 'facebook',
+      externalEventId: 'meta:facebook:comment-feed-1',
+      eventType: 'comment',
+      content: 'Quiero información',
+      externalContentId: 'page-1_post-1',
+      recipient: { type: 'facebook_comment', commentId: 'comment-feed-1' },
     });
   });
 
@@ -310,6 +341,42 @@ describe('Phase 4 Meta consolidation', () => {
     expect(new Set(observations.map(item => item.correlationId)).size).toBe(1);
     expect(JSON.stringify(observations)).not.toContain('sha256=');
     expect(JSON.stringify(observations)).not.toContain('signed');
+  });
+
+  test('rejects a valid signed webhook for a different Facebook Page', async () => {
+    const info = jest.spyOn(console, 'info').mockImplementation();
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+    process.env.META_APP_SECRET = 'secret';
+    process.env.META_PAGE_ID = 'authorized-page';
+    process.env.CRM_OWNER_ID = ownerA.toString();
+    const payload = facebookComment('wrong-page-comment');
+    payload.entry[0] = { ...payload.entry[0], id: 'different-page' } as any;
+    const body = Buffer.from(JSON.stringify(payload));
+    const req: any = {
+      body,
+      header: (name: string) => name.toLowerCase() === 'x-hub-signature-256'
+        ? `sha256=${crypto.createHmac('sha256', 'secret').update(body).digest('hex')}`
+        : undefined,
+    };
+    const res: any = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+      sendStatus: jest.fn().mockReturnThis(),
+    };
+
+    await MetaController.receive(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(await InboundEvent.countDocuments({})).toBe(0);
+    const observations = [...info.mock.calls, ...warn.mock.calls]
+      .filter(([message]) => message === 'Meta webhook observability')
+      .map(([, observation]) => observation as any);
+    expect(observations.map(item => item.code)).toEqual([
+      'received',
+      'signature_valid',
+      'platform_detected',
+      'facebook_page_mismatch',
+    ]);
   });
 
   test('emits one sanitized fingerprint through persistence, CRM interaction and proposal', async () => {
