@@ -134,11 +134,34 @@ describe('MetaMessagingProvider', () => {
     expect(post).toHaveBeenCalledWith('https://graph.facebook.com/v23.0/page-1/messages', { recipient: { id: 'psid-1' }, message: { text: 'Hola' } }, expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer page-token-never-logged' }) }));
   });
 
-  test('uses the official Facebook private-replies resource for a Page comment', async () => {
+  test('uses the official Facebook Page messages resource for a private comment reply', async () => {
     process.env.META_PAGE_ACCESS_TOKEN = 'page-token-never-logged';
+    process.env.META_PAGE_ID = 'page-1';
     const post = jest.fn().mockResolvedValue({ data: { id: 'private-reply-1' } });
     const provider = new MetaMessagingProvider({ post } as unknown as AxiosInstance);
     await provider.sendMessage({ text: 'Hola', recipient: { type: 'facebook_comment', commentId: 'comment-1' } });
-    expect(post).toHaveBeenCalledWith('https://graph.facebook.com/v23.0/comment-1/private_replies', { message: 'Hola' }, expect.any(Object));
+    expect(post).toHaveBeenCalledWith('https://graph.facebook.com/v23.0/page-1/messages', { recipient: { comment_id: 'comment-1' }, message: { text: 'Hola' } }, expect.any(Object));
+  });
+
+  test('logs structured Facebook Graph error details without credentials or message text', async () => {
+    process.env.META_PAGE_ACCESS_TOKEN = 'page-token-never-logged';
+    process.env.META_PAGE_ID = 'page-1';
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const error = new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, {
+      status: 400,
+      data: { error: { message: 'Unsupported post request.', type: 'GraphMethodException', code: 100, error_subcode: 33, error_user_title: 'No disponible', error_user_msg: 'Revisa el comentario.', fbtrace_id: 'trace-1' } },
+    } as any);
+    const provider = new MetaMessagingProvider({ post: jest.fn().mockRejectedValue(error) } as unknown as AxiosInstance);
+
+    await expect(provider.sendMessage({ text: 'Texto privado que no debe registrarse', recipient: { type: 'facebook_comment', commentId: 'comment-1' } }))
+      .rejects.toMatchObject({ code: '100', status: 400 });
+    expect(warn).toHaveBeenCalledWith('Facebook outbound Meta request rejected', {
+      method: 'POST', resource: 'page/messages', recipientType: 'facebook_comment', objectId: 'comment-1', parameterNames: ['recipient', 'message'], httpStatus: 400,
+      errorMessage: 'Unsupported post request.', errorType: 'GraphMethodException', errorCode: 100, errorSubcode: 33,
+      errorUserTitle: 'No disponible', errorUserMessage: 'Revisa el comentario.', fbtraceId: 'trace-1',
+    });
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('page-token-never-logged');
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('Texto privado que no debe registrarse');
+    warn.mockRestore();
   });
 });

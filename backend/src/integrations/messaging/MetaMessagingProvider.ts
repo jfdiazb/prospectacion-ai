@@ -2,6 +2,17 @@ import axios, { type AxiosInstance } from 'axios';
 import { MessagingProviderError, type MessagingProvider, type MessagingRequest, type MessagingResult } from './MessagingProvider';
 
 type MetaResponse = { message_id?: string; id?: string };
+type MetaErrorResponse = {
+  error?: {
+    message?: string;
+    type?: string;
+    code?: number;
+    error_subcode?: number;
+    error_user_title?: string;
+    error_user_msg?: string;
+    fbtrace_id?: string;
+  };
+};
 
 export class MetaMessagingProvider implements MessagingProvider {
   readonly name = 'meta' as const;
@@ -14,18 +25,18 @@ export class MetaMessagingProvider implements MessagingProvider {
     const isFacebook = request.recipient.type === 'facebook_user' || request.recipient.type === 'facebook_comment';
     const accessToken = isFacebook ? process.env.META_PAGE_ACCESS_TOKEN : process.env.META_ACCESS_TOKEN;
     const accountId = isFacebook ? process.env.META_PAGE_ID : process.env.META_IG_USER_ID;
-    if (!accessToken || (isFacebook && !accountId && request.recipient.type !== 'facebook_comment')) throw new MessagingProviderError('Credenciales del canal Meta no configuradas', 'META_CONFIGURATION_ERROR');
+    if (!accessToken || (isFacebook && !accountId)) throw new MessagingProviderError('Credenciales del canal Meta no configuradas', 'META_CONFIGURATION_ERROR');
     const metaRecipient = request.recipient;
-    const endpoint = request.recipient.type === 'facebook_comment'
-      ? `https://graph.facebook.com/${version}/${encodeURIComponent(request.recipient.commentId)}/private_replies`
-      : isFacebook
+    const endpoint = isFacebook
         ? `https://graph.facebook.com/${version}/${encodeURIComponent(accountId!)}/messages`
-        : `https://graph.instagram.com/${version}/me/messages`;
+        : request.recipient.type === 'instagram_comment'
+          ? `https://graph.instagram.com/${version}/${encodeURIComponent(request.recipient.commentId)}/private_replies`
+          : `https://graph.instagram.com/${version}/me/messages`;
     let destination: { comment_id: string } | { id: string } | undefined;
-    if (metaRecipient.type === 'comment' || metaRecipient.type === 'instagram_comment') destination = { comment_id: metaRecipient.commentId };
+    if (metaRecipient.type === 'comment' || metaRecipient.type === 'instagram_comment' || metaRecipient.type === 'facebook_comment') destination = { comment_id: metaRecipient.commentId };
     else if (metaRecipient.type === 'facebook_user') destination = { id: metaRecipient.pageScopedId };
     else if (metaRecipient.type === 'instagram_user') destination = { id: metaRecipient.instagramScopedId };
-    const body = metaRecipient.type === 'facebook_comment'
+    const body = metaRecipient.type === 'instagram_comment'
       ? { message: request.text }
       : { recipient: destination, message: { text: request.text } };
     try {
@@ -40,10 +51,35 @@ export class MetaMessagingProvider implements MessagingProvider {
       if (error instanceof MessagingProviderError) throw error;
       if (axios.isAxiosError(error)) {
         if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') throw new MessagingProviderError('Tiempo de espera agotado al contactar Meta', 'META_TIMEOUT');
-        const metaError = error.response?.data as { error?: { code?: number; message?: string } } | undefined;
+        const metaError = error.response?.data as MetaErrorResponse | undefined;
         const status = error.response?.status;
         const code = metaError?.error?.code != null ? String(metaError.error.code) : status ? `HTTP_${status}` : 'META_REQUEST_ERROR';
         const message = metaError?.error?.message || (status ? `Meta respondió con HTTP ${status}` : 'No fue posible contactar Meta');
+        if (isFacebook) {
+          const safeMetaField = (value: unknown) => {
+            if (typeof value !== 'string') return value;
+            return [accessToken, process.env.META_APP_SECRET]
+              .filter((secret): secret is string => Boolean(secret))
+              .reduce((safe, secret) => safe.split(secret).join('[REDACTED]'), value);
+          };
+          console.warn('Facebook outbound Meta request rejected', {
+            method: 'POST',
+            resource: 'page/messages',
+            recipientType: request.recipient.type,
+            objectId: request.recipient.type === 'facebook_comment'
+              ? request.recipient.commentId
+              : request.recipient.type === 'facebook_user' ? request.recipient.pageScopedId : undefined,
+            parameterNames: ['recipient', 'message'],
+            httpStatus: status,
+            errorMessage: safeMetaField(metaError?.error?.message),
+            errorType: safeMetaField(metaError?.error?.type),
+            errorCode: metaError?.error?.code,
+            errorSubcode: metaError?.error?.error_subcode,
+            errorUserTitle: safeMetaField(metaError?.error?.error_user_title),
+            errorUserMessage: safeMetaField(metaError?.error?.error_user_msg),
+            fbtraceId: safeMetaField(metaError?.error?.fbtrace_id),
+          });
+        }
         throw new MessagingProviderError(message, code, status);
       }
       throw new MessagingProviderError('Error inesperado al contactar Meta', 'META_UNKNOWN_ERROR');
