@@ -9,6 +9,7 @@ import { AutomationEngineService } from './AutomationEngineService';
 import { CommercialContextService } from './CommercialContextService';
 import { MetaLaunchAdapter } from './MetaLaunchAdapter';
 import { metaEventFingerprint, metaWebhookCorrelationId, observeMeta } from './MetaObservability';
+import { AlmaService } from './AlmaService';
 
 type AcceptedMetaEvent = {
   id: string;
@@ -230,7 +231,7 @@ export class MetaIngestionService {
           errorType: launchError instanceof Error ? launchError.name : 'unknown',
         });
       }
-      await AssistedResponseService.process({
+      const responseContext = {
         userId,
         leadId: lead._id.toString(),
         conversationId: currentConversationId,
@@ -239,8 +240,16 @@ export class MetaIngestionService {
         isNewLead,
         platform: event.platform,
         recipient: event.recipient,
-      });
-      observeMeta({ correlationId, eventFingerprint, stage: 'proposal', code: 'proposal_created', platform: event.platform });
+      };
+      const facebookAutoSend = event.platform === 'facebook'
+        && process.env.FACEBOOK_AUTO_SEND_ENABLED === 'true';
+      if (facebookAutoSend) {
+        await AlmaService.processMessage(responseContext);
+        observeMeta({ correlationId, eventFingerprint, stage: 'proposal', code: 'auto_sent', platform: event.platform });
+      } else {
+        await AssistedResponseService.process(responseContext);
+        observeMeta({ correlationId, eventFingerprint, stage: 'proposal', code: 'proposal_created', platform: event.platform });
+      }
       const recipient =
         event.recipient.type === 'instagram_user'
           ? { type: event.recipient.type, externalId: event.recipient.instagramScopedId }
