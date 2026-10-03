@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance } from 'axios';
+import crypto from 'crypto';
 import { MessagingProviderError, type MessagingProvider, type MessagingRequest, type MessagingResult } from './MessagingProvider';
 
 type MetaResponse = { message_id?: string; id?: string };
@@ -56,6 +57,12 @@ export class MetaMessagingProvider implements MessagingProvider {
         const code = metaError?.error?.code != null ? String(metaError.error.code) : status ? `HTTP_${status}` : 'META_REQUEST_ERROR';
         const message = metaError?.error?.message || (status ? `Meta respondió con HTTP ${status}` : 'No fue posible contactar Meta');
         if (isFacebook) {
+          const objectId = request.recipient.type === 'facebook_comment'
+            ? request.recipient.commentId
+            : request.recipient.type === 'facebook_user' ? request.recipient.pageScopedId : undefined;
+          const objectFingerprint = objectId
+            ? `meta_obj_${crypto.createHash('sha256').update(objectId).digest('hex').slice(0, 24)}`
+            : undefined;
           const safeMetaField = (value: unknown) => {
             if (typeof value !== 'string') return value;
             return [accessToken, process.env.META_APP_SECRET]
@@ -66,9 +73,8 @@ export class MetaMessagingProvider implements MessagingProvider {
             method: 'POST',
             resource: 'page/messages',
             recipientType: request.recipient.type,
-            objectId: request.recipient.type === 'facebook_comment'
-              ? request.recipient.commentId
-              : request.recipient.type === 'facebook_user' ? request.recipient.pageScopedId : undefined,
+            objectFingerprint,
+            correlationId: request.correlationId,
             parameterNames: ['recipient', 'message'],
             httpStatus: status,
             errorMessage: safeMetaField(metaError?.error?.message),

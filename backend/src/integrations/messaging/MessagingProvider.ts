@@ -9,6 +9,7 @@ export type MessagingRecipient =
 
 export interface MessagingRequest {
   userId?: string;
+  correlationId?: string;
   text: string;
   recipient: MessagingRecipient;
   whatsappAuthorization?: {

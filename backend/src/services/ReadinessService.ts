@@ -61,8 +61,11 @@ export class ReadinessService {
     const ai = getAIRuntimeStatus();
     const technicalReady = database && essentialConfig;
     const behavioralSuiteVersion = 'behavioral-commercial-v1';
+    const deployedCommit = process.env.RENDER_GIT_COMMIT?.trim() || process.env.GIT_COMMIT?.trim();
+    const certifiedCommit = process.env.RELEASE_COMMIT?.trim();
+    const commitMatches = Boolean(deployedCommit && certifiedCommit && deployedCommit === certifiedCommit);
     const behavioralReady = process.env.BEHAVIORAL_CERTIFICATION_VERSION === behavioralSuiteVersion &&
-      process.env.BEHAVIORAL_CERTIFICATION_STATUS === 'passed';
+      process.env.BEHAVIORAL_CERTIFICATION_STATUS === 'passed' && commitMatches;
     return {
       // `ready` remains the infrastructure health signal used by orchestrators.
       // Release authorization is deliberately stricter and exposed as `goLive`.
@@ -73,7 +76,9 @@ export class ReadinessService {
       behavioralCertification: {
         status: behavioralReady ? 'passed' : 'missing_or_stale',
         suiteVersion: behavioralSuiteVersion,
-        releaseCommit: process.env.RELEASE_COMMIT || null,
+        releaseCommit: certifiedCommit || null,
+        deployedCommit: deployedCommit || null,
+        commitMatches,
       },
       checks: { api: true, database, essentialConfig },
       runtime: {

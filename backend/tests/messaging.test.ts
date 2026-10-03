@@ -153,15 +153,16 @@ describe('MetaMessagingProvider', () => {
     } as any);
     const provider = new MetaMessagingProvider({ post: jest.fn().mockRejectedValue(error) } as unknown as AxiosInstance);
 
-    await expect(provider.sendMessage({ text: 'Texto privado que no debe registrarse', recipient: { type: 'facebook_comment', commentId: 'comment-1' } }))
+    await expect(provider.sendMessage({ correlationId: 'meta_req_safe_1', text: 'Texto privado que no debe registrarse', recipient: { type: 'facebook_comment', commentId: 'comment-1' } }))
       .rejects.toMatchObject({ code: '100', status: 400 });
     expect(warn).toHaveBeenCalledWith('Facebook outbound Meta request rejected', {
-      method: 'POST', resource: 'page/messages', recipientType: 'facebook_comment', objectId: 'comment-1', parameterNames: ['recipient', 'message'], httpStatus: 400,
+      method: 'POST', resource: 'page/messages', recipientType: 'facebook_comment', objectFingerprint: expect.stringMatching(/^meta_obj_[0-9a-f]{24}$/), correlationId: 'meta_req_safe_1', parameterNames: ['recipient', 'message'], httpStatus: 400,
       errorMessage: 'Unsupported post request.', errorType: 'GraphMethodException', errorCode: 100, errorSubcode: 33,
       errorUserTitle: 'No disponible', errorUserMessage: 'Revisa el comentario.', fbtraceId: 'trace-1',
     });
     expect(JSON.stringify(warn.mock.calls)).not.toContain('page-token-never-logged');
     expect(JSON.stringify(warn.mock.calls)).not.toContain('Texto privado que no debe registrarse');
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('comment-1');
     warn.mockRestore();
   });
 });

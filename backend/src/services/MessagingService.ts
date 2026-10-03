@@ -2,7 +2,7 @@ import OutboundMessage from '../models/OutboundMessage';
 import { getMessagingProvider, MessagingProviderError, type MessagingProvider, type MessagingRecipient } from '../integrations/messaging';
 import { WhatsAppOutboundAuthorizationService } from './WhatsAppOutboundAuthorizationService';
 
-type SendContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; recipient: MessagingRecipient };
+type SendContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; correlationId?: string; text: string; recipient: MessagingRecipient };
 
 export class MessagingService {
   static async send(context: SendContext, provider?: MessagingProvider): Promise<'sent' | 'simulated' | 'failed' | 'duplicate'> {
@@ -47,6 +47,7 @@ export class MessagingService {
     try {
       const result = await selectedProvider.sendMessage({
         userId: context.userId,
+        correlationId: context.correlationId,
         text: context.text,
         recipient: context.recipient,
         whatsappAuthorization: authorization ? {

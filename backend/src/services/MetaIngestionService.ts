@@ -236,6 +236,7 @@ export class MetaIngestionService {
         leadId: lead._id.toString(),
         conversationId: currentConversationId,
         sourceEventId: event.externalEventId,
+        correlationId,
         text: event.content,
         isNewLead,
         platform: event.platform,

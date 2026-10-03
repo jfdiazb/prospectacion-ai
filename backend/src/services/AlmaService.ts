@@ -16,7 +16,7 @@ import { LaunchAttributionService } from './LaunchAttributionService';
 import { ConversationMemoryService } from './ConversationMemoryService';
 import { ConversationalSafetyService } from './ConversationalSafetyService';
 
-type AlmaContext = { userId: string; leadId: string; conversationId: string; text: string; isNewLead: boolean; platform: 'instagram' | 'facebook' | 'youtube' | 'whatsapp'; sourceEventId: string; recipient: MessagingRecipient; automation?: { flowId: string; response: string } };
+type AlmaContext = { userId: string; leadId: string; conversationId: string; text: string; isNewLead: boolean; platform: 'instagram' | 'facebook' | 'youtube' | 'whatsapp'; sourceEventId: string; correlationId?: string; recipient: MessagingRecipient; automation?: { flowId: string; response: string } };
 
 export class AlmaService {
   private static buildNaturalContinuation(incomingText: string, history: Array<{ sender: 'lead' | 'ai'; text: string }>): string {
@@ -167,7 +167,7 @@ export class AlmaService {
     });
 
     await ConversationService.addMessage(context.conversationId, context.userId, { sender: 'ai', text: response, platform: context.platform });
-    const deliveryStatus = await MessagingService.send({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: response, recipient: context.recipient });
+    const deliveryStatus = await MessagingService.send({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, correlationId: context.correlationId, text: response, recipient: context.recipient });
     console.info('ALMA outbound decision', {
       event: 'alma_outbound_decision', channel: context.platform, deliveryStatus,
       responseSource: meetingOutcome.reply ? 'meeting_orchestrator' : shouldOfferMeeting ? 'qualified_meeting_offer' : context.automation ? 'automation' : 'ai',
@@ -200,7 +200,7 @@ export class AlmaService {
     await Conversation.updateOne({ _id: context.conversationId, userId: context.userId }, {
       $set: { controlMode: 'handoff_requested', handoffReason: reason, handoffRequestedAt: new Date() },
     });
-    await MessagingService.send({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: reply, recipient: context.recipient });
+    await MessagingService.send({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, correlationId: context.correlationId, text: reply, recipient: context.recipient });
     return reply;
   }
 }
