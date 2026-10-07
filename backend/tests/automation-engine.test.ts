@@ -142,7 +142,78 @@ describe('Phase 6 automation engine', () => {
     expect(await AutomationJob.countDocuments({ userId: ownerA })).toBe(0);
     expect(await OutboundMessage.countDocuments({ userId: ownerA })).toBe(0);
   });
+  test('claims one due job once across concurrent workers and does not replay it after completion', async () => {
+    const flow: any = await AutomationService.createFlow(ownerA, definition({
+      status: 'active',
+      actions: [
+        { type: 'wait', config: { durationMs: 60000 } },
+        { type: 'create_proposal', config: { message: 'Concurrent worker guard' } },
+        { type: 'add_tag', config: { tag: 'claimed-once' } },
+      ],
+    }));
+    const execution: any = await AutomationEngineService.start(flow, event());
+    await AutomationJob.updateOne({ executionId: execution._id }, { runAt: new Date(0) });
+
+    const claimed = await Promise.all([
+      AutomationEngineService.processDueJobs(1),
+      AutomationEngineService.processDueJobs(1),
+    ]);
+    expect(claimed.reduce((total, count) => total + count, 0)).toBe(1);
+    expect(await AssistedProposal.countDocuments({ userId: ownerA, text: 'Concurrent worker guard' })).toBe(1);
+    expect((await Lead.findById(lead._id))?.tags.filter(tag => tag === 'claimed-once')).toHaveLength(1);
+    expect((await AutomationExecution.findById(execution._id))?.steps.filter((step: any) => step.index === 1)).toHaveLength(1);
+    expect(await AutomationEngineService.processDueJobs(1)).toBe(0);
+    expect(await AssistedProposal.countDocuments({ userId: ownerA, text: 'Concurrent worker guard' })).toBe(1);
+    expect(await OutboundMessage.countDocuments({})).toBe(0);
+  });
+  test('does not replay completed steps when a later action fails and the event is retried', async () => {
+    const flow: any = await AutomationService.createFlow(ownerA, definition({
+      status: 'active',
+      actions: [
+        { type: 'add_tag', config: { tag: 'completed-before-failure' } },
+        { type: 'create_proposal', config: {} },
+      ],
+    }));
+    const failingEvent = event({ platform: 'youtube', recipient: undefined });
+    const first: any = await AutomationEngineService.start(flow, failingEvent);
+    const second: any = await AutomationEngineService.start(flow, failingEvent);
+
+    expect(first.status).toBe('failed');
+    expect(second._id.toString()).toBe(first._id.toString());
+    expect((await AutomationExecution.findById(first._id))?.steps.filter((step: any) => step.index === 0)).toHaveLength(1);
+    expect((await Lead.findById(lead._id))?.tags.filter(tag => tag === 'completed-before-failure')).toHaveLength(1);
+    expect(await AutomationExecution.countDocuments({ automationId: flow._id })).toBe(1);
+    expect(await OutboundMessage.countDocuments({})).toBe(0);
+  });
+  test('dispatches a normalized YouTube inbound into the automation engine without a real provider', async () => {
+    const flow: any = await AutomationService.createFlow(ownerA, definition({
+      status: 'active',
+      trigger: { type: 'message.received' },
+      actions: [{ type: 'add_tag', config: { tag: 'youtube-inbound-dispatched' } }],
+    }));
+    await AutomationEngineService.emitMessageEvents({
+      ...event({ eventId: 'youtube-inbound-1', platform: 'youtube', trigger: 'message.received' }),
+      source: 'youtube_comment',
+    }, false);
+
+    expect(await AutomationExecution.countDocuments({ automationId: flow._id, platform: 'youtube' })).toBe(1);
+    expect((await Lead.findById(lead._id))?.tags).toContain('youtube-inbound-dispatched');
+    expect(await AssistedProposal.countDocuments({})).toBe(0);
+    expect(await OutboundMessage.countDocuments({})).toBe(0);
+  });
   test('is idempotent for the same event and automation', async () => { await AutomationService.createFlow(ownerA, definition({ status: 'active' })); await AutomationEngineService.emit(event()); await AutomationEngineService.emit(event()); expect(await AutomationExecution.countDocuments({})).toBe(1); });
+  test('is idempotent for concurrent delivery of the same event', async () => {
+    await AutomationService.createFlow(ownerA, definition({ status: 'active' }));
+    const results = await Promise.all([
+      AutomationEngineService.emit(event()),
+      AutomationEngineService.emit(event()),
+    ]);
+    expect(results[0]).toHaveLength(1);
+    expect(results[1]).toHaveLength(1);
+    expect(await AutomationExecution.countDocuments({ userId: ownerA, eventId: 'event-1' })).toBe(1);
+    expect((await Lead.findById(lead._id))?.tags.filter(tag => tag === 'captado')).toHaveLength(1);
+    expect(await OutboundMessage.countDocuments({})).toBe(0);
+  });
   test('retries a safe action before succeeding', async () => { const flow: any = await AutomationService.createFlow(ownerA, definition({ status: 'active' })); const original = AutomationEngineService.executeAction; let calls = 0; const spy = jest.spyOn(AutomationEngineService, 'executeAction').mockImplementation(async (...args: any[]) => { calls++; if (calls < 3) throw new Error('transient'); return original.apply(AutomationEngineService, args as any); }); const result: any = await AutomationEngineService.start(flow, event()); expect(result.status).toBe('completed'); expect(spy).toHaveBeenCalledTimes(3); spy.mockRestore(); });
   test('isolates an action failure and records diagnostics', async () => { const flow: any = await AutomationService.createFlow(ownerA, definition({ status: 'active', actions: [{ type: 'create_proposal', config: {} }] })); const result: any = await AutomationEngineService.start(flow, event({ platform: 'youtube', recipient: undefined })); expect(result).toMatchObject({ status: 'failed', error: expect.stringContaining('canal privado') }); expect(await AutomationFlow.findById(flow._id)).toMatchObject({ status: 'error' }); });
   test('creates an assisted proposal without outbound delivery', async () => { const flow: any = await AutomationService.createFlow(ownerA, definition({ status: 'active', actions: [{ type: 'create_proposal', config: { message: 'Respuesta pendiente de aprobación' } }] })); await AutomationEngineService.start(flow, event()); expect(await AssistedProposal.findOne({})).toMatchObject({ platform: 'whatsapp', status: 'proposed', text: 'Respuesta pendiente de aprobación' }); expect(await OutboundMessage.countDocuments({})).toBe(0); });

@@ -148,4 +148,73 @@ describe('ALMA go-live final automation configuration', () => {
     expect(await AutomationFlow.countDocuments({ userId: ownerId, status: 'active' })).toBe(6);
     expect(await OutboundMessage.countDocuments({})).toBe(0);
   });
+
+  test('all six templates preserve their contractual triggers, intents and action order', async () => {
+    const expected = [
+      {
+        templateKey: 'info_qualification_v1',
+        trigger: 'keyword.detected',
+        keyword: 'INFO',
+        intent: undefined,
+        actions: ['add_tag', 'generate_ai_response', 'update_score', 'change_status', 'wait', 'suggest_followup'],
+      },
+      {
+        templateKey: 'additional_income_assisted_qualification_v1',
+        trigger: 'message.received',
+        intent: 'additional_income_interest',
+        actions: ['add_tag', 'generate_ai_response', 'suggest_followup'],
+      },
+      {
+        templateKey: 'product_interest_assisted_qualification_v1',
+        trigger: 'message.received',
+        intent: 'product_interest',
+        actions: ['add_tag', 'generate_ai_response', 'suggest_followup'],
+      },
+      {
+        templateKey: 'product_sales_interest_assisted_qualification_v1',
+        trigger: 'message.received',
+        intent: 'product_sales_interest',
+        actions: ['add_tag', 'generate_ai_response', 'suggest_followup'],
+      },
+      {
+        templateKey: 'business_opportunity_assisted_qualification_v1',
+        trigger: 'message.received',
+        intent: 'business_opportunity',
+        actions: ['add_tag', 'generate_ai_response', 'suggest_followup'],
+      },
+      {
+        templateKey: 'business_product_assisted_qualification_v1',
+        trigger: 'message.received',
+        intent: 'business_and_product_interest',
+        actions: ['add_tag', 'generate_ai_response', 'suggest_followup'],
+      },
+    ];
+
+    for (const contract of expected) {
+      const flow: any = await AutomationFlow.findOne({ userId: ownerId, templateKey: contract.templateKey });
+      expect(flow.trigger.type).toBe(contract.trigger);
+      expect(flow.trigger.keyword).toBe(contract.keyword);
+      expect(flow.actions.map((action: any) => action.type)).toEqual(contract.actions);
+      const intentCondition = flow.conditions.find((condition: any) => condition.field === 'normalizedIntent');
+      expect(intentCondition?.value).toBe(contract.intent);
+    }
+  });
+
+  test('materializing every template repeatedly reuses exactly the same six flows', async () => {
+    const before: any[] = await AutomationFlow.find({ userId: ownerId }).sort({ templateKey: 1 });
+    const repeated: any[] = await Promise.all([
+      AutomationService.ensureInfoTemplate(ownerId),
+      AutomationService.ensureAdditionalIncomeTemplate(ownerId),
+      AutomationService.ensureProductInterestTemplate(ownerId),
+      AutomationService.ensureProductSalesTemplate(ownerId),
+      AutomationService.ensureBusinessOpportunityTemplate(ownerId),
+      AutomationService.ensureBusinessProductTemplate(ownerId),
+    ]);
+    const after: any[] = await AutomationFlow.find({ userId: ownerId }).sort({ templateKey: 1 });
+
+    expect(after).toHaveLength(6);
+    expect(after.map(flow => flow._id.toString())).toEqual(before.map(flow => flow._id.toString()));
+    expect(repeated.map(flow => flow._id.toString()).sort()).toEqual(before.map(flow => flow._id.toString()).sort());
+    expect(await OutboundMessage.countDocuments({})).toBe(0);
+  });
 });
