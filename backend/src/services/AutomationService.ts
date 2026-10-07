@@ -7,6 +7,15 @@ const triggers = ['lead.created', 'message.received', 'keyword.detected', 'lead.
 const actions = ['create_or_update_lead', 'add_tag', 'change_status', 'update_score', 'generate_ai_response', 'create_proposal', 'create_task', 'suggest_followup', 'mark_meeting_candidate', 'add_note', 'wait'];
 const fields = ['leadId', 'platform', 'source', 'keyword', 'score', 'interestLevel', 'status', 'tags', 'intent', 'normalizedIntent', 'normalizedIntents', 'commercialContextId', 'meetingIntent', 'lastInteractionAt', 'targetProfile', 'affinities'];
 const operators = ['eq', 'neq', 'contains', 'in', 'gte', 'lte', 'exists', 'elapsed_gte'];
+const infoQualificationActions = [
+  { type: 'add_tag', config: { tag: 'INFO' } },
+  { type: 'generate_ai_response', config: {} },
+  { type: 'update_score', config: { score: 65 } },
+  { type: 'change_status', config: { status: 'interested' } },
+  { type: 'wait', config: { durationMs: 86400000 } },
+  { type: 'suggest_followup', config: {} },
+];
+const legacyInfoQualificationActionTypes = ['add_tag', 'generate_ai_response', 'wait', 'update_score', 'change_status', 'suggest_followup'];
 
 export class AutomationService {
   static normalizeKeyword(value: string) { return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').trim(); }
@@ -36,7 +45,25 @@ export class AutomationService {
   static async duplicateFlow(id: string, userId: string) { const flow: any = await this.getFlowById(id, userId); if (!flow) return null; const copy = flow.toObject(); delete copy._id; delete copy.createdAt; delete copy.updatedAt; delete copy.templateKey; return AutomationFlow.create({ ...copy, userId, name: `${flow.name} (copia)`.slice(0, 120), status: 'draft', isActive: false, version: 1, lastRunAt: undefined, executionStats: {} }); }
   static async history(id: string, userId: string) { if (!await AutomationFlow.exists({ _id: id, userId })) return null; return AutomationExecution.find({ automationId: id, userId }).sort({ startedAt: -1 }).limit(100); }
   static async recordExecution(id: string, userId: string, successful: boolean) { await AutomationFlow.updateOne({ _id: id, userId }, { $inc: { 'executionStats.totalExecutions': 1, [`executionStats.${successful ? 'successfulExecutions' : 'failedExecutions'}`]: 1 }, $set: { lastRunAt: new Date(), 'executionStats.lastExecution': new Date() } }); }
-  static async ensureInfoTemplate(userId: string) { return AutomationFlow.findOneAndUpdate({ userId, templateKey: 'info_qualification_v1' }, { $setOnInsert: { userId, templateKey: 'info_qualification_v1', name: 'INFO → Calificación', description: 'Plantilla multicanal asistida: califica, propone respuesta y sugiere seguimiento.', status: 'draft', isActive: false, version: 1, trigger: { type: 'keyword.detected', keyword: 'INFO', keywords: ['INFO'] }, conditionLogic: 'AND', conditions: [], actions: [{ type: 'add_tag', config: { tag: 'INFO' } }, { type: 'generate_ai_response', config: {} }, { type: 'wait', config: { durationMs: 86400000 } }, { type: 'update_score', config: { score: 65 } }, { type: 'change_status', config: { status: 'interested' } }, { type: 'suggest_followup', config: {} }] } }, { upsert: true, new: true }); }
+  static async ensureInfoTemplate(userId: string) {
+    const templateKey = 'info_qualification_v1';
+    const existing: any = await AutomationFlow.findOne({ userId, templateKey });
+    const isInactive = existing && existing.status !== 'active' && existing.isActive !== true;
+    const hasLegacyActionOrder = existing?.actions?.map((action: any) => action.type).join('|') === legacyInfoQualificationActionTypes.join('|');
+    if (isInactive && hasLegacyActionOrder) {
+      return AutomationFlow.findOneAndUpdate(
+        { _id: existing._id, userId, templateKey, status: { $ne: 'active' }, isActive: { $ne: true } },
+        { $set: { actions: infoQualificationActions }, $inc: { version: 1 } },
+        { new: true, runValidators: true }
+      );
+    }
+    if (existing) return existing;
+    return AutomationFlow.findOneAndUpdate(
+      { userId, templateKey },
+      { $setOnInsert: { userId, templateKey, name: 'INFO → Calificación', description: 'Plantilla multicanal asistida: califica, propone respuesta y sugiere seguimiento.', status: 'draft', isActive: false, version: 1, trigger: { type: 'keyword.detected', keyword: 'INFO', keywords: ['INFO'] }, conditionLogic: 'AND', conditions: [], actions: infoQualificationActions } },
+      { upsert: true, new: true }
+    );
+  }
   static async ensureAdditionalIncomeTemplate(userId: string) {
     const context: any = await CommercialContextService.getActive(userId);
     return AutomationFlow.findOneAndUpdate({ userId, templateKey: 'additional_income_assisted_qualification_v1' }, { $setOnInsert: {

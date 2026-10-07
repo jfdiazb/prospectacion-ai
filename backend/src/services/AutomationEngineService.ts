@@ -299,6 +299,7 @@ export class AutomationEngineService {
                 status: 'pending',
                 attempts: 0,
               },
+              $unset: { lockedAt: 1, lastError: 1 },
             },
             { upsert: true }
           );
@@ -548,10 +549,12 @@ export class AutomationEngineService {
 
   static async processDueJobs(limit = 20): Promise<number> {
     let processed = 0;
+    const deferredJobIds: unknown[] = [];
     while (processed < limit) {
       const now = new Date();
       const job: any = await AutomationJob.findOneAndUpdate(
         {
+          ...(deferredJobIds.length ? { _id: { $nin: deferredJobIds } } : {}),
           $or: [
             { status: 'pending', runAt: { $lte: now } },
             { status: 'processing', lockedAt: { $lte: new Date(now.getTime() - 5 * 60000) } },
@@ -568,8 +571,21 @@ export class AutomationEngineService {
           userId: job.userId,
         });
         if (!flow || !execution) throw new Error('Automatización o ejecución no disponible');
+        const flowIsActive = flow.status === 'active' || (!flow.status && flow.isActive === true);
+        if (!flowIsActive) {
+          await AutomationJob.updateOne(
+            { _id: job._id, status: 'processing' },
+            { $set: { status: 'pending' }, $inc: { attempts: -1 }, $unset: { lockedAt: 1 } }
+          );
+          deferredJobIds.push(job._id);
+          processed++;
+          continue;
+        }
         await this.run(flow, execution, job.context, job.resumeStep);
-        await AutomationJob.updateOne({ _id: job._id }, { status: 'completed' });
+        await AutomationJob.updateOne(
+          { _id: job._id, status: 'processing' },
+          { $set: { status: 'completed' }, $unset: { lockedAt: 1 } }
+        );
       } catch (error) {
         const message = error instanceof Error ? error.message.slice(0, 500) : 'Error del worker';
         await AutomationJob.updateOne(

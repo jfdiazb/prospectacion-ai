@@ -32,6 +32,116 @@ describe('Phase 6 automation engine', () => {
   test('supports OR conditions', async () => { await AutomationService.createFlow(ownerA, definition({ status: 'active', conditionLogic: 'OR', conditions: [{ field: 'platform', operator: 'eq', value: 'facebook' }, { field: 'interestLevel', operator: 'eq', value: 'warm' }] })); expect(await AutomationEngineService.emit(event())).toHaveLength(1); });
   test('evaluates step conditions against refreshed lead state', async () => { const flow: any = await AutomationService.createFlow(ownerA, definition({ status: 'active', actions: [{ type: 'update_score', config: { score: 80 } }, { type: 'add_tag', config: { tag: 'qualified' }, conditions: [{ field: 'score', operator: 'gte', value: 80 }] }] })); const result: any = await AutomationEngineService.start(flow, event()); expect(result.status).toBe('completed'); expect((await Lead.findById(lead._id))?.tags).toContain('qualified'); });
   test('persists a wait and resumes after a simulated restart', async () => { const flow: any = await AutomationService.createFlow(ownerA, definition({ status: 'active', actions: [{ type: 'wait', config: { durationMs: 60000 } }, { type: 'add_tag', config: { tag: 'resumed' } }] })); const execution: any = await AutomationEngineService.start(flow, event()); expect(execution.status).toBe('waiting'); await AutomationJob.updateOne({ executionId: execution._id }, { runAt: new Date(0) }); expect(await AutomationEngineService.processDueJobs()).toBe(1); expect((await Lead.findById(lead._id))?.tags).toContain('resumed'); expect(await AutomationJob.findOne({ executionId: execution._id })).toMatchObject({ status: 'completed' }); });
+  test('reuses one pending job across sequential waits without losing or duplicating work', async () => {
+    const flow: any = await AutomationService.createFlow(ownerA, definition({
+      status: 'active',
+      actions: [
+        { type: 'add_tag', config: { tag: 'step-1' } },
+        { type: 'wait', config: { durationMs: 60000 } },
+        { type: 'create_proposal', config: { message: 'step-2' } },
+        { type: 'wait', config: { durationMs: 120000 } },
+        { type: 'add_tag', config: { tag: 'step-3' } },
+      ],
+    }));
+    const execution: any = await AutomationEngineService.start(flow, event());
+    const initialJob: any = await AutomationJob.findOne({ executionId: execution._id });
+    expect((await Lead.findById(lead._id))?.tags).toContain('step-1');
+    expect(execution).toMatchObject({ status: 'waiting' });
+    expect(initialJob).toMatchObject({ status: 'pending', resumeStep: 2, attempts: 0 });
+    expect(initialJob.lockedAt).toBeUndefined();
+
+    await AutomationJob.updateOne({ _id: initialJob._id }, { runAt: new Date(0) });
+    expect(await AutomationEngineService.processDueJobs()).toBe(1);
+
+    const secondWaitExecution: any = await AutomationExecution.findById(execution._id);
+    const secondWaitJob: any = await AutomationJob.findOne({ executionId: execution._id });
+    expect(await AssistedProposal.countDocuments({ userId: ownerA, text: 'step-2' })).toBe(1);
+    expect(secondWaitExecution).toMatchObject({ status: 'waiting' });
+    expect(secondWaitJob._id.toString()).toBe(initialJob._id.toString());
+    expect(secondWaitJob.toObject()).toMatchObject({ status: 'pending', resumeStep: 4, attempts: 0 });
+    expect(secondWaitJob.runAt.getTime()).toBeGreaterThan(Date.now());
+    expect(secondWaitJob.lockedAt).toBeUndefined();
+    expect(await OutboundMessage.countDocuments({ userId: ownerA })).toBe(0);
+
+    await AutomationJob.updateOne({ _id: initialJob._id }, { runAt: new Date(0) });
+    expect(await AutomationEngineService.processDueJobs()).toBe(1);
+
+    const completedExecution: any = await AutomationExecution.findById(execution._id);
+    const completedJob: any = await AutomationJob.findOne({ executionId: execution._id });
+    expect(completedExecution).toMatchObject({ status: 'completed' });
+    expect(completedJob.toObject()).toMatchObject({ status: 'completed', attempts: 1 });
+    expect(completedJob.lockedAt).toBeUndefined();
+    expect(completedExecution.steps.filter((step: any) => step.index === 0)).toHaveLength(1);
+    expect(completedExecution.steps.filter((step: any) => step.index === 2)).toHaveLength(1);
+    expect(completedExecution.steps.filter((step: any) => step.index === 4)).toHaveLength(1);
+    expect(await AssistedProposal.countDocuments({ userId: ownerA, text: 'step-2' })).toBe(1);
+    expect(await OutboundMessage.countDocuments({ userId: ownerA })).toBe(0);
+  });
+  test('keeps a due wait pending while its flow is paused and still processes another owner', async () => {
+    const pausedFlow: any = await AutomationService.createFlow(ownerA, definition({
+      status: 'active',
+      actions: [
+        { type: 'add_tag', config: { tag: 'before-wait' } },
+        { type: 'wait', config: { durationMs: 60000 } },
+        { type: 'add_tag', config: { tag: 'after-wait' } },
+        { type: 'create_proposal', config: { message: 'Must remain pending' } },
+      ],
+    }));
+    const pausedExecution: any = await AutomationEngineService.start(pausedFlow, event());
+    expect((await Lead.findById(lead._id))?.tags).toContain('before-wait');
+    expect(pausedExecution).toMatchObject({ status: 'waiting' });
+    await AutomationJob.updateOne({ executionId: pausedExecution._id }, { runAt: new Date(0) });
+    await AutomationService.setStatus(pausedFlow._id, ownerA, 'paused');
+
+    const otherLead: any = await Lead.create({ userId: ownerB, username: 'lead-2', platform: 'whatsapp', status: 'new', tags: [] });
+    const otherConversation: any = await Conversation.create({ userId: ownerB, leadId: otherLead._id });
+    const otherFlow: any = await AutomationService.createFlow(ownerB, definition({
+      status: 'active',
+      actions: [
+        { type: 'wait', config: { durationMs: 60000 } },
+        { type: 'add_tag', config: { tag: 'other-owner-resumed' } },
+      ],
+    }));
+    const otherExecution: any = await AutomationEngineService.start(otherFlow, event({
+      eventId: 'event-owner-b',
+      userId: ownerB,
+      leadId: otherLead._id.toString(),
+      conversationId: otherConversation._id.toString(),
+    }));
+    await AutomationJob.updateOne({ executionId: otherExecution._id }, { runAt: new Date(0) });
+
+    expect(await AutomationEngineService.processDueJobs()).toBe(2);
+
+    const pausedJob: any = await AutomationJob.findOne({ executionId: pausedExecution._id });
+    const coherentExecution: any = await AutomationExecution.findById(pausedExecution._id);
+    expect((await Lead.findById(lead._id))?.tags).not.toContain('after-wait');
+    expect(await AssistedProposal.countDocuments({ userId: ownerA })).toBe(0);
+    expect(await OutboundMessage.countDocuments({ userId: ownerA })).toBe(0);
+    expect(await AutomationExecution.countDocuments({ automationId: pausedFlow._id })).toBe(1);
+    expect(coherentExecution).toMatchObject({ status: 'waiting' });
+    expect(pausedJob).toMatchObject({ status: 'pending', attempts: 0, resumeStep: 2 });
+    expect(pausedJob.lockedAt).toBeUndefined();
+    expect((await Lead.findById(otherLead._id))?.tags).toContain('other-owner-resumed');
+    expect(await AutomationJob.findOne({ executionId: otherExecution._id })).toMatchObject({ status: 'completed' });
+
+    await AutomationService.setStatus(pausedFlow._id, ownerA, 'active');
+    expect(await AutomationEngineService.processDueJobs()).toBe(1);
+    const resumedExecution: any = await AutomationExecution.findById(pausedExecution._id);
+    expect((await Lead.findById(lead._id))?.tags).toEqual(expect.arrayContaining(['before-wait', 'after-wait']));
+    expect(resumedExecution).toMatchObject({ status: 'completed' });
+    expect(resumedExecution.steps.filter((step: any) => step.index === 0)).toHaveLength(1);
+    expect(await AutomationExecution.countDocuments({ automationId: pausedFlow._id })).toBe(1);
+    expect(await AutomationJob.findOne({ executionId: pausedExecution._id })).toMatchObject({ status: 'completed', attempts: 1 });
+    expect(await AssistedProposal.countDocuments({ userId: ownerA })).toBe(1);
+    expect(await OutboundMessage.countDocuments({ userId: ownerA })).toBe(0);
+  });
+  test('does not start a flow that is already paused', async () => {
+    await AutomationService.createFlow(ownerA, definition({ status: 'paused' }));
+    expect(await AutomationEngineService.emit(event())).toHaveLength(0);
+    expect(await AutomationExecution.countDocuments({ userId: ownerA })).toBe(0);
+    expect(await AutomationJob.countDocuments({ userId: ownerA })).toBe(0);
+    expect(await OutboundMessage.countDocuments({ userId: ownerA })).toBe(0);
+  });
   test('is idempotent for the same event and automation', async () => { await AutomationService.createFlow(ownerA, definition({ status: 'active' })); await AutomationEngineService.emit(event()); await AutomationEngineService.emit(event()); expect(await AutomationExecution.countDocuments({})).toBe(1); });
   test('retries a safe action before succeeding', async () => { const flow: any = await AutomationService.createFlow(ownerA, definition({ status: 'active' })); const original = AutomationEngineService.executeAction; let calls = 0; const spy = jest.spyOn(AutomationEngineService, 'executeAction').mockImplementation(async (...args: any[]) => { calls++; if (calls < 3) throw new Error('transient'); return original.apply(AutomationEngineService, args as any); }); const result: any = await AutomationEngineService.start(flow, event()); expect(result.status).toBe('completed'); expect(spy).toHaveBeenCalledTimes(3); spy.mockRestore(); });
   test('isolates an action failure and records diagnostics', async () => { const flow: any = await AutomationService.createFlow(ownerA, definition({ status: 'active', actions: [{ type: 'create_proposal', config: {} }] })); const result: any = await AutomationEngineService.start(flow, event({ platform: 'youtube', recipient: undefined })); expect(result).toMatchObject({ status: 'failed', error: expect.stringContaining('canal privado') }); expect(await AutomationFlow.findById(flow._id)).toMatchObject({ status: 'error' }); });
