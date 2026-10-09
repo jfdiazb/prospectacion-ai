@@ -230,6 +230,12 @@ export interface IScraperResult {
     text: string;
     engagement: number;
   }[];
+  mode?: 'demo' | 'mock' | 'live';
+  platform?: string;
+  source?: string;
+  fetchedAt?: string;
+  cached?: boolean;
+  sampleSize?: number;
 }
 
 export interface IProfileScrape {
@@ -240,6 +246,11 @@ export interface IProfileScrape {
   engagement: number;
   bio: string;
   recentHashtags: string[];
+  mode?: 'demo' | 'mock' | 'live';
+  source?: string;
+  fetchedAt?: string;
+  cached?: boolean;
+  sampleSize?: number;
 }
 
 export interface IApiResponse<T> {

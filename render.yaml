@@ -46,6 +46,18 @@ services:
         # Safe Blueprint default. ALMA V1 currently has an explicit Render dashboard override;
         # keep false here so recreating the service cannot start polling unexpectedly.
         value: "false"
+      - key: SOCIAL_SCRAPER_MODE
+        # Safe default. A controlled live test requires separate human authorization.
+        value: demo
+      - key: YOUTUBE_SCRAPER_API_KEY
+        # Dedicated Social Scraper credential; never reuse operational YouTube credentials.
+        sync: false
+      - key: ALLOW_YOUTUBE_SCRAPER_PROBE
+        # One-shot operational command only; never enables an HTTP endpoint.
+        value: "false"
+      - key: YOUTUBE_SCRAPER_DAILY_QUOTA_BUDGET
+        # Conservative Social Scraper-only ceiling; enforced durably in MongoDB.
+        value: "1000"
       - key: YOUTUBE_MESSAGING_MODE
         # Safe Blueprint default; the current live override is documented in
         # docs/ALMA_V1_RUNTIME_CONFIG.md and must be reconciled manually.

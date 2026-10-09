@@ -117,4 +117,10 @@ export interface IScraperResult {
     text: string;
     engagement: number;
   }[];
+  mode?: 'demo' | 'mock' | 'live';
+  platform?: string;
+  source?: string;
+  fetchedAt?: string;
+  cached?: boolean;
+  sampleSize?: number;
 }

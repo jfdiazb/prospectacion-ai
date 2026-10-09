@@ -10,6 +10,7 @@ export const ScraperPage = () => {
   const [result, setResult] = useState<IScraperResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const isLiveResult = result?.mode === 'live';
 
   const handleScrape = async () => {
     try {
@@ -19,7 +20,7 @@ export const ScraperPage = () => {
       setResult(response.data || null);
     } catch (error) {
       console.error('Error scrapeando hashtag:', error);
-      setError('No fue posible ejecutar la demostración del analizador.');
+      setError('No fue posible ejecutar el analizador.');
     } finally {
       setLoading(false);
     }
@@ -30,8 +31,12 @@ export const ScraperPage = () => {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
         <Card>
           <div className="space-y-4">
-            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
-              Modo demostración: los resultados de esta pantalla son datos simulados y no provienen de redes sociales reales.
+            <div className={`rounded-2xl border p-4 text-sm ${isLiveResult
+              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+              : 'border-amber-500/30 bg-amber-500/10 text-amber-200'}`}>
+              {isLiveResult
+                ? 'Lectura oficial: esta muestra proviene de YouTube Data API v3.'
+                : 'Modo demostración: los resultados visibles son simulados y no provienen de redes sociales reales.'}
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Análisis rápido de hashtag</h2>
@@ -60,7 +65,17 @@ export const ScraperPage = () => {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <h3 className="text-lg font-semibold text-white">#{result.hashtag}</h3>
-                    <p className="text-dark-400">Datos demostrativos de tendencia, engagement y contenido.</p>
+                    <p className="text-dark-400">
+                      {isLiveResult
+                        ? 'Muestra observada de videos y métricas públicas; no representa el total global de YouTube.'
+                        : 'Datos demostrativos de tendencia, engagement y contenido.'}
+                    </p>
+                    {result.mode && (
+                      <p className="mt-1 text-xs text-dark-500">
+                        Modo: {result.mode.toUpperCase()} · Fuente: {result.source || 'no informada'}
+                        {result.fetchedAt ? ` · Obtenido: ${new Date(result.fetchedAt).toLocaleString('es-CO')}` : ''}
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2 text-sm text-dark-300">
                     <Badge variant="secondary">Posts: {result.totalPosts}</Badge>
@@ -68,7 +83,7 @@ export const ScraperPage = () => {
                   </div>
                 </div>
                 <div className="grid gap-3">
-                  {result.topPosts.map((post: any) => (
+                  {result.topPosts.map(post => (
                     <Card key={post.id} hover>
                       <div className="space-y-2">
                         <p className="text-sm text-dark-300">{post.text}</p>
