@@ -10,6 +10,7 @@ import {
   type YouTubeScraperTransport,
 } from '../src/scraper/providers/YouTubeScraperProvider';
 import { ScraperService } from '../src/services/ScraperService';
+import { YouTubeScraperQuotaBudget } from '../src/scraper/YouTubeScraperQuotaBudget';
 
 function responseDouble() {
   const response: any = {
@@ -183,6 +184,25 @@ describe('Social Scraper Fase 2', () => {
     await expect(service.scrapeHashtag('ventas')).resolves.toMatchObject({ mode: 'mock' });
     const loaded = Object.keys(require.cache).join('\n');
     expect(loaded).not.toMatch(/AutomationEngineService|MessagingService|YouTubeIngestionService|CrmService/);
+  });
+
+  test.each(['demo', 'live'] as const)('/status devuelve el modo efectivo sin red ni reserva de cuota: %s', mode => {
+    process.env.SOCIAL_SCRAPER_MODE = mode;
+    if (mode === 'live') process.env.YOUTUBE_SCRAPER_API_KEY = 'test-only';
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+    const reserveSpy = jest.spyOn(YouTubeScraperQuotaBudget, 'reserve');
+    const response = responseDouble();
+
+    ScraperController.status({} as any, response);
+
+    expect(response.status).toHaveBeenCalledWith(200);
+    expect(response.json).toHaveBeenCalledWith({
+      success: true,
+      message: 'Estado de Social Scraper obtenido',
+      data: { mode },
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(reserveSpy).not.toHaveBeenCalled();
   });
 
   test('/hashtag normaliza en la frontera y conserva envelope HTTP', async () => {

@@ -11,6 +11,19 @@ import {
 import { ScraperError, asScraperError } from '../scraper/errors';
 
 export class ScraperController {
+  static status(_req: AuthRequest, res: Response<IApiResponse<{ mode: string }>>): void {
+    try {
+      res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: 'Estado de Social Scraper obtenido',
+        data: ScraperService.status(),
+      });
+    } catch (error) {
+      const scraperError = asScraperError(error);
+      res.status(scraperError.status).json({ success: false, message: scraperError.message, error: scraperError.code });
+    }
+  }
+
   static async scrapeHashtag(req: AuthRequest, res: Response<IApiResponse<HashtagScrapeResult>>): Promise<void> {
     try {
       let hashtag: string;

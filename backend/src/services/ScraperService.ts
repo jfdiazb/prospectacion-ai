@@ -1,4 +1,4 @@
-import type { HashtagScrapeResult, ProfileScrapeResult, ScraperProvider } from '../scraper/contracts';
+import type { HashtagScrapeResult, ProfileScrapeResult, ScraperMode, ScraperProvider } from '../scraper/contracts';
 import { createScraperProvider } from '../scraper/providerFactory';
 
 /**
@@ -24,5 +24,9 @@ export class ScraperService {
 
   static async scrapeProfile(params: { username: string; platform: string }): Promise<ProfileScrapeResult> {
     return new ScraperService().scrapeProfile(params);
+  }
+
+  static status(): { mode: ScraperMode } {
+    return { mode: createScraperProvider().mode };
   }
 }

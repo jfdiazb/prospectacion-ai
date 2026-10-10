@@ -124,3 +124,7 @@ export interface IScraperResult {
   cached?: boolean;
   sampleSize?: number;
 }
+
+export interface IScraperStatus {
+  mode: 'demo' | 'mock' | 'live';
+}

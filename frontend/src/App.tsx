@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { useAuth } from '@context/AuthContext';
+import { ScraperModeBootstrap } from '@context/ScraperModeContext';
 import { ProtectedRoute } from '@components/ProtectedRoute';
 import { DashboardPage } from '@pages/DashboardPage';
 import { LeadsPage } from '@pages/LeadsPage';
@@ -21,7 +22,7 @@ import { LandingPage } from '@pages/LandingPage';
 import { TermsPage } from '@pages/TermsPage';
 
 function App() {
-  const { isLoading } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -33,7 +34,9 @@ function App() {
   }
 
   return (
-    <AnimatePresence mode="wait">
+    <>
+      <ScraperModeBootstrap enabled={isAuthenticated} />
+      <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -124,7 +127,8 @@ function App() {
         />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </AnimatePresence>
+      </AnimatePresence>
+    </>
   );
 }
 
