@@ -12,6 +12,7 @@ import {
   Youtube,
   CalendarRange,
 } from 'lucide-react';
+import { scraperModeLabel, useScraperMode } from '@context/ScraperModeContext';
 
 const routes = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -19,7 +20,7 @@ const routes = [
   { label: 'Prospectos', path: '/prospectos', icon: Users },
   { label: 'Lead Hunter', path: '/lead-hunter', icon: Search },
   { label: 'YouTube Monitor', path: '/youtube-monitor', icon: Youtube },
-  { label: 'Social Scraper (demo)', path: '/social-scraper', icon: Globe },
+  { label: 'Social Scraper', path: '/social-scraper', icon: Globe },
   { label: 'Automatizaciones', path: '/automatizaciones', icon: Repeat },
   { label: 'CRM', path: '/crm', icon: PhoneCall },
   { label: 'Lanzamientos', path: '/lanzamientos', icon: CalendarRange },
@@ -27,6 +28,8 @@ const routes = [
 ];
 
 export const Sidebar = () => {
+  const { mode: scraperMode } = useScraperMode();
+
   return (
     <aside className="fixed inset-y-0 left-0 z-20 hidden w-72 flex-col gap-8 overflow-y-auto border-r border-white/10 bg-dark-950/95 px-6 py-8 backdrop-blur-xl lg:flex">
       <div className="space-y-4">
@@ -57,7 +60,7 @@ export const Sidebar = () => {
               }
             >
               <Icon className="h-5 w-5" />
-              {route.label}
+              {route.path === '/social-scraper' ? scraperModeLabel(scraperMode) : route.label}
             </NavLink>
           );
         })}

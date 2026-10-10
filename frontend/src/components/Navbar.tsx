@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@context/AuthContext';
+import { scraperModeLabel, useScraperMode } from '@context/ScraperModeContext';
 import { crmService, type CrmTask } from '@services/crmService';
 import { Bell, LogOut, Moon, Search, Sparkles, Sun, UserCircle } from 'lucide-react';
 
@@ -8,12 +9,13 @@ const mobileRoutes = [
   { label: 'Dashboard', path: '/dashboard' },
   { label: 'Prospectos', path: '/prospectos' },
   { label: 'Lead Hunter', path: '/lead-hunter' },
-  { label: 'Social Scraper (demo)', path: '/social-scraper' },
+  { label: 'Social Scraper', path: '/social-scraper' },
   { label: 'Automatizaciones', path: '/automatizaciones' },
 ];
 
 export const Navbar = () => {
   const { user, logout } = useAuth();
+  const { mode: scraperMode } = useScraperMode();
   const [darkMode, setDarkMode] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [alertsOpen, setAlertsOpen] = useState(false);
@@ -78,7 +80,7 @@ export const Navbar = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 text-sm text-dark-300 xl:justify-end">
-          {mobileRoutes.map(route => <Link key={route.path} to={route.path} className="rounded-2xl bg-dark-900 px-4 py-2 transition hover:bg-dark-800 hover:text-white">{route.label}</Link>)}
+          {mobileRoutes.map(route => <Link key={route.path} to={route.path} className="rounded-2xl bg-dark-900 px-4 py-2 transition hover:bg-dark-800 hover:text-white">{route.path === '/social-scraper' ? scraperModeLabel(scraperMode) : route.label}</Link>)}
           <div className="relative">
             <button type="button" aria-expanded={alertsOpen} aria-controls="navbar-alerts" onClick={() => setAlertsOpen(open => !open)} className="inline-flex h-11 items-center gap-2 rounded-2xl border border-white/10 bg-dark-900/95 px-4 text-sm text-white transition hover:border-primary-500 hover:bg-dark-800">
               <Bell className="h-4 w-4" />Alertas
