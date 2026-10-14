@@ -61,6 +61,7 @@ describe('Phase 4 Meta consolidation', () => {
     ownerB = new mongoose.Types.ObjectId();
     delete process.env.META_INITIAL_INTENT_PHRASES;
     delete process.env.META_PAGE_ID;
+    delete process.env.INSTAGRAM_APP_SECRET;
   });
   afterEach(async () => {
     jest.restoreAllMocks();
@@ -341,6 +342,25 @@ describe('Phase 4 Meta consolidation', () => {
     expect(new Set(observations.map(item => item.correlationId)).size).toBe(1);
     expect(JSON.stringify(observations)).not.toContain('sha256=');
     expect(JSON.stringify(observations)).not.toContain('signed');
+  });
+
+  test('uses the isolated Instagram app secret without changing the shared Meta secret', async () => {
+    process.env.META_APP_SECRET = 'facebook-meta-signing-secret';
+    process.env.INSTAGRAM_APP_SECRET = 'instagram-signing-secret';
+    process.env.CRM_OWNER_ID = ownerA.toString();
+    const body = Buffer.from(JSON.stringify(instagramComment('instagram-isolated-secret')));
+    const signature = `sha256=${crypto.createHmac('sha256', process.env.INSTAGRAM_APP_SECRET).update(body).digest('hex')}`;
+    const accept = jest.spyOn(MetaIngestionService, 'acceptPayload').mockResolvedValue([]);
+    const response: any = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+      sendStatus: jest.fn().mockReturnThis(),
+    };
+
+    await MetaController.receive({ body, header: () => signature } as any, response);
+
+    expect(response.sendStatus).toHaveBeenCalledWith(200);
+    expect(accept).toHaveBeenCalledTimes(1);
   });
 
   test('rejects a valid signed webhook for a different Facebook Page', async () => {

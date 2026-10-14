@@ -121,6 +121,8 @@ services:
         value: "false"
       - key: META_APP_SECRET
         sync: false
+      - key: INSTAGRAM_APP_SECRET
+        sync: false
       - key: META_VERIFY_TOKEN
         sync: false
       - key: META_PAGE_ID

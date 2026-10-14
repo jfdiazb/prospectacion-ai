@@ -4,12 +4,13 @@ import { MetaIngestionService } from '../services/MetaIngestionService';
 import { metaWebhookCorrelationId, observeMeta } from '../services/MetaObservability';
 
 export class MetaController {
-  private static validSignature(rawBody: Buffer, signature?: string): boolean {
-    const secret = process.env.META_APP_SECRET;
-    if (!secret || !signature) return false;
-    const expected = Buffer.from(`sha256=${crypto.createHmac('sha256', secret).update(rawBody).digest('hex')}`);
+  private static validSignature(rawBody: Buffer, signature: string | undefined, secrets: string[]): boolean {
+    if (!signature) return false;
     const received = Buffer.from(signature);
-    return expected.length === received.length && crypto.timingSafeEqual(expected, received);
+    return secrets.some(secret => {
+      const expected = Buffer.from(`sha256=${crypto.createHmac('sha256', secret).update(rawBody).digest('hex')}`);
+      return expected.length === received.length && crypto.timingSafeEqual(expected, received);
+    });
   }
 
   private static isMockRequest(req: Request): boolean {
@@ -34,17 +35,21 @@ export class MetaController {
       const signature = req.header('x-hub-signature-256');
       observeMeta({ correlationId, stage: 'received', code: 'received', hasSignature: Boolean(signature) });
       const mockRequest = MetaController.isMockRequest(req);
-      if (!mockRequest && !process.env.META_APP_SECRET) {
+      const payload = JSON.parse(rawBody.toString('utf8'));
+      const platform = payload?.object === 'instagram' ? 'instagram' : payload?.object === 'page' ? 'facebook' : 'unknown';
+      const signatureSecrets = platform === 'instagram'
+        ? [process.env.INSTAGRAM_APP_SECRET, process.env.META_APP_SECRET]
+        : [process.env.META_APP_SECRET];
+      const configuredSignatureSecrets = [...new Set(signatureSecrets.map(secret => secret?.trim()).filter(Boolean))] as string[];
+      if (!mockRequest && !configuredSignatureSecrets.length) {
         observeMeta({ correlationId, stage: 'signature', code: 'signature_unavailable' }, 'error');
-        return res.status(503).json({ success: false, message: 'META_APP_SECRET no configurado' });
+        return res.status(503).json({ success: false, message: 'Secreto de firma Meta no configurado' });
       }
-      if (!mockRequest && !MetaController.validSignature(rawBody, signature)) {
+      if (!mockRequest && !MetaController.validSignature(rawBody, signature, configuredSignatureSecrets)) {
         observeMeta({ correlationId, stage: 'signature', code: 'signature_invalid' }, 'warn');
         return res.status(401).json({ success: false, message: 'Firma de Meta inválida' });
       }
       observeMeta({ correlationId, stage: 'signature', code: mockRequest ? 'signature_mock' : 'signature_valid' });
-      const payload = JSON.parse(rawBody.toString('utf8'));
-      const platform = payload?.object === 'instagram' ? 'instagram' : payload?.object === 'page' ? 'facebook' : 'unknown';
       observeMeta({ correlationId, stage: 'platform', code: platform === 'unknown' ? 'platform_not_supported' : 'platform_detected', platform });
       const configuredPageId = process.env.META_PAGE_ID?.trim();
       if (
