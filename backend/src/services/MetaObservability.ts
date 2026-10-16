@@ -9,6 +9,7 @@ export type MetaObservationStage =
   | 'persistence'
   | 'crm_interaction'
   | 'proposal'
+  | 'outbound'
   | 'processing';
 
 type MetaObservation = {

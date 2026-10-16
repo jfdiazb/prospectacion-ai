@@ -10,6 +10,7 @@ import { CommercialContextService } from './CommercialContextService';
 import { MetaLaunchAdapter } from './MetaLaunchAdapter';
 import { metaEventFingerprint, metaWebhookCorrelationId, observeMeta } from './MetaObservability';
 import { AlmaService } from './AlmaService';
+import OutboundMessage from '../models/OutboundMessage';
 
 type AcceptedMetaEvent = {
   id: string;
@@ -242,11 +243,28 @@ export class MetaIngestionService {
         platform: event.platform,
         recipient: event.recipient,
       };
-      const facebookAutoSend = event.platform === 'facebook'
-        && process.env.FACEBOOK_AUTO_SEND_ENABLED === 'true';
-      if (facebookAutoSend) {
+      const automaticSend =
+        (event.platform === 'facebook' && process.env.FACEBOOK_AUTO_SEND_ENABLED === 'true') ||
+        (event.platform === 'instagram' && process.env.META_AUTO_SEND_ENABLED === 'true');
+      if (automaticSend) {
         await AlmaService.processMessage(responseContext);
-        observeMeta({ correlationId, eventFingerprint, stage: 'proposal', code: 'auto_sent', platform: event.platform });
+        const outbound: any = await OutboundMessage.findOne({
+          userId,
+          sourceEventId: event.externalEventId,
+        })
+          .select('deliveryStatus providerErrorCode providerErrorSubcode requiresReauthorization')
+          .lean();
+        const deliveryStatus = outbound?.deliveryStatus ?? 'not_created';
+        observeMeta(
+          {
+            correlationId,
+            eventFingerprint,
+            stage: 'outbound',
+            code: `outbound_${deliveryStatus}`,
+            platform: event.platform,
+          },
+          deliveryStatus === 'failed' ? 'warn' : 'info'
+        );
       } else {
         await AssistedResponseService.process(responseContext);
         observeMeta({ correlationId, eventFingerprint, stage: 'proposal', code: 'proposal_created', platform: event.platform });

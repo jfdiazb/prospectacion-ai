@@ -11,6 +11,7 @@ import LaunchMetaContent from '../src/models/LaunchMetaContent';
 import { MetaWebhookNormalizer } from '../src/integrations/meta';
 import { MetaIngestionService } from '../src/services/MetaIngestionService';
 import { MetaController } from '../src/controllers/MetaController';
+import { MessagingService } from '../src/services/MessagingService';
 import * as aiIntegrations from '../src/integrations/ai';
 
 const instagramComment = (id: string, text = 'Quiero más información', sender = 'ig-user') => ({
@@ -63,6 +64,8 @@ describe('Phase 4 Meta consolidation', () => {
     delete process.env.META_PAGE_ID;
     delete process.env.META_IG_USER_ID;
     delete process.env.INSTAGRAM_APP_SECRET;
+    delete process.env.META_AUTO_SEND_ENABLED;
+    delete process.env.FACEBOOK_AUTO_SEND_ENABLED;
   });
   afterEach(async () => {
     jest.restoreAllMocks();
@@ -473,5 +476,45 @@ describe('Phase 4 Meta consolidation', () => {
     expect(serialized).not.toContain('sensitive-comment-id');
     expect(serialized).not.toContain('sensitive-user-id');
     expect(await OutboundMessage.countDocuments({})).toBe(0);
+  });
+
+  test('records the real failed Instagram outbound status instead of auto_sent', async () => {
+    process.env.META_AUTO_SEND_ENABLED = 'true';
+    const send = jest.spyOn(MessagingService, 'send').mockImplementation(async context => {
+      await OutboundMessage.create({
+        userId: context.userId,
+        leadId: context.leadId,
+        conversationId: context.conversationId,
+        sourceEventId: context.sourceEventId,
+        channel: 'instagram',
+        messageType: 'private_reply',
+        text: context.text,
+        deliveryStatus: 'failed',
+        provider: 'meta',
+        recipientId: 'comment-ig-failed',
+        errorCode: '190',
+        providerErrorCode: 190,
+        providerErrorSubcode: 467,
+        requiresReauthorization: true,
+      });
+      return 'failed';
+    });
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+    const accepted = await MetaIngestionService.acceptPayload(
+      ownerA.toString(),
+      instagramComment('ig-failed', 'INFO'),
+      'meta_req_instagram_failed'
+    );
+
+    await MetaIngestionService.processAccepted(ownerA.toString(), accepted[0]);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith('Meta webhook observability', expect.objectContaining({
+      correlationId: 'meta_req_instagram_failed',
+      platform: 'instagram',
+      stage: 'outbound',
+      code: 'outbound_failed',
+    }));
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('INFO');
   });
 });
