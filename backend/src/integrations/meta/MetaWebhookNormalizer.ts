@@ -35,6 +35,17 @@ const normalize = (value: string) =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 
+const metaDate = (value: unknown): Date => {
+  if (typeof value === 'string' && /\D/.test(value)) {
+    const parsed = new Date(value);
+    if (Number.isFinite(parsed.getTime())) return parsed;
+  }
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0)
+    return new Date(numeric < 1e12 ? numeric * 1000 : numeric);
+  return new Date();
+};
+
 export class MetaWebhookNormalizer {
   static interestPhrases(context?: CommercialContextLike | null): string[] {
     const configured = (process.env.META_INITIAL_INTENT_PHRASES || '')
@@ -99,7 +110,7 @@ export class MetaWebhookNormalizer {
           externalUserId: String(senderId),
           eventType: 'direct_message',
           content: String(text).trim(),
-          occurredAt: new Date(Number(item.timestamp) || Date.now()),
+          occurredAt: metaDate(item.timestamp),
           source: `${platform}_direct_message`,
           messageId: String(eventId),
           recipientId: recipientId != null ? String(recipientId) : undefined,
@@ -154,14 +165,11 @@ export class MetaWebhookNormalizer {
           externalUserId: String(senderId),
           eventType,
           content: String(text).trim(),
-          occurredAt: new Date(
-            Number(value.created_time || value.timestamp) *
-              (Number(value.created_time || value.timestamp) < 1e12 ? 1000 : 1) || Date.now()
-          ),
+          occurredAt: metaDate(value.created_time ?? value.timestamp),
           source: isComment
             ? `${platform}_${platform === 'instagram' ? 'reel_or_post' : 'post'}_comment`
             : `${platform}_direct_message`,
-          externalContentId: value.media?.id ?? value.post_id,
+          externalContentId: value.media?.id ?? value.media_id ?? value.post_id,
           messageId,
           commentId,
           parentId: parentId != null ? String(parentId) : undefined,
@@ -175,7 +183,7 @@ export class MetaWebhookNormalizer {
             parentId: parentId != null ? String(parentId) : undefined,
             senderId: String(senderId),
             recipientId: recipientId != null ? String(recipientId) : undefined,
-            contentId: value.media?.id ?? value.post_id,
+            contentId: value.media?.id ?? value.media_id ?? value.post_id,
             timestamp: value.created_time ?? value.timestamp,
           },
         });

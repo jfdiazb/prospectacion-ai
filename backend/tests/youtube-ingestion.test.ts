@@ -2,6 +2,7 @@ import { YouTubeIngestionService } from '../src/services/YouTubeIngestionService
 import { AutomationService } from '../src/services/AutomationService';
 import Lead from '../src/models/Lead';
 import { YouTubeLaunchAdapter } from '../src/services/YouTubeLaunchAdapter';
+import YouTubeCredential from '../src/models/YouTubeCredential';
 
 describe('YouTubeIngestionService polling cursor', () => {
   test('matches complete automation keywords without accents or partial words', () => {
@@ -74,6 +75,26 @@ describe('YouTubeIngestionService polling cursor', () => {
       isAxiosError: true,
       response: { status: 400, data: { error: 'invalid_grant', error_description: 'sensitive detail' } },
     })).toEqual({ httpStatus: 400, reason: 'invalid_grant' });
+  });
+
+  test('does not retry a credential whose refresh grant requires reconnection', async () => {
+    const blockedCredential = {
+      userId: { toString: () => 'owner-1' },
+      lastPollingFailure: { operation: 'oauth_refresh', reason: 'invalid_grant' },
+    };
+    jest.spyOn(YouTubeCredential, 'find').mockResolvedValue([blockedCredential] as any);
+    const tokens = { getAccessToken: jest.fn() } as any;
+    const service = new YouTubeIngestionService({} as any, tokens);
+    const poll = jest.spyOn(service, 'pollCredential');
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(service.pollAll()).resolves.toBe(1);
+
+    expect(poll).not.toHaveBeenCalled();
+    expect(tokens.getAccessToken).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith('YouTube polling skipped until OAuth reconnection', {
+      userId: 'owner-1', operation: 'oauth_refresh',
+    });
   });
 
   test('rotates reply coverage so excess threads are not excluded indefinitely', () => {

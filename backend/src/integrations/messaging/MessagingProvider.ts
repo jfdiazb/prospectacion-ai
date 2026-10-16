@@ -26,7 +26,12 @@ export interface MessagingProvider {
 }
 
 export class MessagingProviderError extends Error {
-  constructor(message: string, public readonly code: string, public readonly status?: number) {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly status?: number,
+    public readonly details?: { providerCode?: number; providerSubcode?: number; requiresReauthorization?: boolean }
+  ) {
     super(message);
     this.name = 'MessagingProviderError';
   }

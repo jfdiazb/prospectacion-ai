@@ -86,7 +86,11 @@ export class MetaMessagingProvider implements MessagingProvider {
             fbtraceId: safeMetaField(metaError?.error?.fbtrace_id),
           });
         }
-        throw new MessagingProviderError(message, code, status);
+        throw new MessagingProviderError(message, code, status, {
+          providerCode: metaError?.error?.code,
+          providerSubcode: metaError?.error?.error_subcode,
+          requiresReauthorization: metaError?.error?.code === 190,
+        });
       }
       throw new MessagingProviderError('Error inesperado al contactar Meta', 'META_UNKNOWN_ERROR');
     }

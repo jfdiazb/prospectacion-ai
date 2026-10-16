@@ -80,10 +80,15 @@ describe('MetaMessagingProvider', () => {
   });
 
   test('maps a Meta authentication failure without exposing credentials', async () => {
-    const error = new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, { status: 401, data: { error: { code: 190, message: 'Invalid OAuth access token.' } } } as any);
+    const error = new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, { status: 401, data: { error: { code: 190, error_subcode: 467, message: 'Invalid OAuth access token.' } } } as any);
     const provider = new MetaMessagingProvider({ post: jest.fn().mockRejectedValue(error) } as unknown as AxiosInstance);
     await expect(provider.sendMessage({ text: 'Hola', recipient: { type: 'comment', commentId: 'comment-1' } }))
-      .rejects.toMatchObject({ code: '190', status: 401, message: 'Invalid OAuth access token.' });
+      .rejects.toMatchObject({
+        code: '190',
+        status: 401,
+        message: 'Invalid OAuth access token.',
+        details: { providerCode: 190, providerSubcode: 467, requiresReauthorization: true },
+      });
   });
 
   test('maps a Meta timeout', async () => {

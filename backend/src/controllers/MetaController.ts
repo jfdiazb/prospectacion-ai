@@ -52,6 +52,7 @@ export class MetaController {
       observeMeta({ correlationId, stage: 'signature', code: mockRequest ? 'signature_mock' : 'signature_valid' });
       observeMeta({ correlationId, stage: 'platform', code: platform === 'unknown' ? 'platform_not_supported' : 'platform_detected', platform });
       const configuredPageId = process.env.META_PAGE_ID?.trim();
+      const configuredInstagramId = process.env.META_IG_USER_ID?.trim();
       if (
         platform === 'facebook' &&
         configuredPageId &&
@@ -59,6 +60,14 @@ export class MetaController {
       ) {
         observeMeta({ correlationId, stage: 'platform', code: 'facebook_page_mismatch', platform }, 'warn');
         return res.status(403).json({ success: false, message: 'Página de Facebook no autorizada' });
+      }
+      if (
+        platform === 'instagram' &&
+        configuredInstagramId &&
+        (payload?.entry ?? []).some((entry: any) => String(entry?.id ?? '') !== configuredInstagramId)
+      ) {
+        observeMeta({ correlationId, stage: 'platform', code: 'instagram_account_mismatch', platform }, 'warn');
+        return res.status(403).json({ success: false, message: 'Cuenta de Instagram no autorizada' });
       }
       const ownerId = process.env.CRM_OWNER_ID;
       if (!ownerId) throw new Error('CRM_OWNER_ID no configurado');

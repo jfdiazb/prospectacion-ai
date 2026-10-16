@@ -61,6 +61,7 @@ describe('Phase 4 Meta consolidation', () => {
     ownerB = new mongoose.Types.ObjectId();
     delete process.env.META_INITIAL_INTENT_PHRASES;
     delete process.env.META_PAGE_ID;
+    delete process.env.META_IG_USER_ID;
     delete process.env.INSTAGRAM_APP_SECRET;
   });
   afterEach(async () => {
@@ -166,6 +167,31 @@ describe('Phase 4 Meta consolidation', () => {
       content: 'Quiero información',
       externalContentId: 'page-1_post-1',
       recipient: { type: 'facebook_comment', commentId: 'comment-feed-1' },
+    });
+  });
+
+  test('normalizes the current Instagram comment shape with ISO timestamp and media_id', () => {
+    const occurredAt = '2026-10-15T14:30:00+0000';
+    const event = MetaWebhookNormalizer.normalizePayload({
+      object: 'instagram',
+      entry: [{
+        id: 'ig-business-1',
+        changes: [{ field: 'comments', value: {
+          id: 'ig-comment-current-1',
+          media_id: 'ig-media-current-1',
+          from: { id: 'igsid-current-1', username: 'test_user' },
+          text: 'INFO',
+          timestamp: occurredAt,
+        } }],
+      }],
+    })[0];
+
+    expect(event).toMatchObject({
+      platform: 'instagram',
+      externalEventId: 'meta:instagram:ig-comment-current-1',
+      externalContentId: 'ig-media-current-1',
+      externalUserId: 'igsid-current-1',
+      occurredAt: new Date(occurredAt),
     });
   });
 
@@ -397,6 +423,22 @@ describe('Phase 4 Meta consolidation', () => {
       'platform_detected',
       'facebook_page_mismatch',
     ]);
+  });
+
+  test('rejects a valid signed webhook for a different Instagram account', async () => {
+    process.env.INSTAGRAM_APP_SECRET = 'instagram-secret';
+    process.env.META_IG_USER_ID = 'authorized-instagram';
+    process.env.CRM_OWNER_ID = ownerA.toString();
+    const payload = instagramComment('wrong-instagram-account');
+    payload.entry[0] = { ...payload.entry[0], id: 'different-instagram' } as any;
+    const body = Buffer.from(JSON.stringify(payload));
+    const signature = `sha256=${crypto.createHmac('sha256', process.env.INSTAGRAM_APP_SECRET).update(body).digest('hex')}`;
+    const res: any = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis(), sendStatus: jest.fn().mockReturnThis() };
+
+    await MetaController.receive({ body, header: () => signature } as any, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(await InboundEvent.countDocuments({})).toBe(0);
   });
 
   test('emits one sanitized fingerprint through persistence, CRM interaction and proposal', async () => {

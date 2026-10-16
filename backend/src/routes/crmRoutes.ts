@@ -306,6 +306,25 @@ router.post(
       const baseSourceEventId = `proposal:${proposal._id}`;
       let messagingSourceEventId = baseSourceEventId;
       if (['instagram', 'facebook'].includes(platform) && proposal.deliveryStatus === 'duplicate') {
+        const authorizationFailure = await OutboundMessage.findOne({
+          userId: req.userId,
+          conversationId: proposal.conversationId,
+          sourceEventId: baseSourceEventId,
+          channel: platform,
+          deliveryStatus: 'failed',
+          $or: [{ requiresReauthorization: true }, { errorCode: '190' }],
+        }).select('_id');
+        if (authorizationFailure) {
+          await AssistedProposal.updateOne(
+            { _id: proposal._id },
+            { $set: { status: 'failed', deliveryStatus: 'failed', errorMessage: `${platform} requiere reconexión antes de volver a enviar` } }
+          );
+          return res.status(409).json({
+            success: false,
+            code: 'META_REAUTHORIZATION_REQUIRED',
+            message: `Reconecta ${platform} antes de volver a intentar el envío`,
+          });
+        }
         const failedAttempt = await OutboundMessage.findOne({
           userId: req.userId,
           conversationId: proposal.conversationId,

@@ -67,6 +67,13 @@ export class YouTubeIngestionService {
   async pollAll(): Promise<number> {
     const credentials: any[] = await YouTubeCredential.find({});
     for (const credential of credentials) {
+      if (credential.lastPollingFailure?.operation === 'oauth_refresh') {
+        console.warn('YouTube polling skipped until OAuth reconnection', {
+          userId: credential.userId.toString(),
+          operation: 'oauth_refresh',
+        });
+        continue;
+      }
       try {
         await this.pollCredential(credential);
       } catch (error) {
