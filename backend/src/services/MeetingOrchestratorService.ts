@@ -20,6 +20,15 @@ const TIMEZONE_ALIASES: Record<string, string> = {
 export class MeetingOrchestratorService {
   static async process(context: MeetingContext): Promise<MeetingOutcome> {
     const wantsCancellation = /\b(cancelar|cancela|olvida la reuni[oó]n|ya no quiero la (cita|reuni[oó]n))\b/i.test(context.text);
+    const repeatedInfo = /(?:^|\s)info(?:\s|$)/i.test(context.text.trim());
+    if (repeatedInfo && !wantsCancellation) {
+      const activeMeeting: any = await Meeting.findOne({
+        userId: context.userId,
+        conversationId: context.conversationId,
+        status: { $nin: ['cancelled', 'completed'] },
+      }).sort({ createdAt: -1 });
+      if (activeMeeting) return { handled: true, reply: this.repeatedInfoMeetingReply(activeMeeting) };
+    }
     if ((process.env.SCHEDULING_MODE || 'zoom') === 'zoom') {
       const lifecycle = new MeetingLifecycleService();
       const current: any = await Meeting.findOne({ userId: context.userId, conversationId: context.conversationId, status: { $nin: ['cancelled', 'completed'] } }).sort({ createdAt: -1 });
@@ -171,6 +180,19 @@ export class MeetingOrchestratorService {
 
   static getContactIdentifier(platform: 'youtube', leadId: string): string {
     return `${platform}:${leadId}`;
+  }
+
+  static repeatedInfoMeetingReply(meeting: { status?: string; bookingUrl?: string }): string {
+    if (meeting.status === 'pending_booking' && meeting.bookingUrl) {
+      return `Ya tienes una reunión pendiente de reserva. Puedes retomar el horario cuando quieras desde tu enlace: ${meeting.bookingUrl}`;
+    }
+    if (meeting.status === 'confirmed' || meeting.status === 'scheduled') {
+      return 'Ya tienes una reunión confirmada. Los datos están disponibles de forma privada en el CRM; no crearé otra invitación.';
+    }
+    if (meeting.status === 'failed') {
+      return 'Tu solicitud de reunión ya está registrada y requiere revisión. No crearé una solicitud duplicada.';
+    }
+    return 'Ya tienes una solicitud de reunión en curso. Continuaremos desde ese punto sin crear otra invitación.';
   }
 
   static activeScheduledMeetingFilter(conversationId: string, now = new Date()): Record<string, unknown> {

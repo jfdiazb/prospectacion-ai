@@ -1,9 +1,11 @@
 import { MeetingOrchestratorService } from '../src/services/MeetingOrchestratorService';
+import Meeting from '../src/models/Meeting';
 
 describe('MeetingOrchestratorService detail extraction', () => {
   const originalCalendlyUrl = process.env.CALENDLY_BOOKING_URL;
 
   afterEach(() => {
+    jest.restoreAllMocks();
     if (originalCalendlyUrl === undefined) delete process.env.CALENDLY_BOOKING_URL;
     else process.env.CALENDLY_BOOKING_URL = originalCalendlyUrl;
   });
@@ -42,5 +44,30 @@ describe('MeetingOrchestratorService detail extraction', () => {
     expect(url.searchParams.get('utm_source')).toBe('whatsapp');
     expect(url.searchParams.get('utm_medium')).toBe('alma');
     expect(booking.token).toMatch(/^[a-f0-9]{48}$/);
+  });
+
+  test('continues an existing meeting naturally when the contact repeats INFO', () => {
+    expect(MeetingOrchestratorService.repeatedInfoMeetingReply({
+      status: 'pending_booking',
+      bookingUrl: 'https://calendly.com/example/existing',
+    })).toBe('Ya tienes una reunión pendiente de reserva. Puedes retomar el horario cuando quieras desde tu enlace: https://calendly.com/example/existing');
+    expect(MeetingOrchestratorService.repeatedInfoMeetingReply({ status: 'confirmed' }))
+      .toMatch(/ya tienes una reunión confirmada.+no crearé otra invitación/i);
+    expect(MeetingOrchestratorService.repeatedInfoMeetingReply({ status: 'pending_details' }))
+      .toMatch(/solicitud de reunión en curso.+sin crear otra invitación/i);
+  });
+
+  test('handles repeated INFO from the persisted meeting before offering or creating another one', async () => {
+    const sort = jest.fn().mockResolvedValue({ status: 'confirmed' });
+    const findOne = jest.spyOn(Meeting, 'findOne').mockReturnValue({ sort } as any);
+
+    const result = await MeetingOrchestratorService.process({
+      userId: 'owner-1', leadId: 'lead-1', conversationId: 'conversation-1',
+      sourceEventId: 'wamid.repeat-info', text: 'INFO', wantsMeeting: false, platform: 'whatsapp',
+    });
+
+    expect(result).toMatchObject({ handled: true });
+    expect(result.reply).toMatch(/ya tienes una reunión confirmada.+no crearé otra invitación/i);
+    expect(findOne).toHaveBeenCalledTimes(1);
   });
 });
