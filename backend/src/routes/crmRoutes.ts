@@ -306,16 +306,20 @@ router.post(
       const baseSourceEventId = `proposal:${proposal._id}`;
       let messagingSourceEventId = baseSourceEventId;
       if (['instagram', 'facebook'].includes(platform) && proposal.deliveryStatus === 'duplicate') {
-        const failedAttempt = await OutboundMessage.findOne({
+        const previousAttempts = await OutboundMessage.find({
           userId: req.userId,
           conversationId: proposal.conversationId,
-          sourceEventId: baseSourceEventId,
+          sourceEventId: { $regex: `^${baseSourceEventId}(?::controlled-retry:\\d+)?$` },
           channel: platform,
-          deliveryStatus: 'failed',
           recipientId: proposal.recipient.externalId,
-          errorCode: { $nin: ['META_TIMEOUT', 'MESSAGING_UNKNOWN_ERROR', 'META_UNKNOWN_ERROR'] },
-        }).select('_id');
-        if (failedAttempt) messagingSourceEventId = `${baseSourceEventId}:controlled-retry:1`;
+        }).sort({ createdAt: 1 }).select('sourceEventId deliveryStatus errorCode');
+        const retryAttempts = previousAttempts.filter((attempt: any) => attempt.sourceEventId !== baseSourceEventId);
+        const latestAttempt: any = previousAttempts.at(-1);
+        const deterministicFailure = latestAttempt?.deliveryStatus === 'failed'
+          && !['META_TIMEOUT', 'MESSAGING_UNKNOWN_ERROR', 'META_UNKNOWN_ERROR'].includes(latestAttempt.errorCode || '');
+        if (deterministicFailure && retryAttempts.length < 3) {
+          messagingSourceEventId = `${baseSourceEventId}:controlled-retry:${retryAttempts.length + 1}`;
+        }
       }
       const deliveryStatus = await MessagingService.send({
         userId: req.userId as string,
