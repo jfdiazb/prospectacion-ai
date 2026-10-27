@@ -32,7 +32,7 @@ export class YouTubeController {
   static async status(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const credential: any = await YouTubeCredential.findOne({ userId: req.userId })
-        .select('channelId channelTitle channelHandle authorizedChannelId authorizedChannelTitle authorizedChannelHandle connectedAt lastPolledAt lastPollingFailure')
+        .select('channelId channelTitle channelHandle authorizedChannelId authorizedChannelTitle authorizedChannelHandle connectedAt lastAuthorizedAt lastPolledAt lastTokenRefreshAt lastTokenRefreshSuccessAt lastTokenRefreshFailure lastPollingFailure')
         .lean();
       const reconnectRequired = credential?.lastPollingFailure?.operation === 'oauth_refresh';
       res.json({
@@ -55,7 +55,13 @@ export class YouTubeController {
                 authorizedChannelTitle: credential.authorizedChannelTitle || credential.channelTitle,
                 authorizedChannelHandle: credential.authorizedChannelHandle || credential.channelHandle,
                 connectedAt: credential.connectedAt,
+                lastAuthorizedAt: credential.lastAuthorizedAt,
                 lastPolledAt: credential.lastPolledAt,
+                lastTokenRefreshAt: credential.lastTokenRefreshAt,
+                lastTokenRefreshSuccessAt: credential.lastTokenRefreshSuccessAt,
+                tokenRefreshStatus: credential.lastTokenRefreshFailure
+                  ? { healthy: false, reason: credential.lastTokenRefreshFailure.reason, transient: Boolean(credential.lastTokenRefreshFailure.transient) }
+                  : { healthy: true },
               }
             : null,
         },

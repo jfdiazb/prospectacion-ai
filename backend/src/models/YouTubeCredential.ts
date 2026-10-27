@@ -23,6 +23,11 @@ const youtubeCredentialSchema = new Schema({
   lastPollingSummary: { type: Schema.Types.Mixed },
   lastPollingFailure: { type: Schema.Types.Mixed },
   lastReplyPollingSummary: { type: Schema.Types.Mixed },
+  lastAuthorizedAt: Date,
+  lastTokenRefreshAt: Date,
+  lastTokenRefreshSuccessAt: Date,
+  lastTokenRefreshFailure: { type: Schema.Types.Mixed },
+  tokenRefreshAttempts: { type: Number, default: 0 },
   connectedAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 

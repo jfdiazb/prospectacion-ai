@@ -11,7 +11,7 @@ export class OperationalDiagnosticsService {
   static async getForUser(userId: string) {
     const now = new Date();
     const credential: any = await YouTubeCredential.findOne({ userId }).select(
-      'channelId channelTitle channelHandle authorizedChannelId authorizedChannelTitle authorizedChannelHandle connectedAt lastPolledAt lastRepliesPolledAt lastPollingSummary lastPollingFailure lastReplyPollingSummary',
+      'channelId channelTitle channelHandle authorizedChannelId authorizedChannelTitle authorizedChannelHandle connectedAt lastAuthorizedAt lastPolledAt lastRepliesPolledAt lastPollingSummary lastPollingFailure lastReplyPollingSummary lastTokenRefreshAt lastTokenRefreshSuccessAt lastTokenRefreshFailure tokenRefreshAttempts',
     ).lean();
     const [pendingBooking, futureScheduled, expiredScheduled, failedMeetings, latestCalendly, readiness, latestInbound] = await Promise.all([
       Meeting.countDocuments({ userId, status: 'pending_booking' }),
@@ -35,6 +35,15 @@ export class OperationalDiagnosticsService {
       authorizedChannelTitle: credential?.authorizedChannelTitle || credential?.channelTitle,
       lastPolledAt: credential?.lastPolledAt,
       lastRepliesPolledAt: credential?.lastRepliesPolledAt,
+      lastAuthorizedAt: credential?.lastAuthorizedAt,
+      lastTokenRefreshAt: credential?.lastTokenRefreshAt,
+      lastTokenRefreshSuccessAt: credential?.lastTokenRefreshSuccessAt,
+      tokenRefreshFailure: credential?.lastTokenRefreshFailure ? {
+        reason: credential.lastTokenRefreshFailure.reason,
+        transient: Boolean(credential.lastTokenRefreshFailure.transient),
+        failedAt: credential.lastTokenRefreshFailure.failedAt,
+        attempts: credential.lastTokenRefreshFailure.attempts,
+      } : undefined,
       polling: credential?.lastPollingSummary,
       pollingFailure: credential?.lastPollingFailure,
       replies: credential?.lastReplyPollingSummary,

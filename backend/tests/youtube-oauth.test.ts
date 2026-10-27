@@ -127,4 +127,91 @@ describe('YouTube OAuth security', () => {
     find.mockRestore();
     update.mockRestore();
   });
+
+  test('reconnecting without a new refresh token preserves the durable token already stored', async () => {
+    const http = { get: jest.fn().mockResolvedValue({ data: { items: [{
+      id: 'UCauthorized000000000001', snippet: { title: 'Authorized' },
+    }] } }) } as any;
+    const service = new YouTubeTokenService(http);
+    const find = jest.spyOn(YouTubeCredential, 'findOne').mockReturnValue({
+      select: () => ({ lean: async () => ({
+        channelId: 'UCauthorized000000000001', authorizedChannelId: 'UCauthorized000000000001',
+        refreshToken: service.encrypt('durable-refresh-token'),
+      }) }),
+    } as any);
+    const update = jest.spyOn(YouTubeCredential, 'findOneAndUpdate').mockResolvedValue({} as any);
+
+    await service.saveAuthorization('owner-1', { access_token: 'new-access-token', expires_in: 3600 });
+
+    const mutation = update.mock.calls[0][1] as any;
+    expect(mutation.$set.refreshToken).toBeUndefined();
+    expect(mutation.$set.lastAuthorizedAt).toBeInstanceOf(Date);
+    expect(mutation.$unset).toHaveProperty('lastTokenRefreshFailure');
+    find.mockRestore();
+    update.mockRestore();
+  });
+
+  test('coalesces concurrent refresh requests and persists one successful refresh', async () => {
+    const http = { post: jest.fn().mockResolvedValue({ data: { access_token: 'refreshed-access', expires_in: 3600 } }) } as any;
+    const service = new YouTubeTokenService(http);
+    const refreshToken = service.encrypt('refresh-token');
+    const expiredCredential = {
+      _id: 'credential-1', accessTokenExpiresAt: new Date(0),
+      accessToken: { toObject: () => service.encrypt('expired-access') },
+      refreshToken: { toObject: () => refreshToken },
+    };
+    const find = jest.spyOn(YouTubeCredential, 'findOne').mockResolvedValue(expiredCredential as any);
+    const update = jest.spyOn(YouTubeCredential, 'findOneAndUpdate').mockResolvedValue({ _id: 'credential-1' } as any);
+
+    await expect(Promise.all([
+      service.getAccessToken('owner-concurrent'), service.getAccessToken('owner-concurrent'), service.getAccessToken('owner-concurrent'),
+    ])).resolves.toEqual(['refreshed-access', 'refreshed-access', 'refreshed-access']);
+
+    expect(http.post).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledTimes(1);
+    expect((update.mock.calls[0][1] as any).$set).toMatchObject({ tokenRefreshAttempts: 1 });
+    find.mockRestore();
+    update.mockRestore();
+  });
+
+  test('retries transient Google failures but does not retry or expose a revoked refresh token', async () => {
+    process.env.YOUTUBE_TOKEN_REFRESH_RETRY_MS = '0';
+    const service = new YouTubeTokenService({ post: jest.fn()
+      .mockRejectedValueOnce({ response: { status: 503, data: { error: 'temporarily_unavailable' } } })
+      .mockResolvedValueOnce({ data: { access_token: 'after-retry', expires_in: 3600 } }) } as any);
+    const refreshToken = service.encrypt('secret-refresh-token');
+    const credential = {
+      _id: 'credential-transient', accessTokenExpiresAt: new Date(0),
+      accessToken: { toObject: () => service.encrypt('expired-access') }, refreshToken: { toObject: () => refreshToken },
+    };
+    const find = jest.spyOn(YouTubeCredential, 'findOne').mockResolvedValue(credential as any);
+    const update = jest.spyOn(YouTubeCredential, 'findOneAndUpdate').mockResolvedValue({ _id: credential._id } as any);
+
+    await expect(service.getAccessToken('owner-transient')).resolves.toBe('after-retry');
+    expect((service as any).http.post).toHaveBeenCalledTimes(2);
+    expect((update.mock.calls[0][1] as any).$set.tokenRefreshAttempts).toBe(2);
+    find.mockRestore();
+    update.mockRestore();
+
+    const revokedHttp = { post: jest.fn().mockRejectedValue({ response: { status: 400, data: { error: 'invalid_grant', error_description: 'sensitive' } } }) } as any;
+    const revokedService = new YouTubeTokenService(revokedHttp);
+    const revokedToken = revokedService.encrypt('revoked-secret-token');
+    const revokedFind = jest.spyOn(YouTubeCredential, 'findOne').mockResolvedValue({
+      _id: 'credential-revoked', accessTokenExpiresAt: new Date(0),
+      accessToken: { toObject: () => revokedService.encrypt('expired-access') }, refreshToken: { toObject: () => revokedToken },
+    } as any);
+    const record = jest.spyOn(YouTubeCredential, 'updateOne').mockResolvedValue({ acknowledged: true } as any);
+
+    await expect(revokedService.getAccessToken('owner-revoked')).rejects.toMatchObject({ response: { data: { error: 'invalid_grant' } } });
+    expect(revokedHttp.post).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(record.mock.calls[0])).not.toContain('revoked-secret-token');
+    expect(record.mock.calls[0][1]).toEqual(expect.objectContaining({ $set: expect.objectContaining({
+      tokenRefreshAttempts: 1,
+      lastTokenRefreshFailure: expect.objectContaining({ reason: 'invalid_grant', transient: false }),
+      lastPollingFailure: expect.objectContaining({ operation: 'oauth_refresh', reason: 'invalid_grant' }),
+    }) }));
+    revokedFind.mockRestore();
+    record.mockRestore();
+    delete process.env.YOUTUBE_TOKEN_REFRESH_RETRY_MS;
+  });
 });
