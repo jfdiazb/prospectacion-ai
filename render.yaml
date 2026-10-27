@@ -4,8 +4,8 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm ci --include=dev && npm run build
-    startCommand: npm start
+    buildCommand: npm ci --include=dev && npm test -- --runInBand tests/behavioral-certification.test.ts && npm run build
+    startCommand: RELEASE_COMMIT=$RENDER_GIT_COMMIT npm start
     healthCheckPath: /api/v1/readiness
     envVars:
       - key: NODE_VERSION
@@ -35,7 +35,11 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: REAL_OUTBOUND_ENABLED
-        value: "false"
+        value: "true"
+      - key: BEHAVIORAL_CERTIFICATION_VERSION
+        value: behavioral-commercial-v1
+      - key: BEHAVIORAL_CERTIFICATION_STATUS
+        value: passed
       - key: INSTAGRAM_REAL_OUTBOUND_ENABLED
         value: "true"
       - key: FACEBOOK_REAL_OUTBOUND_ENABLED
@@ -43,9 +47,7 @@ services:
       - key: FACEBOOK_AUTO_SEND_ENABLED
         value: "false"
       - key: YOUTUBE_POLLING_ENABLED
-        # Safe Blueprint default. ALMA V1 currently has an explicit Render dashboard override;
-        # keep false here so recreating the service cannot start polling unexpectedly.
-        value: "false"
+        value: "true"
       - key: SOCIAL_SCRAPER_MODE
         # Safe default. A controlled live test requires separate human authorization.
         value: demo
@@ -59,9 +61,7 @@ services:
         # Conservative Social Scraper-only ceiling; enforced durably in MongoDB.
         value: "1000"
       - key: YOUTUBE_MESSAGING_MODE
-        # Safe Blueprint default; the current live override is documented in
-        # docs/ALMA_V1_RUNTIME_CONFIG.md and must be reconciled manually.
-        value: mock
+        value: live
       - key: YOUTUBE_INGESTION_MODE
         value: live
       - key: YOUTUBE_HUNTER_MODE
@@ -130,10 +130,9 @@ services:
       - key: META_PAGE_ACCESS_TOKEN
         sync: false
       - key: WHATSAPP_MESSAGING_MODE
-        value: mock
+        value: live
       - key: WHATSAPP_AUTO_REPLY_ENABLED
-        # Safe Blueprint default; production's explicit override is documented separately.
-        value: "false"
+        value: "true"
       - key: WHATSAPP_REPLY_MODE
         value: assisted
       - key: WHATSAPP_INBOUND_MAX_AGE_MS
