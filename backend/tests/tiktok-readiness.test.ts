@@ -70,4 +70,27 @@ describe('release certification readiness', () => {
     expect(readiness.behavioralReady).toBe(true);
     expect(readiness.behavioralCertification.commitMatches).toBe(true);
   });
+
+  test('does not certify external delivery from API acceptance alone', async () => {
+    process.env = {
+      ...originalEnv,
+      NODE_ENV: 'test',
+      WHATSAPP_MESSAGING_MODE: 'mock',
+      INSTAGRAM_MESSAGING_MODE: 'mock',
+      FACEBOOK_MESSAGING_MODE: 'mock',
+      YOUTUBE_MESSAGING_MODE: 'live',
+      YOUTUBE_CLIENT_ID: 'configured',
+      YOUTUBE_CLIENT_SECRET: 'configured',
+      CRM_OWNER_ID: 'configured',
+      BEHAVIORAL_CERTIFICATION_VERSION: 'behavioral-commercial-v1',
+      BEHAVIORAL_CERTIFICATION_STATUS: 'passed',
+      RELEASE_COMMIT: 'same-commit',
+      RENDER_GIT_COMMIT: 'same-commit',
+    };
+    const readiness = await ReadinessService.inspect();
+
+    expect(readiness.externalDeliveryReady).toBe(false);
+    expect(readiness.externalDeliveryCertification).toMatchObject({ status: 'not_verified', enabledChannels: expect.arrayContaining(['youtube']), confirmedChannels: [] });
+    expect(readiness.goLive).toBe(false);
+  });
 });

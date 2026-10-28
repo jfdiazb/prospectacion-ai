@@ -18,7 +18,16 @@ export interface MessagingRequest {
     sourceEventId?: string;
   };
 }
-export interface MessagingResult { externalMessageId: string; simulated: boolean }
+export interface MessagingResult {
+  externalMessageId: string;
+  simulated: boolean;
+  providerEvidence?: {
+    acceptedAt: Date;
+    parentId?: string;
+    authorChannelId?: string;
+    moderationStatus?: string;
+  };
+}
 
 export interface MessagingProvider {
   readonly name: 'meta' | 'youtube' | 'mock';

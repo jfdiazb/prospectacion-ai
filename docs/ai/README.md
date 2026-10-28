@@ -1,5 +1,12 @@
 # Documentación AI - Prospectación AI
 
+## Entrega verificable de respuestas YouTube — 2026-10-28
+- La aceptación de `comments.insert` se registra como `sent`, no como visibilidad confirmada. Se persisten el ID devuelto, comentario padre, identidad del canal autor y estado de moderación disponibles.
+- El poller confirma una respuesta solo cuando vuelve a observar el ID exacto en el hilo padre correcto, publicado por el canal conectado. Respuestas ausentes o retenidas no producen `confirmed`.
+- Los estados operativos son `generated`, `queued`, `sent`, `confirmed`, `failed` y `unknown`; `simulated` permanece explícito y no certifica producción.
+- GO LIVE separa la suite automatizada ligada al commit de la evidencia externa. Un canal live sin salida `confirmed` mantiene `externalDeliveryCertification.status=not_verified` y `goLive=false`.
+- No se efectuaron envíos ni pruebas externas y no se modificaron credenciales durante la corrección.
+
 ## Automatizaciones ejecutables de YouTube — 2026-08-11
 - `YouTubeIngestionService` busca una automatización `keyword` activa antes de descartar un comentario de un canal todavía desconocido. Esto permite palabras de captación distintas de `INFO`.
 - `AutomationService.textMatchesKeyword` normaliza mayúsculas y diacríticos, pero exige límites de palabra para evitar que `INFO` coincida accidentalmente con `información`.

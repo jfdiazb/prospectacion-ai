@@ -2,7 +2,7 @@ import axios, { type AxiosInstance } from 'axios';
 import { MessagingProviderError, type MessagingProvider, type MessagingRequest, type MessagingResult } from './MessagingProvider';
 import { YouTubeTokenService } from '../youtube/YouTubeTokenService';
 
-type YouTubeCommentResponse = { id?: string };
+type YouTubeCommentResponse = { id?: string; snippet?: { parentId?: string; authorChannelId?: { value?: string }; moderationStatus?: string } };
 
 export class YouTubeMessagingProvider implements MessagingProvider {
   readonly name = 'youtube' as const;
@@ -21,7 +21,16 @@ export class YouTubeMessagingProvider implements MessagingProvider {
         { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, timeout: Number(process.env.YOUTUBE_TIMEOUT_MS || 10000) },
       );
       if (!response.data?.id) throw new MessagingProviderError('Respuesta inválida de YouTube: falta comment id', 'YOUTUBE_INVALID_RESPONSE');
-      return { externalMessageId: response.data.id, simulated: false };
+      return {
+        externalMessageId: response.data.id,
+        simulated: false,
+        providerEvidence: {
+          acceptedAt: new Date(),
+          parentId: response.data.snippet?.parentId,
+          authorChannelId: response.data.snippet?.authorChannelId?.value,
+          moderationStatus: response.data.snippet?.moderationStatus,
+        },
+      };
     } catch (error) {
       if (error instanceof MessagingProviderError) throw error;
       if (axios.isAxiosError(error)) {

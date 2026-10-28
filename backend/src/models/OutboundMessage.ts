@@ -8,7 +8,7 @@ const outboundMessageSchema = new Schema({
   channel: { type: String, enum: ['instagram', 'facebook', 'whatsapp', 'youtube'] },
   messageType: { type: String, enum: ['private_reply', 'direct_message', 'whatsapp_message', 'youtube_reply'], required: true },
   text: { type: String, required: true },
-  deliveryStatus: { type: String, enum: ['pending', 'sent', 'delivered', 'failed', 'simulated'], default: 'pending', required: true },
+  deliveryStatus: { type: String, enum: ['generated', 'queued', 'sent', 'confirmed', 'failed', 'unknown', 'simulated', 'pending', 'delivered'], default: 'generated', required: true },
   provider: { type: String, enum: ['meta', 'youtube', 'mock'], required: true },
   externalMessageId: String,
   recipientId: { type: String, required: true },
@@ -23,6 +23,14 @@ const outboundMessageSchema = new Schema({
   retryCount: { type: Number, default: 0 },
   lastRetryAt: Date,
   simulatedDelivery: { type: Boolean, default: false },
+  providerEvidence: {
+    acceptedAt: Date,
+    confirmedAt: Date,
+    parentId: String,
+    authorChannelId: String,
+    moderationStatus: String,
+    confirmationSource: String,
+  },
   authorization: {
     mode: { type: String, enum: ['static_allowlist', 'inbound_conversation'] },
     channel: String,

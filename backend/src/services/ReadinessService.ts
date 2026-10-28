@@ -26,7 +26,7 @@ export class ReadinessService {
       const channels = Object.keys(verified);
       const [inbound, outbound, completedAI] = await Promise.all([
         InboundEvent.distinct('channel', { channel: { $in: channels }, processingState: 'completed' }),
-        OutboundMessage.distinct('channel', { channel: { $in: channels }, deliveryStatus: { $in: ['sent', 'delivered'] }, simulatedDelivery: { $ne: true } }),
+        OutboundMessage.distinct('channel', { channel: { $in: channels }, deliveryStatus: 'confirmed', simulatedDelivery: { $ne: true } }),
         AIInvocation.exists({ provider: 'groq', status: 'completed' }),
       ]);
       for (const channel of inbound) if (verified[channel]) verified[channel].inbound = true;
@@ -66,13 +66,33 @@ export class ReadinessService {
     const commitMatches = Boolean(deployedCommit && certifiedCommit && deployedCommit === certifiedCommit);
     const behavioralReady = process.env.BEHAVIORAL_CERTIFICATION_VERSION === behavioralSuiteVersion &&
       process.env.BEHAVIORAL_CERTIFICATION_STATUS === 'passed' && commitMatches;
+    const effectiveModes = {
+      whatsapp: effectiveOutbound('whatsapp', whatsappMode),
+      instagram: effectiveOutbound('instagram', instagramMode),
+      facebook: effectiveOutbound('facebook', facebookMode),
+      youtube: effectiveOutbound('youtube', youtubeMode),
+    } as const;
+    const externallyEnabledChannels = Object.entries(effectiveModes)
+      .filter(([, configured]) => configured === 'live')
+      .map(([channel]) => channel as keyof typeof verified);
+    const externallyConfirmedChannels = externallyEnabledChannels.filter(channel => verified[channel].outbound);
+    const externalDeliveryReady = externallyEnabledChannels.length > 0 &&
+      externallyConfirmedChannels.length === externallyEnabledChannels.length;
     return {
       // `ready` remains the infrastructure health signal used by orchestrators.
       // Release authorization is deliberately stricter and exposed as `goLive`.
       ready: technicalReady,
       technicalReady,
       behavioralReady,
-      goLive: technicalReady && behavioralReady,
+      externalDeliveryReady,
+      goLive: technicalReady && behavioralReady && externalDeliveryReady,
+      externalDeliveryCertification: {
+        status: externalDeliveryReady ? 'passed' : 'not_verified',
+        evidenceRequired: 'provider-visible-confirmation',
+        enabledChannels: externallyEnabledChannels,
+        confirmedChannels: externallyConfirmedChannels,
+        note: 'Las pruebas automatizadas y la aceptación API (sent) no confirman visibilidad externa.',
+      },
       behavioralCertification: {
         status: behavioralReady ? 'passed' : 'missing_or_stale',
         suiteVersion: behavioralSuiteVersion,
@@ -84,10 +104,10 @@ export class ReadinessService {
       runtime: {
         ai: { ...ai, verified: ai.provider === 'groq' ? aiVerified : ai.provider === 'mock' },
         providers: {
-          whatsapp: { inbound: inboundStatus('whatsapp', has('WHATSAPP_APP_SECRET', 'WHATSAPP_PHONE_NUMBER_ID')), outbound: outboundStatus('whatsapp', effectiveOutbound('whatsapp', whatsappMode)), configured: whatsappMode === 'mock' || has('WHATSAPP_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID'), automatic: process.env.WHATSAPP_AUTO_REPLY_ENABLED === 'true' },
-          instagram: { inbound: inboundStatus('instagram', has('META_APP_SECRET', 'META_VERIFY_TOKEN')), outbound: outboundStatus('instagram', effectiveOutbound('instagram', instagramMode)), configured: instagramMode === 'mock' || has('META_ACCESS_TOKEN', 'META_IG_USER_ID'), automatic: process.env.META_AUTO_SEND_ENABLED === 'true' },
-          facebook: { inbound: inboundStatus('facebook', has('META_APP_SECRET', 'META_VERIFY_TOKEN')), outbound: outboundStatus('facebook', effectiveOutbound('facebook', facebookMode)), configured: facebookMode === 'mock' || has('META_PAGE_ACCESS_TOKEN', 'META_PAGE_ID'), automatic: process.env.FACEBOOK_AUTO_SEND_ENABLED === 'true' },
-          youtube: { inbound: inboundStatus('youtube', isYouTubePollingEnabled()), outbound: outboundStatus('youtube', effectiveOutbound('youtube', youtubeMode)), configured: youtubeMode === 'mock' || has('YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET', 'CRM_OWNER_ID') },
+          whatsapp: { inbound: inboundStatus('whatsapp', has('WHATSAPP_APP_SECRET', 'WHATSAPP_PHONE_NUMBER_ID')), outbound: outboundStatus('whatsapp', effectiveModes.whatsapp), configured: whatsappMode === 'mock' || has('WHATSAPP_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID'), automatic: process.env.WHATSAPP_AUTO_REPLY_ENABLED === 'true' },
+          instagram: { inbound: inboundStatus('instagram', has('META_APP_SECRET', 'META_VERIFY_TOKEN')), outbound: outboundStatus('instagram', effectiveModes.instagram), configured: instagramMode === 'mock' || has('META_ACCESS_TOKEN', 'META_IG_USER_ID'), automatic: process.env.META_AUTO_SEND_ENABLED === 'true' },
+          facebook: { inbound: inboundStatus('facebook', has('META_APP_SECRET', 'META_VERIFY_TOKEN')), outbound: outboundStatus('facebook', effectiveModes.facebook), configured: facebookMode === 'mock' || has('META_PAGE_ACCESS_TOKEN', 'META_PAGE_ID'), automatic: process.env.FACEBOOK_AUTO_SEND_ENABLED === 'true' },
+          youtube: { inbound: inboundStatus('youtube', isYouTubePollingEnabled()), outbound: outboundStatus('youtube', effectiveModes.youtube), configured: youtubeMode === 'mock' || has('YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET', 'CRM_OWNER_ID') },
           // Flags express operator intent; they are not connectivity evidence. There is no
           // authenticated TikTok transport, webhook/poller or outbound provider in ALMA yet.
           tiktok: {

@@ -43,6 +43,7 @@ export class YouTubeMonitorService {
       && conversation.messages?.[0]?.sender === 'lead'
       && Date.now() - new Date(conversation.lastMessage).getTime() > config.responseAlertMinutes * 60000);
     const sentCount = Number(deliveryCounts.sent || 0);
+    const confirmedCount = Number(deliveryCounts.confirmed || 0);
     const estimatedQuotaUnits = sentCount * 50;
     const errorSummary = this.summarizeErrors(failed);
     const coverageCycleCount = Math.max(1, Math.ceil(threads.length / config.maxThreads));
@@ -55,7 +56,7 @@ export class YouTubeMonitorService {
       uncoveredThreadCount: Math.max(0, threads.length - monitored.length),
       coverageCycleCount, maxCoverageDelayMinutes,
       lastProcessedCommentAt: lastInbound?.processedAt,
-      delivery: { sent: sentCount, failed: Number(deliveryCounts.failed || 0), pending: Number(deliveryCounts.pending || 0), simulated: Number(deliveryCounts.simulated || 0) },
+      delivery: { generated: Number(deliveryCounts.generated || 0), queued: Number(deliveryCounts.queued || 0), sent: sentCount, confirmed: confirmedCount, failed: Number(deliveryCounts.failed || 0), unknown: Number(deliveryCounts.unknown || 0), simulated: Number(deliveryCounts.simulated || 0) },
       quota: { estimatedUnitsToday: estimatedQuotaUnits, dailyLimit: config.dailyQuota, estimatedPercent: Math.min(100, Math.round(estimatedQuotaUnits / config.dailyQuota * 100)), note: 'Estimación mínima basada en respuestas publicadas; Google Cloud es la fuente definitiva.' },
       unanswered: { count: unanswered.length, oldestAt: unanswered.length ? unanswered[unanswered.length - 1].lastMessage : undefined },
       errors: errorSummary,

@@ -2,6 +2,7 @@ import { YouTubeIngestionService } from '../src/services/YouTubeIngestionService
 import { AutomationService } from '../src/services/AutomationService';
 import Lead from '../src/models/Lead';
 import { YouTubeLaunchAdapter } from '../src/services/YouTubeLaunchAdapter';
+import OutboundMessage from '../src/models/OutboundMessage';
 import YouTubeCredential from '../src/models/YouTubeCredential';
 
 describe('YouTubeIngestionService polling cursor', () => {
@@ -131,6 +132,49 @@ describe('YouTubeIngestionService polling cursor', () => {
     expect(process).toHaveBeenNthCalledWith(1, 'owner-1', expect.objectContaining({ id: 'reply-2' }), 'root-comment', 'channel-owner');
     expect(process).toHaveBeenNthCalledWith(2, 'owner-1', expect.objectContaining({ id: 'reply-1' }), 'root-comment', 'channel-owner');
     expect(summary).toEqual(expect.objectContaining({ pages: 2, replies: 2, processed: 2 }));
+  });
+
+  test('confirms only the exact provider id observed in the original thread from the connected channel', async () => {
+    const http = { get: jest.fn().mockResolvedValue({ data: { items: [{ id: 'created-reply-1', snippet: { textOriginal: 'Respuesta', parentId: 'root-comment', authorChannelId: { value: 'channel-owner' }, moderationStatus: 'published' } }] } }) } as any;
+    const service = new YouTubeIngestionService(http);
+    jest.spyOn(service, 'processComment').mockResolvedValue('own_channel');
+    const update = jest.spyOn(OutboundMessage, 'updateOne').mockResolvedValue({ matchedCount: 1 } as any);
+    await service.pollThreadReplies({ userId: { toString: () => 'owner-1' }, channelId: 'channel-owner' }, 'token-1', 'root-comment');
+    expect(update).toHaveBeenCalledWith(
+      { userId: 'owner-1', channel: 'youtube', messageType: 'youtube_reply', externalMessageId: 'created-reply-1', recipientId: 'root-comment' },
+      { $set: expect.objectContaining({ deliveryStatus: 'confirmed', providerEvidence: expect.objectContaining({ parentId: 'root-comment', authorChannelId: 'channel-owner', moderationStatus: 'published', confirmationSource: 'youtube_thread_poll', confirmedAt: expect.any(Date) }) }) }
+    );
+    update.mockRestore();
+  });
+
+  test('does not confirm an API-accepted reply when the thread poll cannot observe it', async () => {
+    const service = new YouTubeIngestionService({ get: jest.fn().mockResolvedValue({ data: { items: [] } }) } as any);
+    const update = jest.spyOn(OutboundMessage, 'updateOne').mockResolvedValue({ matchedCount: 0 } as any);
+    await service.pollThreadReplies({ userId: { toString: () => 'owner-1' }, channelId: 'channel-owner' }, 'token-1', 'root-comment');
+    expect(update).not.toHaveBeenCalled();
+    update.mockRestore();
+  });
+
+  test.each([
+    ['missing moderation evidence', { parentId: 'root-comment', authorChannelId: { value: 'channel-owner' } }, 'unknown'],
+    ['held for review', { parentId: 'root-comment', authorChannelId: { value: 'channel-owner' }, moderationStatus: 'heldForReview' }, 'unknown'],
+  ])('records %s without inventing published visibility', async (_label, snippet, expectedStatus) => {
+    const service = new YouTubeIngestionService({ get: jest.fn().mockResolvedValue({ data: { items: [{ id: 'created-reply-1', snippet: { textOriginal: 'Respuesta', ...snippet } }] } }) } as any);
+    jest.spyOn(service, 'processComment').mockResolvedValue('own_channel');
+    const update = jest.spyOn(OutboundMessage, 'updateOne').mockResolvedValue({ matchedCount: 1 } as any);
+    await service.pollThreadReplies({ userId: { toString: () => 'owner-1' }, channelId: 'channel-owner' }, 'token-1', 'root-comment');
+    expect(update).toHaveBeenCalledWith(expect.any(Object), { $set: expect.objectContaining({ deliveryStatus: expectedStatus }) });
+    expect(update.mock.calls[0][1]).not.toEqual(expect.objectContaining({ $set: expect.objectContaining({ providerEvidence: expect.objectContaining({ confirmedAt: expect.any(Date) }) }) }));
+    update.mockRestore();
+  });
+
+  test('does not reconcile an exact id returned under a different parent', async () => {
+    const service = new YouTubeIngestionService({ get: jest.fn().mockResolvedValue({ data: { items: [{ id: 'created-reply-1', snippet: { textOriginal: 'Respuesta', parentId: 'different-root', authorChannelId: { value: 'channel-owner' }, moderationStatus: 'published' } }] } }) } as any);
+    jest.spyOn(service, 'processComment').mockResolvedValue('own_channel');
+    const update = jest.spyOn(OutboundMessage, 'updateOne').mockResolvedValue({ matchedCount: 0 } as any);
+    await service.pollThreadReplies({ userId: { toString: () => 'owner-1' }, channelId: 'channel-owner' }, 'token-1', 'root-comment');
+    expect(update).not.toHaveBeenCalled();
+    update.mockRestore();
   });
 
   test('logs privacy-safe counters for every credential poll', async () => {

@@ -21,7 +21,9 @@ type TopComment = {
     authorDisplayName?: string;
     authorChannelId?: { value?: string };
     videoId?: string;
+    parentId?: string;
     publishedAt?: string;
+    moderationStatus?: string;
   };
 };
 type ThreadResponse = { items?: Array<{ snippet?: { topLevelComment?: TopComment } }> };
@@ -373,6 +375,7 @@ export class YouTubeIngestionService {
           new Date(b.snippet?.publishedAt ?? 0).getTime()
       );
       for (const reply of replies) {
+        await this.recordOutboundVisibility(credential.userId.toString(), threadId, credential.channelId, reply);
         const result = await this.processComment(
           credential.userId.toString(),
           reply,
@@ -384,6 +387,26 @@ export class YouTubeIngestionService {
       pageToken = response.data.nextPageToken;
     } while (pageToken);
     return summary;
+  }
+
+  private async recordOutboundVisibility(userId: string, parentId: string, ownChannelId: string | undefined, reply: TopComment): Promise<void> {
+    const externalMessageId = reply.id?.trim();
+    const authorChannelId = reply.snippet?.authorChannelId?.value?.trim();
+    const observedParentId = reply.snippet?.parentId?.trim();
+    if (!externalMessageId || !ownChannelId || authorChannelId !== ownChannelId || observedParentId !== parentId) return;
+    const moderationStatus = reply.snippet?.moderationStatus?.trim();
+    const confirmed = moderationStatus === 'published';
+    const evidence: Record<string, unknown> = {
+      parentId,
+      authorChannelId,
+      moderationStatus: moderationStatus || 'unknown',
+      confirmationSource: 'youtube_thread_poll',
+    };
+    if (confirmed) evidence.confirmedAt = new Date();
+    await OutboundMessage.updateOne(
+      { userId, channel: 'youtube', messageType: 'youtube_reply', externalMessageId, recipientId: parentId },
+      { $set: { deliveryStatus: confirmed ? 'confirmed' : 'unknown', providerEvidence: evidence } }
+    );
   }
 
   static getPollingCutoff(credential: { connectedAt?: Date; lastPolledAt?: Date }): number {

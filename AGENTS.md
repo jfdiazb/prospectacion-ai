@@ -1,5 +1,13 @@
 # AGENTS.md
 
+## Certificación de entrega externa YouTube — 2026-10-28
+- `comments.insert` confirma únicamente aceptación de la API. El mensaje queda `sent`, conserva el ID creado y la evidencia devuelta (`parentId`, canal autor y moderación), pero no se considera visible.
+- El lifecycle saliente distingue `generated`, `queued`, `sent`, `confirmed`, `failed` y `unknown` (además de `simulated`; estados heredados siguen admitidos para compatibilidad).
+- El poller promueve a `confirmed` solo al observar el `externalMessageId` exacto bajo el mismo comentario padre, emitido por el canal conectado y con moderación `published`. Una moderación no publicada queda `unknown`.
+- `ReadinessService` ya no usa `sent` como prueba externa. `goLive` exige certificado automatizado ligado al commit y evidencia `confirmed` para cada canal outbound realmente habilitado; expone ambas certificaciones por separado.
+- La incidencia del 27/10/2026 permanece externamente `NO VERIFICADA`: no hubo acceso autenticado a Render, Atlas o YouTube para recuperar el ID real y su estado. No se reenvió ni publicó ningún mensaje y no se modificaron credenciales.
+- Regresión completa: 60 suites / 859 pruebas aprobadas y build TypeScript correcto.
+
 ## Lanzamientos L6F consolidado: TikTok mock/inbound — 2026-08-22
 - El soporte TikTok real continúa limitado a un boundary normalizador y una ingesta inyectable, desactivada por defecto; no existe transporte oficial configurado, provider outbound ni capacidad DM verificable. L6F implementa únicamente comentarios fixture sobre contenido propio.
 - `LaunchTikTokContent` relaciona owner, lanzamiento, cuenta y contentId de forma explícita e inactivable. El adaptador no correlaciona por texto, INFO, hashtag, intención o IA; contenido no mapeado, cuenta ausente y lead no participante quedan en `pending_review`.

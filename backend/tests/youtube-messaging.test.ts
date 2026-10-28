@@ -13,10 +13,10 @@ describe('YouTubeMessagingProvider', () => {
   });
 
   test('builds the official comments.insert reply request', async () => {
-    const post = jest.fn().mockResolvedValue({ data: { id: 'youtube-reply-1' } });
+    const post = jest.fn().mockResolvedValue({ data: { id: 'youtube-reply-1', snippet: { parentId: 'parent-comment-1', authorChannelId: { value: 'owner-channel' }, moderationStatus: 'published' } } });
     const provider = new YouTubeMessagingProvider({ post } as unknown as AxiosInstance);
     await expect(provider.sendMessage({ text: 'Gracias por comentar', recipient: { type: 'youtube_comment', parentCommentId: 'parent-comment-1' } }))
-      .resolves.toEqual({ externalMessageId: 'youtube-reply-1', simulated: false });
+      .resolves.toMatchObject({ externalMessageId: 'youtube-reply-1', simulated: false, providerEvidence: { parentId: 'parent-comment-1', authorChannelId: 'owner-channel', moderationStatus: 'published', acceptedAt: expect.any(Date) } });
     expect(post).toHaveBeenCalledWith('https://www.googleapis.com/youtube/v3/comments?part=snippet',
       { snippet: { parentId: 'parent-comment-1', textOriginal: 'Gracias por comentar' } },
       expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer youtube-test-token' }) }));
