@@ -35,13 +35,21 @@ export class ConversationMemoryService {
   static async get(userId: string, conversationId: string) {
     const [conversation, meeting]: any[] = await Promise.all([
       Conversation.findOne({ _id: conversationId, userId }).select('commercialMemory aiAskedTopics').lean(),
-      Meeting.findOne({ conversationId, userId }).sort({ createdAt: -1 }).select('status provider').lean(),
+      Meeting.findOne({ conversationId, userId }).sort({ createdAt: -1 })
+        .select('status provider modality requestedDate requestedTime timezone scheduledAt scheduledFor joinUrl bookingUrl').lean(),
     ]);
     return {
       ...(conversation?.commercialMemory ?? {}),
       askedTopics: conversation?.aiAskedTopics ?? [],
       bookingStatus: meeting?.status,
       bookingProvider: meeting?.provider,
+      meetingModality: meeting?.modality,
+      requestedMeetingDate: meeting?.requestedDate,
+      requestedMeetingTime: meeting?.requestedTime,
+      meetingTimezone: meeting?.timezone,
+      meetingScheduledFor: meeting?.scheduledFor || meeting?.scheduledAt,
+      meetingJoinUrl: meeting?.joinUrl,
+      meetingBookingUrl: meeting?.bookingUrl,
     };
   }
 }

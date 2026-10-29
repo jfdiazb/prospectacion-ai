@@ -8,6 +8,9 @@ type MeetingSnapshot = {
   bookingUrl?: string;
   scheduledAt?: Date;
   scheduledFor?: Date;
+  requestedDate?: string;
+  requestedTime?: string;
+  modality?: 'video' | 'in_person' | 'phone';
 };
 
 export type SafetyResult = {
@@ -74,10 +77,12 @@ export class ConversationalSafetyService {
     if (input.asksCommercialDetails && !input.commercialInformationAuthorized && /\b(ofrecemos|nuestro negocio|nuestro modelo|funciona mediante|incluye|precio|cuesta|ganar|resultado garantizado)\b/.test(normalized)) {
       violations.push('unsupported_commercial_claim');
     }
-    const bookingClaim = /\b(reunion|cita)\b.{0,45}\b(confirmad[ao]|reservad[ao]|agendad[ao]|programad[ao])\b|\b(nos vemos|quedo agendada|agende la reunion|reunion esta confirmada)\b/.test(normalized);
-    if (bookingClaim && !confirmed) violations.push('false_booking_confirmation');
+    const bookingClaim = /\b(reunion|cita)\b.{0,45}\b(confirmad[ao]|reservad[ao]|agendad[ao]|programad[ao])\b|\b(nos vemos|quedo agendada|agende la reunion|reunion esta confirmada|te agendo|te agendare|voy a agendarte|queda agendada)\b/.test(normalized);
+    const explicitlyPending = /\b(?:todavia|aun) no (?:esta|queda)\b.{0,25}\b(confirmad[ao]|reservad[ao]|agendad[ao])\b|\bno (?:esta|ha sido|quedo)\b.{0,25}\b(confirmad[ao]|reservad[ao]|agendad[ao])\b/.test(normalized);
+    if (bookingClaim && !explicitlyPending && !confirmed) violations.push('false_booking_confirmation');
     const joinClaim = /\b(te envio|te comparto|este es|aqui (?:esta|tienes)|puedes unirte|nos vemos por)\b.{0,55}\b(zoom|meet|enlace|link)\b/.test(normalized);
     if (joinClaim && !hasJoinUrl) violations.push('false_join_url_claim');
+    if (/^perfect\b/i.test(text)) violations.push('mixed_language_opening');
     const urls = text.match(/https?:\/\/[^\s)]+/gi) ?? [];
     const authorizedUrls = new Set([meeting?.bookingUrl, meeting?.joinUrl].filter(Boolean));
     if (urls.some(url => !authorizedUrls.has(url))) violations.push('unauthorized_url');
@@ -98,7 +103,7 @@ export class ConversationalSafetyService {
     firstContactDiscovery?: boolean;
   }): Promise<SafetyResult> {
     const meeting: any = await Meeting.findOne({ userId: input.userId, conversationId: input.conversationId })
-      .sort({ createdAt: -1 }).select('status provider joinUrl bookingUrl scheduledAt scheduledFor').lean();
+      .sort({ createdAt: -1 }).select('status provider joinUrl bookingUrl scheduledAt scheduledFor requestedDate requestedTime modality').lean();
     return this.validate({ ...input, meeting });
   }
 
@@ -117,7 +122,11 @@ export class ConversationalSafetyService {
       return '¡Hola! Gracias por escribir. Para orientarte mejor, ¿qué te llamó la atención o qué te gustaría encontrar en este momento?';
     }
     if (meeting?.status === 'pending_booking' && meeting.bookingUrl) {
-      return `Tu preferencia de fecha y hora quedó registrada, pero la reunión aún no está reservada. Confirma un horario disponible aquí: ${meeting.bookingUrl}`;
+      const modality = meeting.modality === 'video' ? ' por videollamada' : meeting.modality === 'in_person' ? ' presencial' : '';
+      const requested = meeting.requestedDate || meeting.requestedTime
+        ? ` La preferencia ${[meeting.requestedDate, meeting.requestedTime].filter(Boolean).join(' a las ')} aún debe verificarse con la agenda.`
+        : '';
+      return `La reunión${modality} todavía no está confirmada.${requested} Elige un horario disponible aquí: ${meeting.bookingUrl}`;
     }
     if (meeting && ['confirmed', 'scheduled'].includes(String(meeting.status))) {
       if (meeting.joinUrl) return `Tu reunión está confirmada. Puedes consultar el enlace de acceso aquí: ${meeting.joinUrl}`;

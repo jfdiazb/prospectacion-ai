@@ -17,6 +17,7 @@ const meetingSchema = new Schema({
   attendeeEmail: String,
   requestedDate: String,
   requestedTime: String,
+  modality: { type: String, enum: ['video', 'in_person', 'phone'] },
   sourceEventId: String,
   externalId: String,
   externalMeetingId: String,

@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { MeetingLifecycleService } from './MeetingLifecycleService';
 import { AutomationEngineService } from './AutomationEngineService';
 import { LaunchAttributionService } from './LaunchAttributionService';
+import Conversation from '../models/Conversation';
 
 type MeetingContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; wantsMeeting: boolean; meetingReadiness?: 'explicit_request' | 'explicit_acceptance' | 'qualified_discovery' | 'meeting_declined' | 'needs_discovery'; launchId?: string; launchParticipantId?: string; platform?: 'instagram' | 'facebook' | 'youtube' | 'whatsapp' };
 type MeetingOutcome = { handled: boolean; reply?: string };
@@ -20,6 +21,9 @@ const TIMEZONE_ALIASES: Record<string, string> = {
 export class MeetingOrchestratorService {
   static async process(context: MeetingContext): Promise<MeetingOutcome> {
     const wantsCancellation = /\b(cancelar|cancela|olvida la reuni[oó]n|ya no quiero la (cita|reuni[oó]n))\b/i.test(context.text);
+    const asksForConfirmation = /\b(confirmas?|confirma|confirmaci[oó]n)\b.{0,45}\b(reuni[oó]n|cita|videollamada|horario|enlace)\b|\b(reuni[oó]n|cita)\b.{0,45}\b(confirmas?|confirmada|confirmaci[oó]n)\b/i.test(context.text);
+    const modality = this.extractModality(context.text);
+    const meetingIntent = context.wantsMeeting || asksForConfirmation;
     const repeatedInfo = /(?:^|\s)info(?:\s|$)/i.test(context.text.trim());
     if (repeatedInfo && !wantsCancellation) {
       const activeMeeting: any = await Meeting.findOne({
@@ -32,6 +36,14 @@ export class MeetingOrchestratorService {
     if ((process.env.SCHEDULING_MODE || 'zoom') === 'zoom') {
       const lifecycle = new MeetingLifecycleService();
       const current: any = await Meeting.findOne({ userId: context.userId, conversationId: context.conversationId, status: { $nin: ['cancelled', 'completed'] } }).sort({ createdAt: -1 });
+      const preferences = await this.resolvePreferences(context.conversationId, context.text);
+      if (current) {
+        if (modality) current.modality = modality;
+        if (!current.requestedDate && preferences.date) current.requestedDate = preferences.date;
+        if (!current.requestedTime && preferences.time) current.requestedTime = preferences.time;
+        if (!current.timezone && preferences.timezone) current.timezone = preferences.timezone;
+        await current.save();
+      }
       if (wantsCancellation && current) { await lifecycle.cancel(context.userId, current._id.toString()); return { handled: true, reply: 'Entendido, cancelé la solicitud o reunión de forma controlada.' }; }
       if (/\b(reprogramar|cambiar (la )?(fecha|hora)|otro horario)\b/i.test(context.text) && current) { const outcome = await lifecycle.requestReschedule(context); return { handled: true, reply: outcome.reply }; }
       if (current?.status === 'pending_confirmation' || current?.status === 'reschedule_requested') {
@@ -40,20 +52,28 @@ export class MeetingOrchestratorService {
         return { handled: false };
       }
       if (current?.status === 'failed' && /\b(reintentar|confirmo|intenta de nuevo)\b/i.test(context.text)) { const outcome = await lifecycle.confirm(context); return { handled: true, reply: outcome.reply }; }
-      if (current?.status === 'pending_configuration') return { handled: context.wantsMeeting, reply: context.wantsMeeting ? 'Tu horario ya está registrado; Zoom permanece en modo de prueba y no crearé un duplicado.' : undefined };
-      if (current && ['confirmed', 'scheduled'].includes(current.status)) return { handled: context.wantsMeeting, reply: context.wantsMeeting ? 'Ya tienes una reunión confirmada. Los datos están disponibles de forma privada en el CRM.' : undefined };
-      if (!context.wantsMeeting) return { handled: false };
+      if (current?.status === 'pending_configuration') return { handled: meetingIntent, reply: meetingIntent ? 'Tu horario ya está registrado; Zoom permanece en modo de prueba y no crearé un duplicado.' : undefined };
+      if (current && ['confirmed', 'scheduled'].includes(current.status)) return { handled: meetingIntent, reply: meetingIntent ? 'Ya tienes una reunión confirmada. Los datos están disponibles de forma privada en el CRM.' : undefined };
+      if (!meetingIntent) return { handled: false };
       await AutomationEngineService.emit({ eventId: `${context.sourceEventId}:meeting-intent`, trigger: 'meeting.intent_detected', userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, platform: context.platform, text: context.text, data: { meetingIntent: 'high', meetingReadiness: context.meetingReadiness } });
       const outcome = await lifecycle.propose(context); await this.attachAttribution(context, outcome.meeting); return { handled: true, reply: outcome.reply };
     }
-    let meeting = await Meeting.findOne({ userId: context.userId, conversationId: context.conversationId, status: { $in: ['pending_details', 'pending_booking', 'pending_configuration', 'failed'] } }).sort({ createdAt: -1 });
+    let meeting: any = await Meeting.findOne({ userId: context.userId, conversationId: context.conversationId, status: { $in: ['pending_details', 'pending_booking', 'pending_configuration', 'failed'] } }).sort({ createdAt: -1 });
+    const preferences = await this.resolvePreferences(context.conversationId, context.text);
+    if (meeting) {
+      if (modality) meeting.modality = modality;
+      if (!meeting.requestedDate && preferences.date) meeting.requestedDate = preferences.date;
+      if (!meeting.requestedTime && preferences.time) meeting.requestedTime = preferences.time;
+      if (!meeting.timezone && preferences.timezone) meeting.timezone = preferences.timezone;
+      await meeting.save();
+    }
     if (meeting?.status === 'pending_booking') {
       if (wantsCancellation) {
         meeting.status = 'cancelled';
         await meeting.save();
         return { handled: true, reply: 'Entendido, cancelé la solicitud. No se reservó ninguna reunión.' };
       }
-      if (context.wantsMeeting) return { handled: true, reply: `Elige el día que mejor te convenga entre los horarios disponibles: ${meeting.bookingUrl}` };
+      if (meetingIntent) return { handled: true, reply: this.pendingBookingReply(meeting) };
       return { handled: false };
     }
     if (meeting?.status === 'pending_configuration') {
@@ -62,16 +82,16 @@ export class MeetingOrchestratorService {
         await meeting.save();
         return { handled: true, reply: 'Entendido, cancelé la solicitud de reunión. Si cambias de opinión, aquí estaré.' };
       }
-      if (!context.wantsMeeting) return { handled: false };
+      if (!meetingIntent) return { handled: false };
       if ((process.env.ZOOM_MODE || 'mock') !== 'live') {
         return { handled: true, reply: 'Ya tengo los datos de tu reunión y está pendiente de confirmación mientras Zoom se encuentra en modo de prueba.' };
       }
     }
-    if (!meeting && context.wantsMeeting) {
+    if (!meeting && meetingIntent) {
       const existing = await Meeting.findOne({ userId: context.userId, ...this.activeScheduledMeetingFilter(context.conversationId) }).sort({ scheduledFor: 1 });
       if (existing) return { handled: true, reply: `Ya tienes una reunión registrada${existing.scheduledFor ? ` para ${existing.scheduledFor.toISOString()}` : ''}. Los datos de acceso están guardados de forma privada.` };
     }
-    if (!meeting && !context.wantsMeeting) return { handled: false };
+    if (!meeting && !meetingIntent) return { handled: false };
     if (!meeting) {
       if ((process.env.SCHEDULING_MODE || 'zoom') === 'calendly') {
         const booking = this.buildCalendlyBookingUrl(context.platform);
@@ -84,13 +104,14 @@ export class MeetingOrchestratorService {
           launchId: context.launchId, launchParticipantId: context.launchParticipantId,
           provider: 'calendly', status: 'pending_booking', topic: 'Reunión de descubrimiento con ALMA',
           sourceEventId: context.sourceEventId, bookingUrl: booking.url, bookingToken: booking.token,
+          modality, requestedDate: preferences.date, requestedTime: preferences.time, timezone: preferences.timezone,
         });
         await this.attachAttribution(context, meeting);
         await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'meeting_requested', description: 'ALMA ofreció horarios disponibles mediante Calendly' });
         await TaskService.createTask(context.userId, { leadId: context.leadId, conversationId: context.conversationId,
           title: 'Esperar reserva del prospecto', description: 'El prospecto recibió la agenda segura de Calendly.', type: 'meeting', status: 'pending', priority: 'high',
           metadata: { meetingId: meeting._id.toString(), autoGenerated: true } });
-        return { handled: true, reply: `Perfecto. Elige el día que mejor te convenga entre los horarios disponibles: ${booking.url}` };
+        return { handled: true, reply: this.pendingBookingReply(meeting) };
       }
       meeting = await Meeting.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, launchId: context.launchId, launchParticipantId: context.launchParticipantId,
         status: 'pending_details', topic: 'Reunión de descubrimiento con ALMA', sourceEventId: context.sourceEventId });
@@ -162,6 +183,7 @@ export class MeetingOrchestratorService {
   }
 
   static extractDetails(text: string): { email?: string; date?: string; time?: string; timezone?: string } {
+    const normalizedTimeText = text.replace(/\ba\.?\s*m\.?\b/gi, 'am').replace(/\bp\.?\s*m\.?\b/gi, 'pm');
     const email = text.match(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i)?.[0]?.toLowerCase();
     const isoDate = text.match(/\b(20\d{2})[-/]([01]?\d)[-/]([0-3]?\d)\b/);
     const latinDate = text.match(/\b([0-3]?\d)[/]([01]?\d)[/](20\d{2})\b/);
@@ -169,13 +191,35 @@ export class MeetingOrchestratorService {
     if (isoDate) date = `${isoDate[1]}-${isoDate[2].padStart(2, '0')}-${isoDate[3].padStart(2, '0')}`;
     else if (latinDate) date = `${latinDate[3]}-${latinDate[2].padStart(2, '0')}-${latinDate[1].padStart(2, '0')}`;
     else if (/\bma[nñ]ana\b/i.test(text)) { const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000); date = tomorrow.toISOString().slice(0, 10); }
-    const timeMatch = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\s*(am|pm)?\b/i) || text.match(/\b(1[0-2]|0?[1-9])\s*(am|pm)\b/i);
+    const timeMatch = normalizedTimeText.match(/\b([01]?\d|2[0-3]):([0-5]\d)\s*(am|pm)?\b/i) || normalizedTimeText.match(/\b(1[0-2]|0?[1-9])\s*(am|pm)\b/i);
     let time: string | undefined;
     if (timeMatch) { let hour = Number(timeMatch[1]); const minute = Number(timeMatch[2] && !/am|pm/i.test(timeMatch[2]) ? timeMatch[2] : 0); const meridiem = (timeMatch[3] || timeMatch[2] || '').toLowerCase(); if (meridiem === 'pm' && hour < 12) hour += 12; if (meridiem === 'am' && hour === 12) hour = 0; time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`; }
     const iana = text.match(/\b(?:America|Europe|Asia|Africa|Australia)\/[A-Za-z_]+(?:\/[A-Za-z_]+)?\b/)?.[0];
     const normalized = text.toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const alias = Object.keys(TIMEZONE_ALIASES).sort((a, b) => b.length - a.length).find(key => normalized.includes(key));
     return { email, date, time, timezone: iana || (alias ? TIMEZONE_ALIASES[alias] : undefined) };
+  }
+
+  static extractModality(text: string): 'video' | 'in_person' | 'phone' | undefined {
+    const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
+    if (/\b(videollamada|video llamada|zoom|meet|virtual|en linea)\b/.test(normalized)) return 'video';
+    if (/\b(presencial|en persona)\b/.test(normalized)) return 'in_person';
+    if (/\b(llamada telefonica|por telefono)\b/.test(normalized)) return 'phone';
+    return undefined;
+  }
+
+  static pendingBookingReply(meeting: { bookingUrl?: string; modality?: string; requestedDate?: string; requestedTime?: string }): string {
+    const modality = meeting.modality === 'video' ? ' por videollamada' : meeting.modality === 'in_person' ? ' presencial' : meeting.modality === 'phone' ? ' por teléfono' : '';
+    const preference = meeting.requestedDate || meeting.requestedTime
+      ? ` La preferencia ${[meeting.requestedDate, meeting.requestedTime].filter(Boolean).join(' a las ')} todavía debe verificarse con la agenda.`
+      : '';
+    return `La reunión${modality} todavía no está confirmada.${preference} Elige un horario disponible aquí: ${meeting.bookingUrl}`;
+  }
+
+  private static async resolvePreferences(conversationId: string, currentText: string) {
+    const conversation: any = await Conversation.findById(conversationId).select('messages').lean();
+    const recent = (conversation?.messages ?? []).slice(-6).map((message: any) => message.text).filter(Boolean);
+    return this.extractDetails([...recent, currentText].join(' '));
   }
 
   static getContactIdentifier(platform: 'youtube', leadId: string): string {

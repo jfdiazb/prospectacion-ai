@@ -24,6 +24,7 @@ describe('Behavioral/commercial production certification', () => {
   const falseBookingClaims = [
     'Tu reunión está confirmada', 'La reunión quedó agendada', 'Nos vemos el lunes a las 8',
     'Agendé la reunión para mañana', 'La cita está reservada', 'La reunión está programada',
+    'Perfect, te agendo para mañana a las 7 p.m. ¿Prefieres que sea presencial o por videollamada?',
   ];
   test.each(falseBookingClaims)('blocks booking language without persisted booking: %s', text => {
     const result = ConversationalSafetyService.validate({ text, readiness: qualified, meeting: { status: 'pending_booking', provider: 'calendly' } });
