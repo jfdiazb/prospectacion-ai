@@ -79,6 +79,7 @@ describe('ALMA qualification to meeting readiness', () => {
     'Agendemos',
     'Me interesa',
     'Quiero la reunión',
+    'Sí, me interesa. Envíame el enlace para agendar la llamada.',
   ])('an affirmative response to an explicit meeting offer is recognized: %s', acceptance => {
     const texts = ['Quiero conocer cómo funciona el negocio', acceptance];
     const conversation = [

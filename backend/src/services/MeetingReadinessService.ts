@@ -32,7 +32,9 @@ export class MeetingReadinessService {
     const affirmative = normalize(current).replace(/[^a-z0-9]+/g, ' ').trim();
     const shortAcceptance = /^(?:si(?: por favor| claro| me gustaria)?|claro(?: que si| agendemos)?|de acuerdo|ok|vale|por supuesto|me gustaria|hagamoslo|agendemos|me interesa|quiero (?:la )?(?:reunion|llamada|cita|asesoria))$/.test(affirmative);
     const explicitAcceptance = /^(si|claro|de acuerdo|ok|vale|por supuesto)\b.{0,40}\b(me gustaria|quiero|podemos|hagamos)\b.{0,40}\b(agendar|programar|reservar|coordinar)\b.{0,30}\b(reunion|llamada|cita|asesoria)\b/.test(affirmative);
-    if (!shortAcceptance && !explicitAcceptance) {
+    const affirmativeOpening = /^(?:si\b|claro\b|de acuerdo\b|ok\b|vale\b|por supuesto\b|me interesa\b|quiero\b|hagamoslo\b|agendemos\b)/.test(affirmative);
+    const requestsSchedulingAction = /\b(?:enviame|mandame|comparteme|pasame)\b.{0,45}\b(?:enlace|link|agenda)\b|\b(?:agendar|programar|reservar|coordinar)\b.{0,35}\b(?:reunion|llamada|cita|asesoria)\b/.test(affirmative);
+    if (!shortAcceptance && !explicitAcceptance && !(affirmativeOpening && requestsSchedulingAction)) {
       return false;
     }
     const currentIndex = [...conversation].map(turn => turn.text).lastIndexOf(current);

@@ -83,6 +83,15 @@ export class MeetingOrchestratorService {
         return { handled: true, reply: 'Entendido, cancelé la solicitud de reunión. Si cambias de opinión, aquí estaré.' };
       }
       if (!meetingIntent) return { handled: false };
+      if (meeting.provider === 'calendly') {
+        const booking = this.buildCalendlyBookingUrl(context.platform);
+        if (!booking) return { handled: true, reply: this.calendlyUnavailableReply() };
+        meeting.bookingUrl = booking.url;
+        meeting.bookingToken = booking.token;
+        meeting.status = 'pending_booking';
+        await meeting.save();
+        return { handled: true, reply: this.pendingBookingReply(meeting) };
+      }
       if ((process.env.ZOOM_MODE || 'mock') !== 'live') {
         return { handled: true, reply: 'Ya tengo los datos de tu reunión y está pendiente de confirmación mientras Zoom se encuentra en modo de prueba.' };
       }
@@ -96,8 +105,16 @@ export class MeetingOrchestratorService {
       if ((process.env.SCHEDULING_MODE || 'zoom') === 'calendly') {
         const booking = this.buildCalendlyBookingUrl(context.platform);
         if (!booking) {
+          meeting = await Meeting.create({
+            userId: context.userId, leadId: context.leadId, conversationId: context.conversationId,
+            launchId: context.launchId, launchParticipantId: context.launchParticipantId,
+            provider: 'calendly', status: 'pending_configuration', topic: 'Reunión de descubrimiento con ALMA',
+            sourceEventId: context.sourceEventId, modality,
+            requestedDate: preferences.date, requestedTime: preferences.time, timezone: preferences.timezone,
+          });
+          await this.attachAttribution(context, meeting);
           await Activity.create({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, type: 'meeting_requested', description: 'El prospecto solicitó una reunión; Calendly aún no está configurado' });
-          return { handled: true, reply: '¡Gracias! La agenda está siendo configurada. Dejé tu solicitud registrada para ofrecerte un horario disponible.' };
+          return { handled: true, reply: this.calendlyUnavailableReply() };
         }
         meeting = await Meeting.create({
           userId: context.userId, leadId: context.leadId, conversationId: context.conversationId,
@@ -216,6 +233,10 @@ export class MeetingOrchestratorService {
     return `La reunión${modality} todavía no está confirmada.${preference} Elige un horario disponible aquí: ${meeting.bookingUrl}`;
   }
 
+  static calendlyUnavailableReply(): string {
+    return 'Acepté tu solicitud de reunión, pero la agenda no está disponible en este momento. La solicitud quedó registrada y no necesitas repetir la información anterior.';
+  }
+
   private static async resolvePreferences(conversationId: string, currentText: string) {
     const conversation: any = await Conversation.findById(conversationId).select('messages').lean();
     const recent = (conversation?.messages ?? []).slice(-6).map((message: any) => message.text).filter(Boolean);
@@ -226,7 +247,7 @@ export class MeetingOrchestratorService {
     return `${platform}:${leadId}`;
   }
 
-  static repeatedInfoMeetingReply(meeting: { status?: string; bookingUrl?: string }): string {
+  static repeatedInfoMeetingReply(meeting: { status?: string; provider?: string; bookingUrl?: string }): string {
     if (meeting.status === 'pending_booking' && meeting.bookingUrl) {
       return `Ya tienes una reunión pendiente de reserva. Puedes retomar el horario cuando quieras desde tu enlace: ${meeting.bookingUrl}`;
     }
@@ -235,6 +256,9 @@ export class MeetingOrchestratorService {
     }
     if (meeting.status === 'failed') {
       return 'Tu solicitud de reunión ya está registrada y requiere revisión. No crearé una solicitud duplicada.';
+    }
+    if (meeting.status === 'pending_configuration' && meeting.provider === 'calendly') {
+      return this.calendlyUnavailableReply();
     }
     return 'Ya tienes una solicitud de reunión en curso. Continuaremos desde ese punto sin crear otra invitación.';
   }
