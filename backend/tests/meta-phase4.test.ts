@@ -13,6 +13,7 @@ import { MetaIngestionService } from '../src/services/MetaIngestionService';
 import { MetaController } from '../src/controllers/MetaController';
 import { MessagingService } from '../src/services/MessagingService';
 import * as aiIntegrations from '../src/integrations/ai';
+import { AlmaService } from '../src/services/AlmaService';
 
 const instagramComment = (id: string, text = 'Quiero más información', sender = 'ig-user') => ({
   object: 'instagram',
@@ -293,6 +294,24 @@ describe('Phase 4 Meta consolidation', () => {
       recipient: { type: 'instagram_comment', externalId: 'ig-1' },
     });
     expect(await OutboundMessage.countDocuments({})).toBe(0);
+  });
+
+  test('routes a new Facebook event directly through ALMA when automatic mode is enabled', async () => {
+    process.env.FACEBOOK_AUTO_SEND_ENABLED = 'true';
+    const processMessage = jest.spyOn(AlmaService, 'processMessage').mockResolvedValue('Respuesta');
+    const accepted = await MetaIngestionService.acceptPayload(
+      ownerA.toString(),
+      facebookComment('fb-automatic', 'INFO')
+    );
+
+    await MetaIngestionService.processAccepted(ownerA.toString(), accepted[0]);
+
+    expect(processMessage).toHaveBeenCalledWith(expect.objectContaining({
+      platform: 'facebook',
+      sourceEventId: 'meta:facebook:fb-automatic',
+      recipient: expect.objectContaining({ type: 'facebook_comment' }),
+    }));
+    expect(await AssistedProposal.countDocuments({ sourceEventId: 'meta:facebook:fb-automatic' })).toBe(0);
   });
 
   test('is idempotent, reuses an existing lead and isolates owners/channels', async () => {

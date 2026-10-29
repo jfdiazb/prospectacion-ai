@@ -117,8 +117,11 @@ export const validateServerEnvironment = (): void => {
   const messagingMode =
     process.env.INSTAGRAM_MESSAGING_MODE || process.env.META_MESSAGING_MODE || 'mock';
   const instagramRealOutboundEnabled = process.env.INSTAGRAM_REAL_OUTBOUND_ENABLED;
+  const metaAutoSendEnabled = process.env.META_AUTO_SEND_ENABLED;
   if (instagramRealOutboundEnabled && !['true', 'false'].includes(instagramRealOutboundEnabled))
     throw new Error('INSTAGRAM_REAL_OUTBOUND_ENABLED debe ser true o false');
+  if (metaAutoSendEnabled && !['true', 'false'].includes(metaAutoSendEnabled))
+    throw new Error('META_AUTO_SEND_ENABLED debe ser true o false');
   for (const key of ['META_INBOUND_MAX_AGE_MS', 'META_LAUNCH_EVENT_TOLERANCE_MS']) {
     const value = Number(process.env[key] || 600000);
     if (!Number.isFinite(value) || value < 60000 || value > 3600000)
@@ -137,6 +140,8 @@ export const validateServerEnvironment = (): void => {
     throw new Error(
       'INSTAGRAM_MESSAGING_MODE debe ser live cuando INSTAGRAM_REAL_OUTBOUND_ENABLED=true'
     );
+  if (metaAutoSendEnabled === 'true' && messagingMode !== 'live')
+    throw new Error('INSTAGRAM_MESSAGING_MODE debe ser live cuando META_AUTO_SEND_ENABLED=true');
   const facebookMessagingMode =
     process.env.FACEBOOK_MESSAGING_MODE || process.env.META_MESSAGING_MODE || 'mock';
   const facebookRealOutboundEnabled = process.env.FACEBOOK_REAL_OUTBOUND_ENABLED;
@@ -158,12 +163,20 @@ export const validateServerEnvironment = (): void => {
     throw new Error(
       'FACEBOOK_MESSAGING_MODE debe ser live cuando FACEBOOK_REAL_OUTBOUND_ENABLED=true'
     );
+  if (facebookAutoSendEnabled === 'true' && facebookMessagingMode !== 'live')
+    throw new Error(
+      'FACEBOOK_MESSAGING_MODE debe ser live cuando FACEBOOK_AUTO_SEND_ENABLED=true'
+    );
   const whatsappMessagingMode = process.env.WHATSAPP_MESSAGING_MODE || 'mock';
   if (!['mock', 'live'].includes(whatsappMessagingMode))
     throw new Error('WHATSAPP_MESSAGING_MODE debe ser mock o live');
   const whatsappReplyMode = process.env.WHATSAPP_REPLY_MODE || 'assisted';
   if (!['assisted', 'automatic'].includes(whatsappReplyMode))
     throw new Error('WHATSAPP_REPLY_MODE debe ser assisted o automatic');
+  if (process.env.WHATSAPP_AUTO_REPLY_ENABLED === 'true' && whatsappReplyMode !== 'automatic')
+    throw new Error(
+      'WHATSAPP_REPLY_MODE debe ser automatic cuando WHATSAPP_AUTO_REPLY_ENABLED=true'
+    );
   const whatsappInboundMaxAgeMs = Number(process.env.WHATSAPP_INBOUND_MAX_AGE_MS || 600000);
   if (!Number.isFinite(whatsappInboundMaxAgeMs) || whatsappInboundMaxAgeMs < 60000)
     throw new Error('WHATSAPP_INBOUND_MAX_AGE_MS debe ser un número de al menos 60000');

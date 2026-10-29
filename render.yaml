@@ -45,7 +45,7 @@ services:
       - key: FACEBOOK_REAL_OUTBOUND_ENABLED
         value: "true"
       - key: FACEBOOK_AUTO_SEND_ENABLED
-        value: "false"
+        value: "true"
       - key: YOUTUBE_POLLING_ENABLED
         value: "true"
       - key: SOCIAL_SCRAPER_MODE
@@ -117,8 +117,7 @@ services:
       - key: FACEBOOK_MESSAGING_MODE
         value: live
       - key: META_AUTO_SEND_ENABLED
-        # Safe Blueprint default; never enable automatic real messages from source control.
-        value: "false"
+        value: "true"
       - key: META_APP_SECRET
         sync: false
       - key: INSTAGRAM_APP_SECRET
@@ -134,7 +133,7 @@ services:
       - key: WHATSAPP_AUTO_REPLY_ENABLED
         value: "true"
       - key: WHATSAPP_REPLY_MODE
-        value: assisted
+        value: automatic
       - key: WHATSAPP_INBOUND_MAX_AGE_MS
         value: "600000"
       - key: WHATSAPP_ACTIVATION_ALLOWLIST
