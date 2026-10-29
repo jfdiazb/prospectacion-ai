@@ -39,7 +39,26 @@ export const validateServerEnvironment = (): void => {
     'TIKTOK_OAUTH_STATE_SECRET',
     'TIKTOK_TOKEN_ENCRYPTION_KEY',
   ];
-  if (tikTokOAuthKeys.some(key => Boolean(process.env[key]?.trim()))) {
+  const tikTokFlags = [
+    'TIKTOK_API_APPROVED',
+    'TIKTOK_INGESTION_ENABLED',
+    'TIKTOK_MESSAGING_ENABLED',
+  ] as const;
+  for (const key of tikTokFlags) {
+    const value = process.env[key]?.trim().toLowerCase();
+    if (value && !['true', 'false'].includes(value))
+      throw new Error(`${key} debe ser true o false`);
+  }
+  const tikTokApproved = process.env.TIKTOK_API_APPROVED === 'true';
+  const tikTokIngestionEnabled = process.env.TIKTOK_INGESTION_ENABLED === 'true';
+  const tikTokMessagingEnabled = process.env.TIKTOK_MESSAGING_ENABLED === 'true';
+  if ((tikTokIngestionEnabled || tikTokMessagingEnabled) && !tikTokApproved)
+    throw new Error(
+      'TIKTOK_API_APPROVED debe ser true antes de habilitar ingesta o mensajería TikTok'
+    );
+  const tikTokOperationallyEnabled =
+    tikTokApproved || tikTokIngestionEnabled || tikTokMessagingEnabled;
+  if (tikTokOperationallyEnabled) {
     const tikTokMissing = tikTokOAuthKeys.filter(key => !process.env[key]?.trim());
     if (tikTokMissing.length)
       throw new Error(`Faltan variables para OAuth TikTok: ${tikTokMissing.join(', ')}`);
