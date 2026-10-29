@@ -32,6 +32,29 @@ export const validateServerEnvironment = (): void => {
     throw new Error(
       'CRM_OWNER_ID debe contener exactamente 24 caracteres hexadecimales, sin < > ni comillas'
     );
+  const tikTokOAuthKeys = [
+    'TIKTOK_CLIENT_KEY',
+    'TIKTOK_CLIENT_SECRET',
+    'TIKTOK_OAUTH_REDIRECT_URI',
+    'TIKTOK_OAUTH_STATE_SECRET',
+    'TIKTOK_TOKEN_ENCRYPTION_KEY',
+  ];
+  if (tikTokOAuthKeys.some(key => Boolean(process.env[key]?.trim()))) {
+    const tikTokMissing = tikTokOAuthKeys.filter(key => !process.env[key]?.trim());
+    if (tikTokMissing.length)
+      throw new Error(`Faltan variables para OAuth TikTok: ${tikTokMissing.join(', ')}`);
+    if ((process.env.TIKTOK_OAUTH_STATE_SECRET?.length ?? 0) < 32)
+      throw new Error('TIKTOK_OAUTH_STATE_SECRET debe tener al menos 32 caracteres');
+    const redirect = new URL(process.env.TIKTOK_OAUTH_REDIRECT_URI!);
+    if (redirect.protocol !== 'https:' || redirect.search || redirect.hash)
+      throw new Error('TIKTOK_OAUTH_REDIRECT_URI debe ser HTTPS, estática y sin query o fragmento');
+    const encryptionKey = process.env.TIKTOK_TOKEN_ENCRYPTION_KEY!.trim();
+    const decodedKey = /^[a-f\d]{64}$/i.test(encryptionKey)
+      ? Buffer.from(encryptionKey, 'hex')
+      : Buffer.from(encryptionKey, 'base64');
+    if (decodedKey.length !== 32)
+      throw new Error('TIKTOK_TOKEN_ENCRYPTION_KEY debe representar exactamente 32 bytes');
+  }
   const formWebhookSecret = process.env.LAUNCH_FORM_WEBHOOK_SECRET?.trim();
   const formWebhookOwner = process.env.LAUNCH_FORM_WEBHOOK_OWNER_ID?.trim();
   if (formWebhookSecret || formWebhookOwner) {

@@ -7,13 +7,28 @@ const outboundMessageSchema = new Schema({
   sourceEventId: { type: String, required: true },
   channel: { type: String, enum: ['instagram', 'facebook', 'whatsapp', 'youtube'] },
   messageType: { type: String, enum: ['private_reply', 'direct_message', 'whatsapp_message', 'youtube_reply'], required: true },
+  transportKind: {
+    type: String,
+    enum: ['private_reply', 'direct_message', 'whatsapp_message', 'youtube_comment_reply', 'public_comment_reply'],
+  },
   text: { type: String, required: true },
-  deliveryStatus: { type: String, enum: ['generated', 'queued', 'sent', 'confirmed', 'failed', 'unknown', 'simulated', 'pending', 'delivered'], default: 'generated', required: true },
+  deliveryStatus: {
+    type: String,
+    enum: ['generated', 'queued', 'sent', 'confirmed', 'failed', 'unknown', 'simulated', 'pending', 'delivered'],
+    default: 'generated',
+    required: true,
+  },
   provider: { type: String, enum: ['meta', 'youtube', 'mock'], required: true },
   externalMessageId: String,
+  correlationId: String,
+  credentialFingerprint: String,
   recipientId: { type: String, required: true },
   commentId: String,
   sentAt: Date,
+  confirmedAt: Date,
+  lastVerificationAt: Date,
+  confirmationEvidenceSource: { type: String, enum: ['provider_webhook', 'provider_readback'] },
+  providerLatencyMs: Number,
   failedAt: Date,
   errorCode: String,
   errorMessage: String,
@@ -23,14 +38,6 @@ const outboundMessageSchema = new Schema({
   retryCount: { type: Number, default: 0 },
   lastRetryAt: Date,
   simulatedDelivery: { type: Boolean, default: false },
-  providerEvidence: {
-    acceptedAt: Date,
-    confirmedAt: Date,
-    parentId: String,
-    authorChannelId: String,
-    moderationStatus: String,
-    confirmationSource: String,
-  },
   authorization: {
     mode: { type: String, enum: ['static_allowlist', 'inbound_conversation'] },
     channel: String,
@@ -45,5 +52,6 @@ const outboundMessageSchema = new Schema({
 outboundMessageSchema.index({ conversationId: 1, createdAt: -1 });
 outboundMessageSchema.index({ userId: 1, deliveryStatus: 1, createdAt: -1 });
 outboundMessageSchema.index({ userId: 1, channel: 1, messageType: 1, createdAt: -1, recipientId: 1 });
+outboundMessageSchema.index({ channel: 1, credentialFingerprint: 1, requiresReauthorization: 1, deliveryStatus: 1 });
 outboundMessageSchema.index({ userId: 1, sourceEventId: 1 }, { unique: true });
 export default mongoose.model('OutboundMessage', outboundMessageSchema);

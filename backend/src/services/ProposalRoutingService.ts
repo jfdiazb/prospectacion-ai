@@ -1,7 +1,7 @@
 import type { MessagingRecipient } from '../integrations/messaging';
 
 export type ProposalChannel = 'whatsapp' | 'instagram' | 'facebook';
-export type ProposalDeliveryStatus = 'sent' | 'simulated' | 'failed' | 'duplicate';
+export type ProposalDeliveryStatus = 'sent' | 'simulated' | 'failed' | 'unknown' | 'duplicate';
 
 const supported = (value: unknown): value is ProposalChannel =>
   value === 'whatsapp' || value === 'instagram' || value === 'facebook';

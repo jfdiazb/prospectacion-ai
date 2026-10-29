@@ -157,6 +157,20 @@ services:
         value: "false"
       - key: TIKTOK_MESSAGING_ENABLED
         value: "false"
+      - key: TIKTOK_CLIENT_KEY
+        sync: false
+      - key: TIKTOK_CLIENT_SECRET
+        sync: false
+      - key: TIKTOK_OAUTH_REDIRECT_URI
+        value: "https://alma-backend-9eo1.onrender.com/api/v1/tiktok/oauth/callback"
+      - key: TIKTOK_OAUTH_STATE_SECRET
+        sync: false
+      - key: TIKTOK_TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: TIKTOK_OAUTH_SCOPES
+        value: "user.info.basic"
+      - key: REQUIRED_LIVE_CHANNELS
+        value: "facebook,instagram,youtube"
       - key: AUTOMATION_WORKER_ENABLED
         value: "true"
       - key: AUTOMATION_WORKER_INTERVAL_MS

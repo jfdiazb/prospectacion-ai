@@ -58,10 +58,13 @@ export class OperationalDiagnosticsService {
         : provider.inbound === 'pending' ? 'pending' : 'disabled';
       const outbound = provider.outbound === 'live'
         ? 'live'
-        : provider.outbound === 'mock' ? 'mock' : provider.outbound === 'pending' ? 'pending' : 'disabled';
+        : provider.outbound === 'mock' ? 'mock'
+          : provider.outbound === 'pending' ? 'pending'
+            : provider.outbound === 'blocked' ? 'blocked' : 'disabled';
       const state = provider.reason === 'official_transport_not_configured'
         ? 'pending'
-        : provider.error ? 'error'
+        : provider.reconnectRequired || outbound === 'blocked' ? 'error'
+          : provider.error ? 'error'
           : inbound === 'live' && outbound === 'live' ? 'live'
             : inbound === 'live' || outbound === 'live' ? 'degraded'
               : inbound === 'pending' || outbound === 'pending' ? 'pending'
@@ -74,6 +77,8 @@ export class OperationalDiagnosticsService {
         inbound,
         outbound,
         automatic: Boolean(provider.automatic),
+        credentialStatus: provider.credentialStatus,
+        reconnectRequired: Boolean(provider.reconnectRequired),
         lastActivityAt: inboundActivity[key],
         reason: provider.reason,
       };

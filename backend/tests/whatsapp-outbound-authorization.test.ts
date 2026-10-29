@@ -6,7 +6,7 @@ import InboundEvent from '../src/models/InboundEvent';
 import Lead from '../src/models/Lead';
 import OutboundMessage from '../src/models/OutboundMessage';
 import { MessagingService } from '../src/services/MessagingService';
-import type { MessagingProvider } from '../src/integrations/messaging';
+import { MessagingProviderError, type MessagingProvider } from '../src/integrations/messaging';
 
 jest.setTimeout(120000);
 
@@ -108,5 +108,48 @@ describe('WhatsApp conversation-scoped outbound authorization', () => {
     await expect(MessagingService.send({ userId: userId.toString(), leadId: lead._id.toString(), conversationId: conversation._id.toString(), sourceEventId: 'control-send', text: 'Control', recipient: { type: 'whatsapp_user', phoneNumber: lead.phone } }, provider)).resolves.toBe('sent');
     expect(await OutboundMessage.findOne({ sourceEventId: 'control-send' })).toMatchObject({ authorization: { mode: 'static_allowlist' } });
     expect(process.env.WHATSAPP_AUTO_REPLY_ENABLED).toBe('false');
+  });
+
+  test('opens a credential circuit after a revoked token and blocks repeated provider calls', async () => {
+    process.env.WHATSAPP_TOKEN = 'revoked-token-fingerprint-only';
+    const { lead, conversation } = await leadAndConversation('573001111111');
+    const rejected: MessagingProvider = {
+      name: 'meta',
+      sendMessage: jest.fn(async () => {
+        throw new MessagingProviderError('Invalid OAuth access token.', '190', 401, {
+          providerCode: 190,
+          providerSubcode: 467,
+          requiresReauthorization: true,
+        });
+      }),
+    };
+    const base = { userId: userId.toString(), leadId: lead._id.toString(), conversationId: conversation._id.toString(), text: 'Control', recipient: { type: 'whatsapp_user' as const, phoneNumber: lead.phone } };
+    await expect(MessagingService.send({ ...base, sourceEventId: 'revoked:first' }, rejected)).resolves.toBe('failed');
+    await expect(MessagingService.send({ ...base, sourceEventId: 'revoked:second' }, rejected)).resolves.toBe('failed');
+    expect(rejected.sendMessage).toHaveBeenCalledTimes(1);
+    expect(await OutboundMessage.findOne({ sourceEventId: 'revoked:second' })).toMatchObject({
+      deliveryStatus: 'failed',
+      errorCode: 'CREDENTIAL_REAUTHORIZATION_REQUIRED',
+      requiresReauthorization: true,
+    });
+  });
+
+  test('records ambiguous provider outcomes as unknown and never as sent', async () => {
+    process.env.WHATSAPP_TOKEN = 'healthy-token-fingerprint-only';
+    const { lead, conversation } = await leadAndConversation('573001111111');
+    const timeout: MessagingProvider = {
+      name: 'meta',
+      sendMessage: jest.fn(async () => { throw new MessagingProviderError('Timeout', 'META_TIMEOUT'); }),
+    };
+    await expect(MessagingService.send({
+      userId: userId.toString(), leadId: lead._id.toString(), conversationId: conversation._id.toString(),
+      sourceEventId: 'ambiguous:timeout', text: 'Control',
+      recipient: { type: 'whatsapp_user', phoneNumber: lead.phone },
+    }, timeout)).resolves.toBe('unknown');
+    expect(await OutboundMessage.findOne({ sourceEventId: 'ambiguous:timeout' })).toMatchObject({
+      deliveryStatus: 'unknown',
+      errorCode: 'META_TIMEOUT',
+      simulatedDelivery: false,
+    });
   });
 });

@@ -329,6 +329,21 @@ router.post(
         text: proposal.text,
         recipient,
       });
+      if (deliveryStatus === 'unknown') {
+        await AssistedProposal.updateOne(
+          { _id: proposal._id },
+          {
+            status: 'failed',
+            failedAt: new Date(),
+            deliveryStatus,
+            errorMessage: `${platform} devolvió un resultado ambiguo; verificar antes de reintentar`,
+          }
+        );
+        return res.status(202).json({
+          success: false,
+          message: `${platform} no confirmó el resultado; no se reintentará automáticamente`,
+        });
+      }
       if (deliveryStatus === 'failed') {
         await AssistedProposal.updateOne(
           { _id: proposal._id },
@@ -510,6 +525,10 @@ router.post('/conversations/:conversationId/messages', async (req: AuthRequest, 
       text,
       recipient,
     });
+    if (deliveryStatus === 'unknown')
+      return res
+        .status(202)
+        .json({ success: false, message: `${platform} no confirmó el resultado; verifica externamente antes de reintentar` });
     if (deliveryStatus === 'failed')
       return res
         .status(502)

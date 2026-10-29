@@ -263,7 +263,7 @@ export class MetaIngestionService {
             code: `outbound_${deliveryStatus}`,
             platform: event.platform,
           },
-          deliveryStatus === 'failed' ? 'warn' : 'info'
+          deliveryStatus === 'failed' || deliveryStatus === 'unknown' ? 'warn' : 'info'
         );
       } else {
         await AssistedResponseService.process(responseContext);
