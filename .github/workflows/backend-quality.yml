@@ -1,0 +1,43 @@
+name: Backend quality gate
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - 'render.yaml'
+      - '.github/workflows/backend-quality.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'render.yaml'
+      - '.github/workflows/backend-quality.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Build and type-check
+        run: npm run build
+        working-directory: backend
+
+      - name: Run backend regression suite
+        run: npm test -- --runInBand
+        working-directory: backend
+
+      - name: Lint backend
+        run: npm run lint
+        working-directory: backend

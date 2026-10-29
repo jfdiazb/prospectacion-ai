@@ -121,6 +121,28 @@ export class ReadinessService {
       facebook: effectiveOutbound('facebook', facebookMode),
       youtube: effectiveOutbound('youtube', youtubeMode),
     } as const;
+    const socialScraperMode = process.env.SOCIAL_SCRAPER_MODE === 'live' ? 'live' : 'demo';
+    const configurationIssues: Array<{ severity: 'critical' | 'warning'; code: string }> = [];
+    const requireLiveConfiguration = (channel: keyof typeof effectiveModes) => {
+      if (effectiveModes[channel] === 'live' && !providerConfig[channel]) {
+        configurationIssues.push({ severity: 'critical', code: `${channel}_live_missing_configuration` });
+      }
+    };
+    (Object.keys(effectiveModes) as Array<keyof typeof effectiveModes>).forEach(requireLiveConfiguration);
+    if (process.env.WHATSAPP_AUTO_REPLY_ENABLED === 'true' && effectiveModes.whatsapp !== 'live') {
+      configurationIssues.push({ severity: 'critical', code: 'whatsapp_automatic_without_live_outbound' });
+    }
+    if (process.env.META_AUTO_SEND_ENABLED === 'true' &&
+      effectiveModes.instagram !== 'live' && effectiveModes.facebook !== 'live') {
+      configurationIssues.push({ severity: 'critical', code: 'meta_automatic_without_live_outbound' });
+    }
+    if (socialScraperMode === 'live' && !has('YOUTUBE_SCRAPER_API_KEY')) {
+      configurationIssues.push({ severity: 'critical', code: 'social_scraper_live_missing_configuration' });
+    }
+    if (tiktokApproved && (tiktokIngestionRequested || tiktokMessagingRequested)) {
+      configurationIssues.push({ severity: 'warning', code: 'tiktok_requested_without_official_transport' });
+    }
+    const configurationConsistent = !configurationIssues.some(issue => issue.severity === 'critical');
     const requiredLiveChannels = (process.env.REQUIRED_LIVE_CHANNELS || '')
       .split(',')
       .map(value => value.trim().toLowerCase())
@@ -138,7 +160,7 @@ export class ReadinessService {
       ready: technicalReady,
       technicalReady,
       behavioralReady,
-      goLive: technicalReady && behavioralReady && externalDeliveryCertified,
+      goLive: technicalReady && configurationConsistent && behavioralReady && externalDeliveryCertified,
       externalDeliveryReady: externalDeliveryCertified,
       externalDeliveryCertified,
       requiredLiveChannels: certificationChannels,
@@ -157,6 +179,19 @@ export class ReadinessService {
         commitMatches,
       },
       checks: { api: true, database, essentialConfig },
+      configuration: {
+        consistent: configurationConsistent,
+        issues: configurationIssues,
+        releaseCommit: certifiedCommit || null,
+        deployedCommit: deployedCommit || null,
+        socialScraper: {
+          mode: socialScraperMode,
+          provider: socialScraperMode === 'live' ? 'youtube' : 'alma-demo-fixture',
+          credentialConfigured: socialScraperMode === 'live' ? has('YOUTUBE_SCRAPER_API_KEY') : false,
+          quotaProbeAuthorized: process.env.ALLOW_YOUTUBE_SCRAPER_PROBE === 'true',
+          intentionallyDisabled: socialScraperMode === 'demo',
+        },
+      },
       runtime: {
         ai: { ...ai, verified: ai.provider === 'groq' ? aiVerified : ai.provider === 'mock' },
         providers: {

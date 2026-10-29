@@ -4,7 +4,9 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm ci --include=dev && npm test -- --runInBand tests/behavioral-certification.test.ts && npm run build
+    # A release must pass the complete backend suite. Running only the behavioral
+    # smoke suite allowed integration regressions to reach production unnoticed.
+    buildCommand: npm ci --include=dev && npm run build && npm test -- --runInBand
     startCommand: RELEASE_COMMIT=$RENDER_GIT_COMMIT npm start
     healthCheckPath: /api/v1/readiness
     envVars:

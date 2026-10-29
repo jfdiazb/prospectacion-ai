@@ -93,4 +93,48 @@ describe('release certification readiness', () => {
     expect(readiness.externalDeliveryCertification).toMatchObject({ status: 'not_verified', enabledChannels: expect.arrayContaining(['youtube']), confirmedChannels: [] });
     expect(readiness.goLive).toBe(false);
   });
+
+  test('reports effective demo scraper mode without pretending that credentials were checked', async () => {
+    process.env = {
+      ...originalEnv,
+      SOCIAL_SCRAPER_MODE: 'demo',
+      ALLOW_YOUTUBE_SCRAPER_PROBE: 'false',
+    };
+
+    const readiness = await ReadinessService.inspect();
+
+    expect(readiness.configuration.socialScraper).toEqual({
+      mode: 'demo',
+      provider: 'alma-demo-fixture',
+      credentialConfigured: false,
+      quotaProbeAuthorized: false,
+      intentionallyDisabled: true,
+    });
+  });
+
+  test('blocks certification when automatic WhatsApp replies contradict effective outbound mode', async () => {
+    process.env = {
+      ...originalEnv,
+      NODE_ENV: 'production',
+      MONGO_URI: 'configured',
+      JWT_SECRET: 'configured',
+      CORS_ORIGIN: 'https://example.test',
+      WHATSAPP_MESSAGING_MODE: 'mock',
+      WHATSAPP_AUTO_REPLY_ENABLED: 'true',
+      WHATSAPP_REPLY_MODE: 'automatic',
+      BEHAVIORAL_CERTIFICATION_VERSION: 'behavioral-commercial-v1',
+      BEHAVIORAL_CERTIFICATION_STATUS: 'passed',
+      RELEASE_COMMIT: 'same-commit',
+      RENDER_GIT_COMMIT: 'same-commit',
+    };
+
+    const readiness = await ReadinessService.inspect();
+
+    expect(readiness.configuration.consistent).toBe(false);
+    expect(readiness.configuration.issues).toContainEqual({
+      severity: 'critical',
+      code: 'whatsapp_automatic_without_live_outbound',
+    });
+    expect(readiness.goLive).toBe(false);
+  });
 });
