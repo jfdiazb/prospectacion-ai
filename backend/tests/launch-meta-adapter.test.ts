@@ -24,8 +24,15 @@ import { MessagingService } from '../src/services/MessagingService';
 import { MetaMessagingProvider } from '../src/integrations/messaging/MetaMessagingProvider';
 
 describe('Launch L6C Meta mock inbound adapter', () => {
+  const configuredMetaPageId = process.env.META_PAGE_ID;
+  const configuredMetaInstagramId = process.env.META_IG_USER_ID;
   let mongo: MongoMemoryServer;
   beforeAll(async () => {
+    // Render supplies the production Meta account allowlist during builds, but
+    // this suite signs synthetic fixture accounts. The allowlist rejection path
+    // remains asserted in meta-phase4.test.ts.
+    delete process.env.META_PAGE_ID;
+    delete process.env.META_IG_USER_ID;
     mongo = await MongoMemoryServer.create();
     await mongoose.connect(mongo.getUri());
     await Promise.all([
@@ -56,6 +63,10 @@ describe('Launch L6C Meta mock inbound adapter', () => {
   afterAll(async () => {
     await mongoose.disconnect();
     await mongo.stop();
+    if (configuredMetaPageId === undefined) delete process.env.META_PAGE_ID;
+    else process.env.META_PAGE_ID = configuredMetaPageId;
+    if (configuredMetaInstagramId === undefined) delete process.env.META_IG_USER_ID;
+    else process.env.META_IG_USER_ID = configuredMetaInstagramId;
   });
 
   const setup = async (

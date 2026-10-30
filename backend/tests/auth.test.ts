@@ -33,11 +33,18 @@ const waitUntil = async (predicate: () => Promise<boolean>, timeout = 5000) => {
 jest.setTimeout(120000);
 
 describe('Auth integration tests', () => {
+  const configuredMetaPageId = process.env.META_PAGE_ID;
+  const configuredMetaInstagramId = process.env.META_IG_USER_ID;
   let server: http.Server | undefined;
   let mongoServer: MongoMemoryServer | undefined;
   let baseURL: string;
 
   beforeAll(async () => {
+    // Render injects the real account allowlist while it runs the build suite.
+    // These integration fixtures use synthetic Meta accounts; account-mismatch
+    // enforcement is covered separately in meta-phase4.test.ts.
+    delete process.env.META_PAGE_ID;
+    delete process.env.META_IG_USER_ID;
     delete process.env.GEMINI_API_KEY;
     process.env.AI_MODE = 'mock';
     process.env.ZOOM_MODE = 'mock';
@@ -63,6 +70,10 @@ describe('Auth integration tests', () => {
     if (mongoose.connection.readyState === 1) await mongoose.connection.dropDatabase();
     await disconnectDB();
     if (mongoServer) await mongoServer.stop();
+    if (configuredMetaPageId === undefined) delete process.env.META_PAGE_ID;
+    else process.env.META_PAGE_ID = configuredMetaPageId;
+    if (configuredMetaInstagramId === undefined) delete process.env.META_IG_USER_ID;
+    else process.env.META_IG_USER_ID = configuredMetaInstagramId;
   });
 
   beforeEach(async () => {
