@@ -33,8 +33,8 @@ const waitUntil = async (predicate: () => Promise<boolean>, timeout = 5000) => {
 jest.setTimeout(120000);
 
 describe('Auth integration tests', () => {
-  let server: http.Server;
-  let mongoServer: MongoMemoryServer;
+  let server: http.Server | undefined;
+  let mongoServer: MongoMemoryServer | undefined;
   let baseURL: string;
 
   beforeAll(async () => {
@@ -55,12 +55,14 @@ describe('Auth integration tests', () => {
   });
 
   afterAll(async () => {
-    await mongoose.connection.dropDatabase();
+    if (server?.listening) {
+      await new Promise<void>((resolve, reject) => {
+        server!.close(err => (err ? reject(err) : resolve()));
+      });
+    }
+    if (mongoose.connection.readyState === 1) await mongoose.connection.dropDatabase();
     await disconnectDB();
-    await mongoServer.stop();
-    await new Promise<void>((resolve, reject) => {
-      server.close(err => (err ? reject(err) : resolve()));
-    });
+    if (mongoServer) await mongoServer.stop();
   });
 
   beforeEach(async () => {

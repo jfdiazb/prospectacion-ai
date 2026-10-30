@@ -5,11 +5,16 @@ import { MessagingProviderError } from '../src/integrations/messaging/MessagingP
 import { getMessagingProvider } from '../src/integrations/messaging';
 
 describe('production outbound kill switch', () => {
-  const originalEnv = process.env;
-  afterEach(() => { process.env = originalEnv; });
+  const originalEnv = { ...process.env };
+  afterEach(() => { process.env = { ...originalEnv }; });
 
   test('forces mock in production until real outbound is explicitly enabled', () => {
-    process.env = { ...originalEnv, NODE_ENV: 'production', WHATSAPP_MESSAGING_MODE: 'live' };
+    process.env = {
+      ...originalEnv,
+      NODE_ENV: 'production',
+      REAL_OUTBOUND_ENABLED: 'false',
+      WHATSAPP_MESSAGING_MODE: 'live',
+    };
     expect(getMessagingProvider('whatsapp').name).toBe('mock');
     process.env.REAL_OUTBOUND_ENABLED = 'true';
     expect(getMessagingProvider('whatsapp').name).toBe('meta');
@@ -61,11 +66,11 @@ describe('production outbound kill switch', () => {
 });
 
 describe('MetaMessagingProvider', () => {
-  const originalEnv = process.env;
+  const originalEnv = { ...process.env };
   beforeEach(() => {
     process.env = { ...originalEnv, META_ACCESS_TOKEN: 'test-token-never-logged', META_IG_USER_ID: 'ig-business-1', META_GRAPH_API_VERSION: 'v23.0' };
   });
-  afterAll(() => { process.env = originalEnv; });
+  afterEach(() => { process.env = { ...originalEnv }; });
 
   test('sends an initial private reply with comment_id', async () => {
     const post = jest.fn().mockResolvedValue({ data: { message_id: 'meta-message-1' } });
