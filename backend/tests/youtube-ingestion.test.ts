@@ -28,6 +28,24 @@ describe('YouTubeIngestionService polling cursor', () => {
     }, 'real-comment-1', 'owner-channel')).resolves.toBe('duplicate');
   });
 
+  test('attributes not_eligible to the exact eligibility rule without retaining comment text', async () => {
+    jest.spyOn(Lead, 'findOne').mockResolvedValue(null);
+    jest.spyOn(AutomationService, 'findMatchingKeywordFlow').mockResolvedValue(null);
+    jest.spyOn(YouTubeLaunchAdapter, 'hasMappedVideo').mockResolvedValue(false);
+    const diagnostics = { notEligibleReasons: {} as Record<string, number> };
+    const service = new YouTubeIngestionService();
+
+    await expect(service.processComment('owner-1', {
+      id: 'unrelated-comment-1',
+      snippet: { textOriginal: 'Buen video', authorChannelId: { value: 'new-author' } },
+    }, 'unrelated-comment-1', 'owner-channel', diagnostics)).resolves.toBe('not_eligible');
+
+    expect(diagnostics).toEqual({
+      notEligibleReasons: { new_author_without_eligibility_signal: 1 },
+    });
+    expect(JSON.stringify(diagnostics)).not.toContain('Buen video');
+  });
+
   const originalOverlap = process.env.YOUTUBE_POLL_OVERLAP_MS;
   const originalReplyInterval = process.env.YOUTUBE_REPLY_POLL_INTERVAL_MS;
 
@@ -129,8 +147,8 @@ describe('YouTubeIngestionService polling cursor', () => {
 
     expect(http.get).toHaveBeenCalledTimes(2);
     expect(http.get.mock.calls[1][0]).toContain('pageToken=page-2');
-    expect(process).toHaveBeenNthCalledWith(1, 'owner-1', expect.objectContaining({ id: 'reply-2' }), 'root-comment', 'channel-owner');
-    expect(process).toHaveBeenNthCalledWith(2, 'owner-1', expect.objectContaining({ id: 'reply-1' }), 'root-comment', 'channel-owner');
+    expect(process).toHaveBeenNthCalledWith(1, 'owner-1', expect.objectContaining({ id: 'reply-2' }), 'root-comment', 'channel-owner', expect.any(Object));
+    expect(process).toHaveBeenNthCalledWith(2, 'owner-1', expect.objectContaining({ id: 'reply-1' }), 'root-comment', 'channel-owner', expect.any(Object));
     expect(summary).toEqual(expect.objectContaining({ pages: 2, replies: 2, processed: 2 }));
   });
 

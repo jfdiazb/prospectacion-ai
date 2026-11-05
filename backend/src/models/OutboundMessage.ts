@@ -21,6 +21,8 @@ const outboundMessageSchema = new Schema({
   provider: { type: String, enum: ['meta', 'youtube', 'mock'], required: true },
   externalMessageId: String,
   correlationId: String,
+  // Immutable deployment identity: old delivery evidence must not certify a new release.
+  releaseCommit: String,
   credentialFingerprint: String,
   recipientId: { type: String, required: true },
   commentId: String,
@@ -28,6 +30,14 @@ const outboundMessageSchema = new Schema({
   confirmedAt: Date,
   lastVerificationAt: Date,
   confirmationEvidenceSource: { type: String, enum: ['provider_webhook', 'provider_readback'] },
+  providerEvidence: {
+    parentId: String,
+    authorChannelId: String,
+    moderationStatus: String,
+    acceptedAt: Date,
+    confirmationSource: String,
+    confirmedAt: Date,
+  },
   providerLatencyMs: Number,
   failedAt: Date,
   errorCode: String,
@@ -51,6 +61,7 @@ const outboundMessageSchema = new Schema({
 
 outboundMessageSchema.index({ conversationId: 1, createdAt: -1 });
 outboundMessageSchema.index({ userId: 1, deliveryStatus: 1, createdAt: -1 });
+outboundMessageSchema.index({ channel: 1, releaseCommit: 1, deliveryStatus: 1 });
 outboundMessageSchema.index({ userId: 1, channel: 1, messageType: 1, createdAt: -1, recipientId: 1 });
 outboundMessageSchema.index({ channel: 1, credentialFingerprint: 1, requiresReauthorization: 1, deliveryStatus: 1 });
 outboundMessageSchema.index({ userId: 1, sourceEventId: 1 }, { unique: true });

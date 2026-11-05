@@ -45,11 +45,11 @@ describe('external delivery certification', () => {
     await Promise.all(Object.values(mongoose.connection.collections).map(collection => collection.deleteMany({})));
   });
 
-  const outbound = (deliveryStatus: string) => OutboundMessage.create({
+  const outbound = (deliveryStatus: string, releaseCommit = 'same-commit') => OutboundMessage.create({
     userId, leadId, conversationId, sourceEventId: `facebook:${deliveryStatus}`,
     channel: 'facebook', messageType: 'private_reply', transportKind: 'private_reply',
     text: 'Respuesta', deliveryStatus, provider: 'meta', recipientId: 'comment-id',
-    simulatedDelivery: false,
+    simulatedDelivery: false, releaseCommit,
   });
 
   test('provider acceptance never certifies external publication', async () => {
@@ -81,6 +81,20 @@ describe('external delivery certification', () => {
     });
     expect(readiness.externalDeliveryCertified).toBe(true);
     expect(readiness.goLive).toBe(true);
+  });
+
+  test('does not reuse a confirmation from a different release', async () => {
+    await outbound('confirmed', 'previous-commit');
+    await InboundEvent.create({
+      userId, externalEventId: 'facebook:inbound-old-release', channel: 'facebook', eventType: 'comment',
+      senderId: 'sender', processingState: 'completed',
+    });
+    const readiness = await ReadinessService.inspect();
+    expect(readiness.runtime.providers.facebook.certification.externallyConfirmed).toBe(false);
+    expect(readiness.externalDeliveryCertification).toMatchObject({
+      status: 'not_verified', releaseCommit: 'same-commit', confirmedChannels: [],
+    });
+    expect(readiness.goLive).toBe(false);
   });
 
   test('confirmation requires matching owner, external id and non-simulated provider evidence', async () => {

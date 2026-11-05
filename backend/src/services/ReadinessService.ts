@@ -25,6 +25,10 @@ export class ReadinessService {
     let aiVerified = false;
     if (database) {
       const channels = Object.keys(verified);
+      const certifiedReleaseCommit = process.env.RELEASE_COMMIT?.trim();
+      const releaseEvidence = certifiedReleaseCommit
+        ? { releaseCommit: certifiedReleaseCommit }
+        : { releaseCommit: '__missing_release_commit__' };
       const [inbound, generated, accepted, confirmed, completedAI] = await Promise.all([
         InboundEvent.distinct('channel', { channel: { $in: channels }, processingState: 'completed' }),
         OutboundMessage.distinct('channel', {
@@ -40,6 +44,7 @@ export class ReadinessService {
           channel: { $in: channels },
           deliveryStatus: { $in: ['confirmed', 'delivered'] },
           simulatedDelivery: { $ne: true },
+          ...releaseEvidence,
         }),
         AIInvocation.exists({ provider: 'groq', status: 'completed' }),
       ]);
@@ -169,6 +174,7 @@ export class ReadinessService {
         evidenceRequired: 'provider-visible-confirmation',
         enabledChannels: certificationChannels,
         confirmedChannels: externallyConfirmedChannels,
+        releaseCommit: certifiedCommit || null,
         note: 'Las pruebas automatizadas y la aceptación API (sent) no confirman visibilidad externa.',
       },
       behavioralCertification: {

@@ -128,7 +128,11 @@ export class OperationalDiagnosticsService {
     else if (!input.youtube.lastPolledAt) alerts.push({ severity: 'warning', code: 'youtube_never_polled', message: 'YouTube está conectado, pero aún no registra un sondeo.' });
     else if (input.now.getTime() - new Date(input.youtube.lastPolledAt).getTime() > 5 * 60 * 1000) alerts.push({ severity: 'error', code: 'youtube_poll_stale', message: 'El sondeo de YouTube lleva más de cinco minutos sin actualizarse.' });
     else alerts.push({ severity: 'healthy', code: 'youtube_healthy', message: 'YouTube está conectado y el sondeo está activo.' });
-    if (Number(input.youtube.replies?.not_eligible || 0) > 0) alerts.push({ severity: 'warning', code: 'youtube_identity_mismatch', message: 'Se detectaron respuestas desde canales que no iniciaron la conversación.' });
+    if (Number(input.youtube.replies?.not_eligible || 0) > 0) alerts.push({
+      severity: 'warning',
+      code: 'youtube_not_eligible',
+      message: 'YouTube descartó comentarios nuevos sin una señal de elegibilidad (INFO, interés explícito, automatización o contenido de lanzamiento mapeado).',
+    });
     if (input.meetings.pendingBooking > 0) alerts.push({ severity: 'info', code: 'booking_pending', message: 'Hay reservas de Calendly pendientes de completar.' });
     if (input.meetings.futureScheduled > 0) alerts.push({ severity: 'healthy', code: 'meeting_scheduled', message: 'Hay al menos una reunión futura programada.' });
     if (input.meetings.failed > 0) alerts.push({ severity: 'error', code: 'meeting_failed', message: 'Hay reuniones con errores que requieren revisión.' });

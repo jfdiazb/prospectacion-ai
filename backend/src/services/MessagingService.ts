@@ -35,7 +35,9 @@ export class MessagingService {
           : context.recipient.type === 'whatsapp_user' ? 'whatsapp_message'
             : context.recipient.type === 'youtube_comment' ? 'youtube_comment_reply' : 'direct_message',
         text: context.text, deliveryStatus: 'generated', provider: selectedProvider.name, recipientId,
-        correlationId: context.correlationId, credentialFingerprint,
+        correlationId: context.correlationId,
+        releaseCommit: process.env.RENDER_GIT_COMMIT?.trim() || process.env.GIT_COMMIT?.trim(),
+        credentialFingerprint,
         commentId: context.recipient.type === 'comment' || context.recipient.type === 'instagram_comment' || context.recipient.type === 'facebook_comment' ? context.recipient.commentId : undefined,
         authorization: authorization || undefined });
     } catch (error: any) {

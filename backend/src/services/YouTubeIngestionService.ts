@@ -36,6 +36,7 @@ type CommentProcessingResult =
   | 'not_eligible'
   | 'duplicate';
 type ReplyPollingSummary = Record<CommentProcessingResult, number> & {
+  notEligibleReasons: Record<string, number>;
   outboundCandidates: number;
   activeThreads: number;
   polledThreads: number;
@@ -118,13 +119,14 @@ export class YouTubeIngestionService {
     const comments = (response.data.items ?? [])
       .map(item => item.snippet?.topLevelComment)
       .filter((item): item is TopComment => Boolean(item));
-    const summary: Record<CommentProcessingResult, number> = {
+    const summary: Record<CommentProcessingResult, number> & { notEligibleReasons: Record<string, number> } = {
       processed: 0,
       processing_failed: 0,
       invalid: 0,
       own_channel: 0,
       not_eligible: 0,
       duplicate: 0,
+      notEligibleReasons: {},
     };
     let afterCutoff = 0;
     comments.sort(
@@ -139,7 +141,8 @@ export class YouTubeIngestionService {
         credential.userId.toString(),
         comment,
         comment.id,
-        credential.channelId
+        credential.channelId,
+        summary
       );
       summary[result] += 1;
     }
@@ -248,6 +251,7 @@ export class YouTubeIngestionService {
       own_channel: 0,
       not_eligible: 0,
       duplicate: 0,
+      notEligibleReasons: {},
     };
     for (const threadId of threadIds) {
       let threadSummary;
@@ -287,6 +291,9 @@ export class YouTubeIngestionService {
       summary.invalid += threadSummary.invalid;
       summary.own_channel += threadSummary.own_channel;
       summary.not_eligible += threadSummary.not_eligible;
+      for (const [reason, count] of Object.entries(threadSummary.notEligibleReasons)) {
+        summary.notEligibleReasons[reason] = (summary.notEligibleReasons[reason] || 0) + count;
+      }
       summary.duplicate += threadSummary.duplicate;
     }
     return summary;
@@ -350,6 +357,7 @@ export class YouTubeIngestionService {
       own_channel: 0,
       not_eligible: 0,
       duplicate: 0,
+      notEligibleReasons: {} as Record<string, number>,
     };
     do {
       const params = new URLSearchParams({
@@ -380,7 +388,8 @@ export class YouTubeIngestionService {
           credential.userId.toString(),
           reply,
           threadId,
-          credential.channelId
+          credential.channelId,
+          summary
         );
         summary[result] += 1;
       }
@@ -421,7 +430,8 @@ export class YouTubeIngestionService {
     userId: string,
     comment: TopComment,
     responseParentId = comment.id,
-    ownChannelId?: string
+    ownChannelId?: string,
+    diagnostics?: { notEligibleReasons: Record<string, number> }
   ): Promise<CommentProcessingResult> {
     const text = comment.snippet?.textOriginal?.trim();
     const senderId = comment.snippet?.authorChannelId?.value;
@@ -436,8 +446,11 @@ export class YouTubeIngestionService {
     const hasLaunchMapping = launchEvent
       ? await YouTubeLaunchAdapter.hasMappedVideo(userId, launchEvent)
       : false;
-    if (!existingLead && !hasInfoKeyword && !hasExplicitOpportunityInterest && !automationReply && !hasLaunchMapping)
+    if (!existingLead && !hasInfoKeyword && !hasExplicitOpportunityInterest && !automationReply && !hasLaunchMapping) {
+      const reason = 'new_author_without_eligibility_signal';
+      if (diagnostics) diagnostics.notEligibleReasons[reason] = (diagnostics.notEligibleReasons[reason] || 0) + 1;
       return 'not_eligible';
+    }
     const sourceEventId = `youtube:${comment.id}`;
     const claimed = await this.claimComment({
       userId,

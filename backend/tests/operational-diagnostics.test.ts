@@ -22,7 +22,7 @@ describe('OperationalDiagnosticsService alerts', () => {
       meetings: { pendingBooking: 1, futureScheduled: 0, expiredScheduled: 1, failed: 1 },
     });
     expect(alerts.map(alert => alert.code)).toEqual(expect.arrayContaining([
-      'youtube_poll_stale', 'youtube_identity_mismatch', 'booking_pending', 'meeting_failed', 'meeting_history',
+      'youtube_poll_stale', 'youtube_not_eligible', 'booking_pending', 'meeting_failed', 'meeting_history',
     ]));
   });
 });
