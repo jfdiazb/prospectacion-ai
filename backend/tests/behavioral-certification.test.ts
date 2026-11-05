@@ -13,12 +13,32 @@ describe('Behavioral/commercial production certification', () => {
   const placeholderVariants = [
     '[sector/servicio]', '[producto]', '[marca]', '{{variable}}', '{{ price }}', '${variable}',
     '<placeholder>', '<TODO>', '<variable>', 'TODO', 'TBD', 'Texto [servicio/producto]',
+    '[breve descripción del objetivo y funcionamiento principal]', '[insertar explicación aquí]',
   ];
   test.each(placeholderVariants)('blocks unresolved placeholder: %s', value => {
     const result = ConversationalSafetyService.validate({ text: `Nuestro negocio ofrece ${value}.`, readiness: discovery });
     expect(result.allowed).toBe(false);
     expect(result.violations).toContain('unresolved_placeholder');
     expect(result.text).not.toContain(value);
+  });
+
+  test('replaces the confirmed YouTube incident with approved commercial facts', () => {
+    const result = ConversationalSafetyService.validate({
+      text: 'Claro, el proyecto consiste en [breve descripción del objetivo y funcionamiento principal].',
+      readiness: discovery, asksCommercialDetails: true, commercialInformationAuthorized: true,
+      commercialContext: { brandName: 'Amway', businessType: 'venta directa y oportunidad de negocio independiente', commercialLines: ['oportunidad de negocio', 'consumo de productos'] },
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.text).toMatch(/Amway.*venta directa/i);
+    expect(result.text).not.toMatch(/\[[^\]]+\]|agendar|reunión/i);
+  });
+
+  test.each(['Ya te envié el correo con la información', 'El email fue enviado y confirmado'])('blocks unsupported execution claim: %s', text => {
+    expect(ConversationalSafetyService.validate({ text, readiness: discovery }).violations).toContain('unsupported_execution_claim');
+  });
+
+  test.each(['La intención detectada es interés comercial', 'Como IA, procesé tu información'])('blocks internal content: %s', text => {
+    expect(ConversationalSafetyService.validate({ text, readiness: discovery }).violations).toContain('internal_content_exposure');
   });
 
   const falseBookingClaims = [

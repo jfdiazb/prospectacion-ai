@@ -24,6 +24,7 @@ import { LaunchActionService } from '../services/LaunchActionService';
 import { ProposalRoutingError, ProposalRoutingService } from '../services/ProposalRoutingService';
 import OutboundMessage from '../models/OutboundMessage';
 import AIInvocation from '../models/AIInvocation';
+import { ConversationalSafetyService } from '../services/ConversationalSafetyService';
 
 const router = Router();
 router.use(authMiddleware, apiLimiter);
@@ -262,6 +263,20 @@ router.post(
           return res
             .status(409)
             .json({ success: false, message: 'La propuesta caducó por una política multicanal' });
+        }
+        const outboundSafety = await ConversationalSafetyService.validateForConversation({
+          userId: req.userId as string,
+          conversationId: req.params.conversationId,
+          text: candidate.text,
+          readiness: { ready: true, reason: 'qualified_discovery', evidence: [] },
+          commercialInformationAuthorized: true,
+        });
+        if (!outboundSafety.allowed) {
+          return res.status(422).json({
+            success: false,
+            message: 'La propuesta contiene texto incompleto o afirmaciones sin evidencia y no puede enviarse',
+            code: 'UNSAFE_CONVERSATIONAL_OUTPUT',
+          });
         }
       }
       const proposal: any = await AssistedProposal.findOneAndUpdate(

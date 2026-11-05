@@ -26,7 +26,16 @@ export class ConversationalSafetyService {
   static readonly version = 'behavioral-commercial-v1';
 
   static detectPlaceholders(text: string): boolean {
-    return /\{\{[^}]+\}\}|\$\{[^}]+\}|<(?:placeholder|todo|tbd|[^>]*variable[^>]*)>|\[(?:sector|servicio|producto|marca|variable|placeholder)(?:\/[^\]]+)?\]|\b(?:TODO|TBD)\b/i.test(text);
+    return /\{\{[^}]+\}\}|\$\{[^}]+\}|<(?:placeholder|todo|tbd|[^>]*variable[^>]*)>|\[[^\]]*(?:breve\s+descripci[oó]n|descripci[oó]n|objetivo|funcionamiento|sector|servicio|producto|marca|variable|placeholder|completar|insertar|ejemplo)[^\]]*\]|\b(?:TODO|TBD)\b/i.test(text);
+  }
+
+  static detectInternalContent(text: string): boolean {
+    return /\b(?:system prompt|prompt interno|instrucciones internas?|intenci[oó]n detectada|informaci[oó]n recopilada|flujo interno|calificaci[oó]n del lead|como (?:ia|inteligencia artificial)|soy (?:una )?(?:ia|inteligencia artificial))\b/i.test(normalize(text));
+  }
+
+  static detectUnsupportedExecutionClaim(text: string): boolean {
+    const value = normalize(text);
+    return /\b(?:te|le|ya) (?:envie|enviamos|mande|mandamos)\b.{0,45}\b(?:correo|email|e-mail)\b|\b(?:correo|email|e-mail)\b.{0,45}\b(?:enviado|confirmado)\b/.test(value);
   }
 
   static isGenericInformationRequest(text: string): boolean {
@@ -62,6 +71,7 @@ export class ConversationalSafetyService {
     commercialInformationAuthorized?: boolean;
     asksCommercialDetails?: boolean;
     firstContactDiscovery?: boolean;
+    commercialContext?: { brandName?: string; businessType?: string; commercialLines?: string[] } | null;
   }): SafetyResult {
     const text = input.text.trim();
     const normalized = normalize(text);
@@ -71,6 +81,8 @@ export class ConversationalSafetyService {
     const violations: string[] = [];
 
     if (this.detectPlaceholders(text)) violations.push('unresolved_placeholder');
+    if (this.detectInternalContent(text)) violations.push('internal_content_exposure');
+    if (this.detectUnsupportedExecutionClaim(text)) violations.push('unsupported_execution_claim');
     if (input.firstContactDiscovery && this.containsPrematureFirstContactContent(text)) {
       violations.push('premature_first_contact_commercial_framing');
     }
@@ -90,7 +102,7 @@ export class ConversationalSafetyService {
       violations.push('premature_meeting_cta');
     }
     if (!violations.length) return { text, allowed: true, violations, fallbackUsed: false };
-    return { text: this.safeFallback(input.readiness, meeting, input.firstContactDiscovery), allowed: false, violations, fallbackUsed: true };
+    return { text: this.safeFallback(input.readiness, meeting, input.firstContactDiscovery, input.asksCommercialDetails, input.commercialContext), allowed: false, violations, fallbackUsed: true };
   }
 
   static async validateForConversation(input: {
@@ -101,6 +113,7 @@ export class ConversationalSafetyService {
     commercialInformationAuthorized?: boolean;
     asksCommercialDetails?: boolean;
     firstContactDiscovery?: boolean;
+    commercialContext?: { brandName?: string; businessType?: string; commercialLines?: string[] } | null;
   }): Promise<SafetyResult> {
     const meeting: any = await Meeting.findOne({ userId: input.userId, conversationId: input.conversationId })
       .sort({ createdAt: -1 }).select('status provider joinUrl bookingUrl scheduledAt scheduledFor requestedDate requestedTime modality').lean();
@@ -117,7 +130,7 @@ export class ConversationalSafetyService {
     return /\b(?:negocio|productos?|marca|amway|nutrilite|compr(?:a|ar|as)|inscripcion|registr(?:o|arte|arse)|precios?|reunion|cita|calendly|zoom|ingresos?|ganancias?)\b|https?:\/\//i.test(value);
   }
 
-  private static safeFallback(readiness: MeetingReadiness, meeting?: MeetingSnapshot | null, firstContactDiscovery = false): string {
+  private static safeFallback(readiness: MeetingReadiness, meeting?: MeetingSnapshot | null, firstContactDiscovery = false, asksCommercialDetails = false, commercial?: { brandName?: string; businessType?: string; commercialLines?: string[] } | null): string {
     if (firstContactDiscovery) {
       return '¡Hola! Gracias por escribir. Para orientarte mejor, ¿qué te llamó la atención o qué te gustaría encontrar en este momento?';
     }
@@ -131,6 +144,11 @@ export class ConversationalSafetyService {
     if (meeting && ['confirmed', 'scheduled'].includes(String(meeting.status))) {
       if (meeting.joinUrl) return `Tu reunión está confirmada. Puedes consultar el enlace de acceso aquí: ${meeting.joinUrl}`;
       return 'Tu reunión está confirmada, pero el enlace de acceso todavía no está disponible. Te lo compartiremos cuando el sistema lo registre.';
+    }
+    if (asksCommercialDetails && commercial?.brandName && commercial.businessType) {
+      const lines = (commercial.commercialLines ?? []).filter(Boolean).slice(0, 3);
+      const scope = lines.length ? ` Incluye ${lines.join(', ')}.` : '';
+      return `Se trata de ${commercial.brandName}, un modelo de ${commercial.businessType}.${scope} Puedo explicarte con más detalle la parte que te interese.`;
     }
     if (readiness.reason === 'qualified_discovery') {
       return 'Con lo que me cuentas, ya podemos revisar el siguiente paso. ¿Te gustaría recibir la agenda para elegir un horario disponible?';

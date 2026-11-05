@@ -138,20 +138,17 @@ export class AlmaService {
     const meetingOutcome = await MeetingOrchestratorService.process({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: context.text, wantsMeeting, meetingReadiness: meetingReadiness.reason, launchId: launchAttribution?.launchId, launchParticipantId: launchAttribution?.participantId, platform: context.platform });
     let deduplication = meetingOutcome.reply ? { text: meetingOutcome.reply, deduplicated: false }
       : this.avoidRepeatedResponse(generatedResponse, history, aiMemory, context.text);
-    if (!meetingOutcome.reply && !await ConversationService.reserveAIResponse(context.conversationId, context.userId, deduplication.text)) {
-      aiMemory = await ConversationService.getOrInitializeAIMemory(context.conversationId, context.userId);
-      deduplication = this.avoidRepeatedResponse(generatedResponse, history, aiMemory, context.text);
-      if (!await ConversationService.reserveAIResponse(context.conversationId, context.userId, deduplication.text)) {
-        throw new Error('No fue posible reservar una respuesta conversacional única');
-      }
-    }
     const asksCommercialDetails = /empresa|marca|producto|precio|plan|modelo|amway|nutrilite|de que se trata|cómo funciona|como funciona/i.test(context.text);
     const commercialInformationAuthorized = Boolean(commercialContext?.allowedInformation?.length);
     const safety = await ConversationalSafetyService.validateForConversation({
       userId: context.userId, conversationId: context.conversationId, text: deduplication.text,
       readiness: meetingReadiness, asksCommercialDetails, commercialInformationAuthorized, firstContactDiscovery,
+      commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines } : undefined,
     });
     const response = safety.text;
+    if (!meetingOutcome.reply && !await ConversationService.reserveAIResponse(context.conversationId, context.userId, response)) {
+      throw new Error('No fue posible reservar una respuesta conversacional única');
+    }
     if (!safety.allowed) console.warn('ALMA conversational output blocked', {
       event: 'alma_output_guardrail_blocked', conversationId: context.conversationId, leadId: context.leadId,
       channel: context.platform, commercialState: commercialMemory.commercialState, readiness: meetingReadiness.reason,
