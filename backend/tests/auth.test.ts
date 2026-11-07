@@ -559,7 +559,9 @@ describe('Auth integration tests', () => {
     expect(outbound).toMatchObject({ channel: 'whatsapp', provider: 'mock', deliveryStatus: 'simulated', simulatedDelivery: true });
     expect(outbound.text).toBe(aiMessages[0].text);
     expect(outbound.text).toMatch(/qué te llamó la atención|qué te gustaría encontrar|qué buscas|qué necesitas|cuál es tu situación/i);
-    expect(outbound.text).not.toMatch(/negocio|producto|marca|amway|nutrilite|compr|inscrip|registr|precio|reunión|calendly|zoom|ingres|ganancia/i);
+    expect(outbound.text).toMatch(/amway/i);
+    expect(outbound.text).toMatch(/venta directa|oportunidad de negocio/i);
+    expect(outbound.text).not.toMatch(/precio|cuesta|ingresos? garantizados?|ganancias? garantizadas?|reunión|calendly|zoom|agendad/i);
     expect(outbound.text).not.toMatch(/https?:\/\//i);
     expect(ConversationalSafetyService.detectPlaceholders(outbound.text)).toBe(false);
     expect(await Meeting.countDocuments({ userId: owner!._id, conversationId: conversation._id })).toBe(0);

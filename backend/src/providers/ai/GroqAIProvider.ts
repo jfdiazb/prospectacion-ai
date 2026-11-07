@@ -1,5 +1,6 @@
 import type { AIProvider, AIReplyContext, AIReplyResult } from '../../integrations/ai/AIProvider';
 import { GroqService } from '../../services/GroqService';
+import { CommercialConversationPolicy } from '../../services/CommercialConversationPolicy';
 
 export class GroqAIProvider implements AIProvider {
   readonly name = 'groq';
@@ -35,14 +36,19 @@ export class GroqAIProvider implements AIProvider {
             ].join('\n')
           : '';
 
-    const asksCommercialDetails = /empresa|marca|producto|precio|plan|modelo|amway|nutrilite/i.test(context.incomingText);
-    const commercialInstructions = commercial && asksCommercialDetails
+    const requiresCommercialGrounding = CommercialConversationPolicy.requiresGrounding(context.incomingText, context.normalizedIntent);
+    const commercialInstructions = commercial && requiresCommercialGrounding
       ? [
           `Contexto comercial activo: ${commercial.brandName}.`,
+          `Modelo autorizado: ${commercial.businessType ?? 'no especificado'}.`,
+          `Lineas comerciales autorizadas: ${JSON.stringify(commercial.commercialLines ?? [])}.`,
+          `Categorias autorizadas: ${JSON.stringify(commercial.categories ?? [])}.`,
+          `Familias de productos autorizadas: ${JSON.stringify(commercial.productFamilies ?? [])}.`,
           `Información autorizada: ${JSON.stringify(commercial.allowedInformation ?? [])}.`,
           `Información pendiente de confirmación que no debes inventar: ${JSON.stringify(commercial.informationPendingConfirmation ?? [])}.`,
           `Reglas: ${JSON.stringify(commercial.communicationRules ?? [])}. Restricciones: ${JSON.stringify(commercial.restrictions ?? [])}.`,
           `Disclaimers: ${JSON.stringify(commercial.disclaimers ?? [])}.`,
+          'CONTRATO DE OFERTA CERRADA: responde solo con estos hechos. No recomiendes freelancing, inversiones, trading, criptomonedas, dropshipping, ventas online genericas ni ninguna alternativa ajena a esta oferta.',
         ].join('\n')
       : 'No reveles ni inventes marca, productos, precios, ingresos o modelo comercial salvo que el mensaje los solicite y exista información autorizada.';
 

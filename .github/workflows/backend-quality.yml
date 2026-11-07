@@ -4,11 +4,17 @@ on:
   push:
     paths:
       - 'backend/**'
+      - 'evals/**'
+      - 'package.json'
+      - 'package-lock.json'
       - 'render.yaml'
       - '.github/workflows/backend-quality.yml'
   pull_request:
     paths:
       - 'backend/**'
+      - 'evals/**'
+      - 'package.json'
+      - 'package-lock.json'
       - 'render.yaml'
       - '.github/workflows/backend-quality.yml'
 
@@ -24,7 +30,9 @@ jobs:
         with:
           node-version: 20.19.0
           cache: npm
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: |
+            backend/package-lock.json
+            package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -41,3 +49,9 @@ jobs:
       - name: Lint backend
         run: npm run lint
         working-directory: backend
+
+      - name: Install evaluation dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run Promptfoo smoke evaluations
+        run: npm run evals:smoke

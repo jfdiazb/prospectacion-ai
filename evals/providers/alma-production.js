@@ -3,6 +3,7 @@ require('../../backend/node_modules/ts-node/register/transpile-only');
 const { ConversationalSafetyService } = require('../../backend/src/services/ConversationalSafetyService');
 const { MessagingService } = require('../../backend/src/services/MessagingService');
 const { YouTubeIngestionService } = require('../../backend/src/services/YouTubeIngestionService');
+const { CommercialConversationPolicy } = require('../../backend/src/services/CommercialConversationPolicy');
 
 const bool = value => value === true || value === 'true';
 
@@ -39,6 +40,17 @@ class AlmaProductionProvider {
           currentMessage: String(vars.text || ''),
           hasPriorConversation: bool(vars.hasPriorConversation),
           commercialMemory: bool(vars.hasCommercialMemory) ? { interests: ['producto'] } : null,
+        }),
+      };
+    } else if (vars.mode === 'commercial') {
+      result = {
+        requiresAuthorizedBrief: CommercialConversationPolicy.requiresAuthorizedBrief(String(vars.text || '')),
+        response: CommercialConversationPolicy.authorizedBrief({
+          brandName: 'Amway',
+          businessType: 'venta directa y oportunidad de negocio independiente',
+          commercialLines: ['oportunidad de negocio', 'consumo de productos'],
+          productFamilies: ['Nutrilite'],
+          allowedInformation: ['Nombre de la marca activa', 'Familia Nutrilite como parte de la configuración activa'],
         }),
       };
     } else {

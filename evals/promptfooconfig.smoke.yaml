@@ -22,3 +22,11 @@ tests:
   - description: repeated INFO retains context
     vars: { mode: memory, text: INFO, isNewLead: true, hasPriorConversation: true }
     assert: [{ type: contains, value: '"firstContactDiscovery":false' }]
+  - description: INFO uses authorized commercial context
+    vars: { mode: commercial, text: INFO }
+    assert:
+      - { type: contains, value: '"requiresAuthorizedBrief":true' }
+      - { type: contains, value: Amway }
+      - { type: not-contains, value: freelancing }
+      - { type: not-contains, value: precio }
+      - { type: not-contains, value: reunión }

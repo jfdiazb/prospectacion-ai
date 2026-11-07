@@ -21,6 +21,8 @@ export interface AIReplyContext {
     brandName: string;
     businessType?: string;
     commercialLines?: string[];
+    categories?: string[];
+    productFamilies?: string[];
     allowedInformation?: string[];
     informationPendingConfirmation?: string[];
     communicationRules?: string[];

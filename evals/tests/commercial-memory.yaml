@@ -25,3 +25,14 @@
 - description: returning prospect memory prevents reset
   vars: { mode: memory, text: INFO, isNewLead: true, hasCommercialMemory: true }
   assert: [{ type: contains, value: '"firstContactDiscovery":false' }]
+- description: project explanation uses the authorized closed offer
+  vars: { mode: commercial, text: 'Explícame de qué se trata el proyecto' }
+  assert:
+    - { type: contains, value: '"requiresAuthorizedBrief":true' }
+    - { type: contains, value: Amway }
+    - { type: contains, value: Nutrilite }
+    - { type: not-contains, value: freelancing }
+    - { type: not-contains, value: inversión }
+    - { type: not-contains, value: precio }
+    - { type: not-contains, value: ingresos garantizados }
+    - { type: not-contains, value: reunión }

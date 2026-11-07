@@ -15,6 +15,7 @@ import { MeetingReadinessService } from './MeetingReadinessService';
 import { LaunchAttributionService } from './LaunchAttributionService';
 import { ConversationMemoryService } from './ConversationMemoryService';
 import { ConversationalSafetyService } from './ConversationalSafetyService';
+import { CommercialConversationPolicy } from './CommercialConversationPolicy';
 
 type AlmaContext = { userId: string; leadId: string; conversationId: string; text: string; isNewLead: boolean; platform: 'instagram' | 'facebook' | 'youtube' | 'whatsapp'; sourceEventId: string; correlationId?: string; recipient: MessagingRecipient; automation?: { flowId: string; response: string } };
 
@@ -127,14 +128,21 @@ export class AlmaService {
     const automationAlreadySent = Boolean(context.automation && aiMemory.responseFingerprints.includes(
       ConversationService.fingerprintAIText(context.automation.response)));
     if (automationAlreadySent) context.automation = undefined;
-    const qualifiedMeetingOffer = !context.automation && !isRejected
+    const meetingAlreadyAccepted = priorCommercialMemory.meetingInterest === 'accepted';
+    const qualifiedMeetingOffer = !context.automation && !isRejected && !meetingAlreadyAccepted
       ? MeetingReadinessService.meetingOfferFor(meetingReadiness, recentMessages, leadTexts)
       : undefined;
     const shouldOfferMeeting = Boolean(qualifiedMeetingOffer);
-    const aiProvider = context.automation || shouldOfferMeeting ? null : getAIProvider();
-    const aiResult = context.automation || shouldOfferMeeting ? null : await aiProvider!.generateReply({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, incomingText: context.text, isNewLead: context.isNewLead, firstContactDiscovery, intent, normalizedIntent: qualification.normalizedIntent, platform: context.platform, history, askedTopics: aiMemory.askedTopics, memory: commercialMemory,
-      commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines, allowedInformation: commercialContext.allowedInformation, informationPendingConfirmation: commercialContext.informationPendingConfirmation, communicationRules: commercialContext.communicationRules, restrictions: commercialContext.restrictions, disclaimers: commercialContext.disclaimers } : undefined });
-    const generatedResponse = context.automation?.response ?? qualifiedMeetingOffer ?? aiResult!.text;
+    const postMeetingContinuation = meetingAlreadyAccepted
+      ? 'Gracias. Si necesitas aclarar algo más sobre el proyecto, con gusto te ayudo.'
+      : null;
+    const authorizedInfoBrief = CommercialConversationPolicy.requiresAuthorizedBrief(context.text)
+      ? CommercialConversationPolicy.authorizedBrief(commercialContext)
+      : null;
+    const aiProvider = context.automation || shouldOfferMeeting || authorizedInfoBrief || postMeetingContinuation ? null : getAIProvider();
+    const aiResult = context.automation || shouldOfferMeeting || authorizedInfoBrief || postMeetingContinuation ? null : await aiProvider!.generateReply({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, incomingText: context.text, isNewLead: context.isNewLead, firstContactDiscovery, intent, normalizedIntent: qualification.normalizedIntent, platform: context.platform, history, askedTopics: aiMemory.askedTopics, memory: commercialMemory,
+      commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines, categories: commercialContext.categories, productFamilies: commercialContext.productFamilies, allowedInformation: commercialContext.allowedInformation, informationPendingConfirmation: commercialContext.informationPendingConfirmation, communicationRules: commercialContext.communicationRules, restrictions: commercialContext.restrictions, disclaimers: commercialContext.disclaimers } : undefined });
+    const generatedResponse = context.automation?.response ?? qualifiedMeetingOffer ?? authorizedInfoBrief ?? postMeetingContinuation ?? aiResult!.text;
     const meetingOutcome = await MeetingOrchestratorService.process({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: context.text, wantsMeeting, meetingReadiness: meetingReadiness.reason, launchId: launchAttribution?.launchId, launchParticipantId: launchAttribution?.participantId, platform: context.platform });
     const deduplication = meetingOutcome.reply ? { text: meetingOutcome.reply, deduplicated: false }
       : this.avoidRepeatedResponse(generatedResponse, history, aiMemory, context.text);
@@ -142,7 +150,8 @@ export class AlmaService {
     const commercialInformationAuthorized = Boolean(commercialContext?.allowedInformation?.length);
     const safety = await ConversationalSafetyService.validateForConversation({
       userId: context.userId, conversationId: context.conversationId, text: deduplication.text,
-      readiness: meetingReadiness, asksCommercialDetails, commercialInformationAuthorized, firstContactDiscovery,
+      readiness: meetingReadiness, asksCommercialDetails, commercialInformationAuthorized,
+      firstContactDiscovery: firstContactDiscovery && !authorizedInfoBrief,
       commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines } : undefined,
     });
     const response = safety.text;
