@@ -459,6 +459,12 @@ export class AutomationEngineService {
       action.type === 'send_message'
     ) {
       if (
+        ['sent', 'confirmed', 'delivered', 'simulated'].includes(
+          String(event.data?.automaticDeliveryStatus || '')
+        )
+      )
+        return { status: 'skipped', reason: 'automatic_delivery_already_handled' };
+      if (
         !event.conversationId ||
         !event.platform ||
         !['whatsapp', 'instagram', 'facebook'].includes(event.platform)

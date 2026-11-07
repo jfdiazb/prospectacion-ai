@@ -246,6 +246,7 @@ export class MetaIngestionService {
       const automaticSend =
         (event.platform === 'facebook' && process.env.FACEBOOK_AUTO_SEND_ENABLED === 'true') ||
         (event.platform === 'instagram' && process.env.META_AUTO_SEND_ENABLED === 'true');
+      let automaticDeliveryStatus: string | undefined;
       if (automaticSend) {
         await AlmaService.processMessage(responseContext);
         const outbound: any = await OutboundMessage.findOne({
@@ -255,6 +256,7 @@ export class MetaIngestionService {
           .select('deliveryStatus providerErrorCode providerErrorSubcode requiresReauthorization')
           .lean();
         const deliveryStatus = outbound?.deliveryStatus ?? 'not_created';
+        automaticDeliveryStatus = deliveryStatus;
         observeMeta(
           {
             correlationId,
@@ -302,6 +304,7 @@ export class MetaIngestionService {
           normalizedIntents: refreshed?.normalizedIntents,
           meetingIntent: refreshed?.qualification?.meetingIntent,
           commercialContextId: refreshed?.commercialContextId?.toString(),
+          automaticDeliveryStatus,
         },
       });
       await InboundEvent.updateOne(

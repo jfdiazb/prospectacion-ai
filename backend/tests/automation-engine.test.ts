@@ -217,6 +217,35 @@ describe('Phase 6 automation engine', () => {
   test('retries a safe action before succeeding', async () => { const flow: any = await AutomationService.createFlow(ownerA, definition({ status: 'active' })); const original = AutomationEngineService.executeAction; let calls = 0; const spy = jest.spyOn(AutomationEngineService, 'executeAction').mockImplementation(async (...args: any[]) => { calls++; if (calls < 3) throw new Error('transient'); return original.apply(AutomationEngineService, args as any); }); const result: any = await AutomationEngineService.start(flow, event()); expect(result.status).toBe('completed'); expect(spy).toHaveBeenCalledTimes(3); spy.mockRestore(); });
   test('isolates an action failure and records diagnostics', async () => { const flow: any = await AutomationService.createFlow(ownerA, definition({ status: 'active', actions: [{ type: 'create_proposal', config: {} }] })); const result: any = await AutomationEngineService.start(flow, event({ platform: 'youtube', recipient: undefined })); expect(result).toMatchObject({ status: 'failed', error: expect.stringContaining('canal privado') }); expect(await AutomationFlow.findById(flow._id)).toMatchObject({ status: 'error' }); });
   test('creates an assisted proposal without outbound delivery', async () => { const flow: any = await AutomationService.createFlow(ownerA, definition({ status: 'active', actions: [{ type: 'create_proposal', config: { message: 'Respuesta pendiente de aprobación' } }] })); await AutomationEngineService.start(flow, event()); expect(await AssistedProposal.findOne({})).toMatchObject({ platform: 'whatsapp', status: 'proposed', text: 'Respuesta pendiente de aprobación' }); expect(await OutboundMessage.countDocuments({})).toBe(0); });
+
+  test('does not create a duplicate assisted proposal after accepted automatic delivery', async () => {
+    const flow: any = await AutomationService.createFlow(ownerA, definition({
+      status: 'active',
+      actions: [{ type: 'create_proposal', config: { message: 'Respuesta duplicada' } }],
+    }));
+    const result: any = await AutomationEngineService.start(flow, event({
+      platform: 'facebook',
+      data: { automaticDeliveryStatus: 'sent' },
+    }));
+    expect(result.status).toBe('completed');
+    expect(await AssistedProposal.countDocuments({})).toBe(0);
+  });
+
+  test('keeps the assisted fallback when automatic delivery failed', async () => {
+    const flow: any = await AutomationService.createFlow(ownerA, definition({
+      status: 'active',
+      actions: [{ type: 'create_proposal', config: { message: 'Recuperación manual segura' } }],
+    }));
+    await AutomationEngineService.start(flow, event({
+      platform: 'facebook',
+      data: { automaticDeliveryStatus: 'failed' },
+    }));
+    expect(await AssistedProposal.findOne({})).toMatchObject({
+      platform: 'facebook',
+      status: 'proposed',
+      text: 'Recuperación manual segura',
+    });
+  });
   test.each(['youtube', 'whatsapp', 'instagram', 'facebook', 'tiktok'] as const)('accepts normalized multichannel events: %s', async platform => { const flow: any = await AutomationService.createFlow(ownerA, definition({ status: 'active', trigger: { type: 'message.received' }, actions: [{ type: 'add_tag', config: { tag: platform } }] })); const result: any = await AutomationEngineService.start(flow, event({ eventId: `event-${platform}`, trigger: 'message.received', platform })); expect(result.status).toBe('completed'); });
   test('creates the INFO qualification template once and inactive', async () => { const first: any = await AutomationService.ensureInfoTemplate(ownerA); const second: any = await AutomationService.ensureInfoTemplate(ownerA); expect(first._id.toString()).toBe(second._id.toString()); expect(first).toMatchObject({ status: 'draft', isActive: false, templateKey: 'info_qualification_v1' }); expect(first.actions.map((item: any) => item.type)).toEqual(expect.arrayContaining(['generate_ai_response', 'wait', 'update_score', 'suggest_followup'])); });
   test('returns execution history only to its owner', async () => { const flow: any = await AutomationService.createFlow(ownerA, definition({ status: 'active' })); await AutomationEngineService.start(flow, event()); expect(await AutomationService.history(flow._id, ownerA)).toHaveLength(1); expect(await AutomationService.history(flow._id, ownerB)).toBeNull(); });
