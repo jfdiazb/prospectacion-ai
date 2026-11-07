@@ -9,6 +9,33 @@ type ConfirmationInput = {
 };
 
 export class MessagingConfirmationService {
+  static async confirmByExternalId(input: {
+    userId: string;
+    channel: 'whatsapp';
+    externalMessageId: string;
+    confirmedAt?: Date;
+  }) {
+    const confirmedAt = input.confirmedAt || new Date();
+    return OutboundMessage.findOneAndUpdate(
+      {
+        userId: input.userId,
+        channel: input.channel,
+        externalMessageId: input.externalMessageId,
+        deliveryStatus: { $in: ['sent', 'confirmed', 'delivered'] },
+        simulatedDelivery: { $ne: true },
+      },
+      {
+        $set: {
+          deliveryStatus: 'confirmed',
+          confirmedAt,
+          lastVerificationAt: confirmedAt,
+          confirmationEvidenceSource: 'provider_webhook',
+        },
+      },
+      { new: true }
+    );
+  }
+
   static async confirm(input: ConfirmationInput) {
     const confirmedAt = input.confirmedAt || new Date();
     return OutboundMessage.findOneAndUpdate(

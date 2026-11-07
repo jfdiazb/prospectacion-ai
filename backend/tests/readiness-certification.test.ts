@@ -119,4 +119,25 @@ describe('external delivery certification', () => {
     });
     expect(confirmed.confirmedAt).toBeTruthy();
   });
+
+  test('WhatsApp provider readback confirms the exact external message id', async () => {
+    const message: any = await outbound('sent');
+    message.channel = 'whatsapp';
+    message.externalMessageId = 'wamid.provider-readback';
+    await message.save();
+    await expect(MessagingConfirmationService.confirmByExternalId({
+      userId: new mongoose.Types.ObjectId().toString(),
+      channel: 'whatsapp',
+      externalMessageId: 'wamid.provider-readback',
+    })).resolves.toBeNull();
+    const confirmed: any = await MessagingConfirmationService.confirmByExternalId({
+      userId: userId.toString(),
+      channel: 'whatsapp',
+      externalMessageId: 'wamid.provider-readback',
+    });
+    expect(confirmed).toMatchObject({
+      deliveryStatus: 'confirmed',
+      confirmationEvidenceSource: 'provider_webhook',
+    });
+  });
 });

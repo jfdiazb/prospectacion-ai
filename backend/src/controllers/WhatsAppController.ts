@@ -13,6 +13,7 @@ import { WhatsAppLaunchAdapter } from '../services/WhatsAppLaunchAdapter';
 import { WhatsAppOptOutService } from '../services/WhatsAppOptOutService';
 import { WhatsAppInboundDiagnosticsService } from '../services/WhatsAppInboundDiagnosticsService';
 import Activity from '../models/Activity';
+import { MessagingConfirmationService } from '../services/MessagingConfirmationService';
 
 export class WhatsAppController {
   static isAutomaticReplyEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -77,6 +78,30 @@ export class WhatsAppController {
         return res.sendStatus(401);
       }
       const payload = JSON.parse(rawBody.toString('utf8'));
+      const statuses = (Array.isArray(payload?.entry) ? payload.entry : []).flatMap(
+        (entry: any) =>
+          (Array.isArray(entry?.changes) ? entry.changes : []).flatMap((change: any) =>
+            Array.isArray(change?.value?.statuses) ? change.value.statuses : []
+          )
+      );
+      const userId = process.env.CRM_OWNER_ID;
+      if (statuses.length && userId) {
+        await Promise.all(
+          statuses
+            .filter((status: any) => ['delivered', 'read'].includes(String(status?.status)))
+            .map((status: any) => {
+              const externalMessageId = typeof status?.id === 'string' ? status.id.trim() : '';
+              const timestamp = Number(status?.timestamp) * 1000;
+              if (!externalMessageId) return Promise.resolve(null);
+              return MessagingConfirmationService.confirmByExternalId({
+                userId,
+                channel: 'whatsapp',
+                externalMessageId,
+                confirmedAt: Number.isFinite(timestamp) && timestamp > 0 ? new Date(timestamp) : new Date(),
+              });
+            })
+        );
+      }
       const deliveries = (Array.isArray(payload?.entry) ? payload.entry : []).flatMap(
         (entry: any) =>
           (Array.isArray(entry?.changes) ? entry.changes : []).flatMap((change: any) => {
@@ -88,7 +113,7 @@ export class WhatsAppController {
           })
       );
       if (!deliveries.length) {
-        console.info('WhatsApp webhook ignored', { reason: 'no_messages' });
+        console.info('WhatsApp webhook ignored', { reason: statuses.length ? 'delivery_status_processed' : 'no_messages' });
         return res.sendStatus(200);
       }
       res.sendStatus(200);
