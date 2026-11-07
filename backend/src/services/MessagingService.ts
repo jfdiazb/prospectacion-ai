@@ -6,6 +6,21 @@ import { ChannelCredentialStateService, type OutboundChannel } from './ChannelCr
 type SendContext = { userId: string; leadId: string; conversationId: string; sourceEventId: string; correlationId?: string; text: string; recipient: MessagingRecipient };
 
 export class MessagingService {
+  static classifyDeliveryOutcome(input: {
+    simulated?: boolean;
+    accepted?: boolean;
+    observedPublished?: boolean;
+    moderationStatus?: string;
+    errorCode?: string;
+  }): 'simulated' | 'sent' | 'confirmed' | 'unknown' | 'failed' {
+    if (input.simulated) return 'simulated';
+    if (input.observedPublished && input.moderationStatus === 'published') return 'confirmed';
+    if (input.accepted) return 'sent';
+    if (['META_TIMEOUT', 'YOUTUBE_TIMEOUT', 'MESSAGING_UNKNOWN_ERROR', 'META_UNKNOWN_ERROR', 'YOUTUBE_UNKNOWN_ERROR'].includes(input.errorCode || ''))
+      return 'unknown';
+    return 'failed';
+  }
+
   static async send(context: SendContext, provider?: MessagingProvider): Promise<'sent' | 'simulated' | 'failed' | 'unknown' | 'duplicate'> {
     const channel = context.recipient.type === 'youtube_comment' ? 'youtube' : context.recipient.type === 'whatsapp_user' ? 'whatsapp'
       : context.recipient.type === 'facebook_user' || context.recipient.type === 'facebook_comment' ? 'facebook' : 'instagram';
@@ -80,7 +95,7 @@ export class MessagingService {
         } : undefined,
       });
       await OutboundMessage.updateOne({ _id: outbound._id }, {
-        deliveryStatus: result.simulated ? 'simulated' : 'sent',
+        deliveryStatus: MessagingService.classifyDeliveryOutcome({ simulated: result.simulated, accepted: !result.simulated }),
         externalMessageId: result.externalMessageId,
         sentAt: new Date(),
         providerLatencyMs: Date.now() - providerStartedAt,
@@ -95,7 +110,8 @@ export class MessagingService {
       return result.simulated ? 'simulated' : 'sent';
     } catch (error) {
       const providerError = error instanceof MessagingProviderError ? error : new MessagingProviderError('Error inesperado de mensajería', 'MESSAGING_UNKNOWN_ERROR');
-      const ambiguous = ['META_TIMEOUT', 'YOUTUBE_TIMEOUT', 'MESSAGING_UNKNOWN_ERROR', 'META_UNKNOWN_ERROR', 'YOUTUBE_UNKNOWN_ERROR'].includes(providerError.code);
+      const outcome = MessagingService.classifyDeliveryOutcome({ errorCode: providerError.code });
+      const ambiguous = outcome === 'unknown';
       await OutboundMessage.updateOne({ _id: outbound._id }, {
         deliveryStatus: ambiguous ? 'unknown' : 'failed',
         failedAt: new Date(),

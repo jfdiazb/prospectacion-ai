@@ -1,0 +1,27 @@
+- description: API acceptance remains sent
+  vars: { mode: delivery, accepted: true }
+  assert: [{ type: contains, value: '"status":"sent"' }]
+- description: provider readback confirms published exact reply
+  vars: { mode: delivery, observedPublished: true, moderationStatus: published }
+  assert: [{ type: contains, value: '"status":"confirmed"' }]
+- description: accepted but not observable is not confirmed
+  vars: { mode: delivery, accepted: true, observedPublished: false }
+  assert: [{ type: not-contains, value: '"status":"confirmed"' }]
+- description: timeout is ambiguous
+  vars: { mode: delivery, errorCode: YOUTUBE_TIMEOUT }
+  assert: [{ type: contains, value: '"status":"unknown"' }]
+- description: unauthorized is failed
+  vars: { mode: delivery, errorCode: YOUTUBE_HTTP_401 }
+  assert: [{ type: contains, value: '"status":"failed"' }]
+- description: forbidden is failed
+  vars: { mode: delivery, errorCode: YOUTUBE_HTTP_403 }
+  assert: [{ type: contains, value: '"status":"failed"' }]
+- description: rate limit is failed and retryable by policy
+  vars: { mode: delivery, errorCode: YOUTUBE_HTTP_429 }
+  assert: [{ type: contains, value: '"status":"failed"' }]
+- description: server error is failed
+  vars: { mode: delivery, errorCode: YOUTUBE_HTTP_500 }
+  assert: [{ type: contains, value: '"status":"failed"' }]
+- description: simulated transport never certifies externally
+  vars: { mode: delivery, simulated: true }
+  assert: [{ type: contains, value: '"status":"simulated"' }]

@@ -1,0 +1,27 @@
+- description: bracket placeholder is blocked
+  vars: { mode: safety, text: 'El servicio es [breve descripción del servicio]' }
+  assert: [{ type: contains, value: unresolved_placeholder }]
+- description: mustache placeholder is blocked
+  vars: { mode: safety, text: 'Hola {{nombre}}' }
+  assert: [{ type: contains, value: unresolved_placeholder }]
+- description: template marker is blocked
+  vars: { mode: safety, text: 'Respuesta TBD' }
+  assert: [{ type: contains, value: unresolved_placeholder }]
+- description: invented email delivery is blocked
+  vars: { mode: safety, text: 'Ya te envié el correo con la información' }
+  assert: [{ type: contains, value: unsupported_execution_claim }]
+- description: unconfirmed meeting promise is blocked
+  vars: { mode: safety, text: 'Tu reunión quedó agendada para mañana' }
+  assert: [{ type: contains, value: false_booking_confirmation }]
+- description: confirmed meeting evidence permits confirmation
+  vars: { mode: safety, text: 'Tu reunión está confirmada', confirmedMeeting: true }
+  assert: [{ type: contains, value: '"allowed":true' }]
+- description: initial INFO starts discovery
+  vars: { mode: memory, text: INFO, isNewLead: true }
+  assert: [{ type: contains, value: '"firstContactDiscovery":true' }]
+- description: repeated INFO preserves prior context
+  vars: { mode: memory, text: INFO, isNewLead: true, hasPriorConversation: true }
+  assert: [{ type: contains, value: '"firstContactDiscovery":false' }]
+- description: returning prospect memory prevents reset
+  vars: { mode: memory, text: INFO, isNewLead: true, hasCommercialMemory: true }
+  assert: [{ type: contains, value: '"firstContactDiscovery":false' }]

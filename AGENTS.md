@@ -1,5 +1,14 @@
 # AGENTS.md
 
+## Eval-first y definición de entrega — 2026-11-06
+- No modificar prompts, proveedores ni reglas comerciales sin ejecutar primero una evaluación base aplicable.
+- Mantener cambios pequeños, verificables y sin dependencias de producción innecesarias.
+- Una aceptación del proveedor (`sent`) no demuestra entrega externa; solo `confirmed` con readback verificable la certifica.
+- Nunca declarar GO LIVE sin evidencia automatizada ligada al SHA exacto desplegado y confirmación externa de cada canal live aplicable.
+- Definition of Done de PR: lint + typecheck + unit + `evals:smoke`.
+- Definition of Done de release: lo anterior + `evals:full` + certificación externa aplicable.
+- Toda prueba que requiera credenciales o una plataforma externa se reporta `BLOCKED`, nunca aprobada por simulación.
+
 ## Certificación de entrega externa YouTube — 2026-10-28
 - `comments.insert` confirma únicamente aceptación de la API. El mensaje queda `sent`, conserva el ID creado y la evidencia devuelta (`parentId`, canal autor y moderación), pero no se considera visible.
 - El lifecycle saliente distingue `generated`, `queued`, `sent`, `confirmed`, `failed` y `unknown` (además de `simulated`; estados heredados siguen admitidos para compatibilidad).

@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance } from 'axios';
+import crypto from 'crypto';
 import YouTubeCredential from '../models/YouTubeCredential';
 import InboundEvent from '../models/InboundEvent';
 import Lead from '../models/Lead';
@@ -65,6 +66,29 @@ export class YouTubeIngestionService {
       error.code ||
       'api_error';
     return { httpStatus: error.response?.status, reason: String(reason).slice(0, 80) };
+  }
+
+  static correlationId(userId: string, commentId: string): string {
+    return `yt_${crypto.createHash('sha256').update(`${userId}:${commentId}`).digest('hex').slice(0, 24)}`;
+  }
+
+  static evaluateEligibility(input: {
+    text: string;
+    isOwnComment?: boolean;
+    hasExistingLead?: boolean;
+    hasAutomationReply?: boolean;
+    hasLaunchMapping?: boolean;
+  }): { eligible: boolean; reason: string } {
+    if (!input.text.trim()) return { eligible: false, reason: 'invalid_text' };
+    if (input.isOwnComment) return { eligible: false, reason: 'own_channel' };
+    const normalized = input.text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (input.hasExistingLead) return { eligible: true, reason: 'existing_lead' };
+    if (/(^|\s)info(\s|$)/i.test(normalized)) return { eligible: true, reason: 'info_keyword' };
+    if (/\bquiero\s+conocer\s+mas\s+sobre\s+(?:esta|la)\s+oportunidad(?:\s+y\s+como\s+funciona)?\b/i.test(normalized))
+      return { eligible: true, reason: 'explicit_opportunity_interest' };
+    if (input.hasAutomationReply) return { eligible: true, reason: 'automation_keyword' };
+    if (input.hasLaunchMapping) return { eligible: true, reason: 'mapped_launch_content' };
+    return { eligible: false, reason: 'new_author_without_eligibility_signal' };
   }
 
   async pollAll(): Promise<number> {
@@ -436,9 +460,7 @@ export class YouTubeIngestionService {
     const text = comment.snippet?.textOriginal?.trim();
     const senderId = comment.snippet?.authorChannelId?.value;
     if (!text || !senderId || !comment.id) return 'invalid';
-    if (ownChannelId && senderId === ownChannelId) return 'own_channel';
     const hasInfoKeyword = /(^|\s)info(\s|$)/i.test(text);
-    const hasExplicitOpportunityInterest = /\bquiero\s+conocer\s+m[aá]s\s+sobre\s+(?:esta|la)\s+oportunidad(?:\s+y\s+c[oó]mo\s+funciona)?\b/i.test(text);
     const automation = await AutomationService.findMatchingKeywordFlow(userId, text);
     const automationReply = AutomationService.getReply(automation);
     const existingLead = await Lead.findOne({ userId, username: senderId, platform: 'youtube' });
@@ -446,12 +468,21 @@ export class YouTubeIngestionService {
     const hasLaunchMapping = launchEvent
       ? await YouTubeLaunchAdapter.hasMappedVideo(userId, launchEvent)
       : false;
-    if (!existingLead && !hasInfoKeyword && !hasExplicitOpportunityInterest && !automationReply && !hasLaunchMapping) {
-      const reason = 'new_author_without_eligibility_signal';
+    const eligibility = YouTubeIngestionService.evaluateEligibility({
+      text,
+      isOwnComment: Boolean(ownChannelId && senderId === ownChannelId),
+      hasExistingLead: Boolean(existingLead),
+      hasAutomationReply: Boolean(automationReply),
+      hasLaunchMapping,
+    });
+    if (eligibility.reason === 'own_channel') return 'own_channel';
+    if (!eligibility.eligible) {
+      const reason = eligibility.reason;
       if (diagnostics) diagnostics.notEligibleReasons[reason] = (diagnostics.notEligibleReasons[reason] || 0) + 1;
       return 'not_eligible';
     }
     const sourceEventId = `youtube:${comment.id}`;
+    const correlationId = YouTubeIngestionService.correlationId(userId, comment.id);
     const claimed = await this.claimComment({
       userId,
       sourceEventId,
@@ -459,6 +490,7 @@ export class YouTubeIngestionService {
       text,
       mediaId: comment.snippet?.videoId,
       matchedKeyword: automation?.trigger?.keyword || (hasInfoKeyword ? 'INFO' : undefined),
+      correlationId,
     });
     if (!claimed) return 'duplicate';
     try {
@@ -516,7 +548,7 @@ export class YouTubeIngestionService {
           { _id: claimed._id },
           {
             $set: { processingState: 'completed', processedAt: new Date() },
-            $unset: { retryAfter: 1, processingFailedAt: 1 },
+            $unset: { retryAfter: 1, processingFailedAt: 1, processingErrorCode: 1 },
           }
         );
         return 'processed';
@@ -529,6 +561,7 @@ export class YouTubeIngestionService {
         isNewLead,
         platform: 'youtube',
         sourceEventId,
+        correlationId,
         recipient: { type: 'youtube_comment', parentCommentId: responseParentId },
         automation:
           automation && automationReply
@@ -558,7 +591,7 @@ export class YouTubeIngestionService {
         { _id: claimed._id },
         {
           $set: { processingState: 'completed', processedAt: new Date() },
-          $unset: { retryAfter: 1, processingFailedAt: 1 },
+          $unset: { retryAfter: 1, processingFailedAt: 1, processingErrorCode: 1 },
         }
       );
       return 'processed';
@@ -574,6 +607,7 @@ export class YouTubeIngestionService {
             processingState: 'failed',
             processingFailedAt: new Date(),
             retryAfter: new Date(Date.now() + retryDelayMs),
+            processingErrorCode: error instanceof Error ? error.name.slice(0, 80) : 'unknown',
           },
         }
       );
@@ -592,6 +626,7 @@ export class YouTubeIngestionService {
     text: string;
     mediaId?: string;
     matchedKeyword?: string;
+    correlationId: string;
   }): Promise<any | null> {
     const now = new Date();
     const initialClaim: any = await InboundEvent.findOneAndUpdate(
@@ -600,6 +635,7 @@ export class YouTubeIngestionService {
         $setOnInsert: {
           userId: input.userId,
           externalEventId: input.sourceEventId,
+          correlationId: input.correlationId,
           channel: 'youtube',
           eventType: 'comment',
           senderId: input.senderId,

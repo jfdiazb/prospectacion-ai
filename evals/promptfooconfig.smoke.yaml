@@ -1,0 +1,24 @@
+description: ALMA smoke eval certification
+prompts:
+  - '{{text}}'
+providers:
+  - file://providers/alma-production.js
+tests:
+  - description: INFO eligibility smoke
+    vars: { mode: eligibility, text: INFO }
+    assert: [{ type: contains, value: '"reason":"info_keyword"' }]
+  - description: API acceptance is not confirmation
+    vars: { mode: delivery, accepted: true }
+    assert: [{ type: contains, value: '"status":"sent"' }]
+  - description: published readback confirmation
+    vars: { mode: delivery, observedPublished: true, moderationStatus: published }
+    assert: [{ type: contains, value: '"status":"confirmed"' }]
+  - description: placeholders blocked
+    vars: { mode: safety, text: 'Hola {{nombre}}' }
+    assert: [{ type: contains, value: unresolved_placeholder }]
+  - description: false meeting confirmation blocked
+    vars: { mode: safety, text: 'Tu reunión quedó agendada' }
+    assert: [{ type: contains, value: false_booking_confirmation }]
+  - description: repeated INFO retains context
+    vars: { mode: memory, text: INFO, isNewLead: true, hasPriorConversation: true }
+    assert: [{ type: contains, value: '"firstContactDiscovery":false' }]

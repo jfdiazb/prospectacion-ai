@@ -123,7 +123,7 @@ export class AlmaService {
     const history = previousMessages.slice(-4)
       .filter((message: any) => (message.sender === 'lead' || message.sender === 'ai') && typeof message.text === 'string')
       .map((message: any) => ({ sender: message.sender as 'lead' | 'ai', text: message.text.slice(0, 1000) }));
-    let aiMemory = await ConversationService.getOrInitializeAIMemory(context.conversationId, context.userId);
+    const aiMemory = await ConversationService.getOrInitializeAIMemory(context.conversationId, context.userId);
     const automationAlreadySent = Boolean(context.automation && aiMemory.responseFingerprints.includes(
       ConversationService.fingerprintAIText(context.automation.response)));
     if (automationAlreadySent) context.automation = undefined;
@@ -136,7 +136,7 @@ export class AlmaService {
       commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines, allowedInformation: commercialContext.allowedInformation, informationPendingConfirmation: commercialContext.informationPendingConfirmation, communicationRules: commercialContext.communicationRules, restrictions: commercialContext.restrictions, disclaimers: commercialContext.disclaimers } : undefined });
     const generatedResponse = context.automation?.response ?? qualifiedMeetingOffer ?? aiResult!.text;
     const meetingOutcome = await MeetingOrchestratorService.process({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, text: context.text, wantsMeeting, meetingReadiness: meetingReadiness.reason, launchId: launchAttribution?.launchId, launchParticipantId: launchAttribution?.participantId, platform: context.platform });
-    let deduplication = meetingOutcome.reply ? { text: meetingOutcome.reply, deduplicated: false }
+    const deduplication = meetingOutcome.reply ? { text: meetingOutcome.reply, deduplicated: false }
       : this.avoidRepeatedResponse(generatedResponse, history, aiMemory, context.text);
     const asksCommercialDetails = /empresa|marca|producto|precio|plan|modelo|amway|nutrilite|de que se trata|cómo funciona|como funciona/i.test(context.text);
     const commercialInformationAuthorized = Boolean(commercialContext?.allowedInformation?.length);

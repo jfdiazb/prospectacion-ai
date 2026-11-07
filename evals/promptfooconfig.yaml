@@ -1,0 +1,9 @@
+description: ALMA eval-first deterministic certification
+prompts:
+  - '{{text}}'
+providers:
+  - file://providers/alma-production.js
+defaultTest:
+  options:
+    transform: output
+tests: file://tests/*.yaml

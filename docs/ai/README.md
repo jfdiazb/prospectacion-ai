@@ -1,5 +1,12 @@
 # Documentación AI - Prospectación AI
 
+## Estabilización eval-first — 2026-11-06
+- Promptfoo ejecuta casos deterministas mediante `evals/providers/alma-production.js`, que importa los servicios productivos de elegibilidad YouTube, seguridad comercial y estados de entrega.
+- La elegibilidad dejó de estar encerrada en el polling: `YouTubeIngestionService.evaluateEligibility` es la decisión única reutilizada por polling y evals.
+- Cada comentario YouTube obtiene un `correlationId` determinista y no reversible, persistido en `InboundEvent` y propagado por ALMA hasta `OutboundMessage`.
+- `MessagingService.classifyDeliveryOutcome` conserva `sent != confirmed`; los transportes simulados permanecen `simulated` y los timeouts ambiguos quedan `unknown`.
+- Los comandos locales son `npm run evals:smoke` y `npm run evals:full`; no consumen Groq ni publican mensajes.
+
 ## Entrega verificable de respuestas YouTube — 2026-10-28
 - La aceptación de `comments.insert` se registra como `sent`, no como visibilidad confirmada. Se persisten el ID devuelto, comentario padre, identidad del canal autor y estado de moderación disponibles.
 - El poller confirma una respuesta solo cuando vuelve a observar el ID exacto en el hilo padre correcto, publicado por el canal conectado. Respuestas ausentes o retenidas no producen `confirmed`.

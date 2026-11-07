@@ -1,0 +1,24 @@
+- description: INFO is eligible
+  vars: { mode: eligibility, text: INFO }
+  assert: [{ type: contains, value: '"reason":"info_keyword"' }]
+- description: accented explicit interest is eligible
+  vars: { mode: eligibility, text: Quiero conocer más sobre esta oportunidad y cómo funciona }
+  assert: [{ type: contains, value: '"reason":"explicit_opportunity_interest"' }]
+- description: configured automation keyword is eligible
+  vars: { mode: eligibility, text: DETALLES, hasAutomationReply: true }
+  assert: [{ type: contains, value: '"reason":"automation_keyword"' }]
+- description: mapped launch comment is eligible but weak downstream evidence
+  vars: { mode: eligibility, text: Me interesa, hasLaunchMapping: true }
+  assert: [{ type: contains, value: '"reason":"mapped_launch_content"' }]
+- description: existing prospect reply remains eligible
+  vars: { mode: eligibility, text: Gracias, hasExistingLead: true }
+  assert: [{ type: contains, value: '"reason":"existing_lead"' }]
+- description: borderline generic comment is not eligible
+  vars: { mode: eligibility, text: Interesante video }
+  assert: [{ type: contains, value: '"eligible":false' }]
+- description: own channel comment is rejected
+  vars: { mode: eligibility, text: INFO, isOwnComment: true }
+  assert: [{ type: contains, value: '"reason":"own_channel"' }]
+- description: empty comment is invalid
+  vars: { mode: eligibility, text: '' }
+  assert: [{ type: contains, value: '"reason":"invalid_text"' }]
