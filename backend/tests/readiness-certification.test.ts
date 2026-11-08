@@ -66,6 +66,20 @@ describe('external delivery certification', () => {
     expect(readiness.goLive).toBe(false);
   });
 
+  test('reports Social Scraper credential wiring while the provider remains in demo mode', async () => {
+    process.env.SOCIAL_SCRAPER_MODE = 'demo';
+    process.env.YOUTUBE_SCRAPER_API_KEY = 'test-key-present-without-revealing-it';
+
+    const readiness = await ReadinessService.inspect();
+
+    expect(readiness.configuration.socialScraper).toMatchObject({
+      mode: 'demo',
+      provider: 'alma-demo-fixture',
+      credentialConfigured: true,
+      intentionallyDisabled: true,
+    });
+  });
+
   test('requires real inbound plus externally confirmed delivery for operational certification', async () => {
     await outbound('confirmed');
     await InboundEvent.create({

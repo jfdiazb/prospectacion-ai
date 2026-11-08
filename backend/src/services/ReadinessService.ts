@@ -127,6 +127,7 @@ export class ReadinessService {
       youtube: effectiveOutbound('youtube', youtubeMode),
     } as const;
     const socialScraperMode = process.env.SOCIAL_SCRAPER_MODE === 'live' ? 'live' : 'demo';
+    const socialScraperCredentialConfigured = has('YOUTUBE_SCRAPER_API_KEY');
     const configurationIssues: Array<{ severity: 'critical' | 'warning'; code: string }> = [];
     const requireLiveConfiguration = (channel: keyof typeof effectiveModes) => {
       if (effectiveModes[channel] === 'live' && !providerConfig[channel]) {
@@ -141,7 +142,7 @@ export class ReadinessService {
       effectiveModes.instagram !== 'live' && effectiveModes.facebook !== 'live') {
       configurationIssues.push({ severity: 'critical', code: 'meta_automatic_without_live_outbound' });
     }
-    if (socialScraperMode === 'live' && !has('YOUTUBE_SCRAPER_API_KEY')) {
+    if (socialScraperMode === 'live' && !socialScraperCredentialConfigured) {
       configurationIssues.push({ severity: 'critical', code: 'social_scraper_live_missing_configuration' });
     }
     if (tiktokApproved && (tiktokIngestionRequested || tiktokMessagingRequested)) {
@@ -193,7 +194,9 @@ export class ReadinessService {
         socialScraper: {
           mode: socialScraperMode,
           provider: socialScraperMode === 'live' ? 'youtube' : 'alma-demo-fixture',
-          credentialConfigured: socialScraperMode === 'live' ? has('YOUTUBE_SCRAPER_API_KEY') : false,
+          // Credential presence is independent from activation. Keeping this observable while
+          // DEMO is selected lets operators validate Render wiring before spending provider quota.
+          credentialConfigured: socialScraperCredentialConfigured,
           quotaProbeAuthorized: process.env.ALLOW_YOUTUBE_SCRAPER_PROBE === 'true',
           intentionallyDisabled: socialScraperMode === 'demo',
         },
