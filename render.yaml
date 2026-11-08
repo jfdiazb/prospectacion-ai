@@ -6,7 +6,9 @@ services:
     rootDir: backend
     # A release must pass the complete backend suite. Running only the behavioral
     # smoke suite allowed integration regressions to reach production unnoticed.
-    buildCommand: npm ci --include=dev && npm run build && npm test -- --runInBand
+    # Temporary one-shot certification: remains in DEMO and authorizes only this build command.
+    # Remove immediately after Render records the real-provider probe result.
+    buildCommand: npm ci --include=dev && npm run build && npm test -- --runInBand && ALLOW_YOUTUBE_SCRAPER_PROBE=true SOCIAL_SCRAPER_MODE=demo npm run probe:youtube-scraper
     startCommand: RELEASE_COMMIT=$RENDER_GIT_COMMIT npm start
     healthCheckPath: /api/v1/readiness
     envVars:
