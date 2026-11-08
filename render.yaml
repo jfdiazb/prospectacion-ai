@@ -6,9 +6,7 @@ services:
     rootDir: backend
     # A release must pass the complete backend suite. Running only the behavioral
     # smoke suite allowed integration regressions to reach production unnoticed.
-    # Temporary one-shot certification: remains in DEMO and authorizes only this build command.
-    # Remove immediately after Render records the real-provider probe result.
-    buildCommand: npm ci --include=dev && npm run build && npm test -- --runInBand && ALLOW_YOUTUBE_SCRAPER_PROBE=true SOCIAL_SCRAPER_MODE=demo npm run probe:youtube-scraper
+    buildCommand: npm ci --include=dev && npm run build && npm test -- --runInBand
     startCommand: RELEASE_COMMIT=$RENDER_GIT_COMMIT npm start
     healthCheckPath: /api/v1/readiness
     envVars:
@@ -53,14 +51,10 @@ services:
       - key: YOUTUBE_POLLING_ENABLED
         value: "true"
       - key: SOCIAL_SCRAPER_MODE
-        # Safe default. A controlled live test requires separate human authorization.
-        value: demo
+        value: live
       - key: YOUTUBE_SCRAPER_API_KEY
         # Dedicated Social Scraper credential; never reuse operational YouTube credentials.
         sync: false
-      - key: ALLOW_YOUTUBE_SCRAPER_PROBE
-        # One-shot operational command only; never enables an HTTP endpoint.
-        value: "false"
       - key: YOUTUBE_SCRAPER_DAILY_QUOTA_BUDGET
         # Conservative Social Scraper-only ceiling; enforced durably in MongoDB.
         value: "1000"

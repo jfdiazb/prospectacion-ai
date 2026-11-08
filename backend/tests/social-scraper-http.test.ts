@@ -395,9 +395,9 @@ describe('Social Scraper Fase 3A - transporte HTTP simulado', () => {
     expect(frontendText).not.toContain(TEST_KEY);
   });
 
-  test('Blueprint declara secreto externo y mantiene demo como default', () => {
+  test('Blueprint declara secreto externo y activa el proveedor live certificado', () => {
     const blueprint = readFileSync(join(__dirname, '..', '..', 'render.yaml'), 'utf8');
-    expect(blueprint).toMatch(/key: SOCIAL_SCRAPER_MODE\s+[\s\S]*?value: demo/);
+    expect(blueprint).toMatch(/key: SOCIAL_SCRAPER_MODE\s+[\s\S]*?value: live/);
     expect(blueprint).toMatch(/key: YOUTUBE_SCRAPER_API_KEY\s+[\s\S]*?sync: false/);
     expect(blueprint).not.toContain(TEST_KEY);
   });

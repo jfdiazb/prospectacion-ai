@@ -197,7 +197,6 @@ export class ReadinessService {
           // Credential presence is independent from activation. Keeping this observable while
           // DEMO is selected lets operators validate Render wiring before spending provider quota.
           credentialConfigured: socialScraperCredentialConfigured,
-          quotaProbeAuthorized: process.env.ALLOW_YOUTUBE_SCRAPER_PROBE === 'true',
           intentionallyDisabled: socialScraperMode === 'demo',
         },
       },

@@ -99,7 +99,6 @@ describe('release certification readiness', () => {
       ...originalEnv,
       SOCIAL_SCRAPER_MODE: 'demo',
       YOUTUBE_SCRAPER_API_KEY: '',
-      ALLOW_YOUTUBE_SCRAPER_PROBE: 'false',
     };
 
     const readiness = await ReadinessService.inspect();
@@ -108,7 +107,6 @@ describe('release certification readiness', () => {
       mode: 'demo',
       provider: 'alma-demo-fixture',
       credentialConfigured: false,
-      quotaProbeAuthorized: false,
       intentionallyDisabled: true,
     });
   });
