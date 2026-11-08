@@ -98,6 +98,7 @@ describe('release certification readiness', () => {
     process.env = {
       ...originalEnv,
       SOCIAL_SCRAPER_MODE: 'demo',
+      YOUTUBE_SCRAPER_API_KEY: '',
       ALLOW_YOUTUBE_SCRAPER_PROBE: 'false',
     };
 
