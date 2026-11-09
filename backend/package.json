@@ -12,7 +12,8 @@
     "format": "prettier --write src",
     "test": "jest",
     "alma:smoke": "node scripts/alma-smoke.js",
-    "migrate": "node scripts/migrate.js"
+    "migrate": "node scripts/migrate.js",
+    "evidence:production": "node dist/operations/productionEvidenceAudit.js"
   },
   "keywords": [
     "prospectacion",
