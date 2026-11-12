@@ -31,6 +31,8 @@ const conversationSchema = new Schema(
         direction: { type: String, enum: ['inbound', 'outbound'] },
         status: { type: String, enum: ['received', 'proposed', 'pending', 'sent', 'simulated', 'failed'] },
         externalMessageId: String,
+        eventType: String,
+        source: String,
         relatedMessageId: String,
         processingError: String,
       },

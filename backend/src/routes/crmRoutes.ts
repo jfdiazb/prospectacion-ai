@@ -76,10 +76,14 @@ router.get('/conversations', async (req: AuthRequest, res, next) => {
     })
       .sort({ evaluatedAt: -1 })
       .lean();
+    const conversationsById = new Map(conversations.map(item => [item._id.toString(), item]));
     const latest = new Map<string, any>();
-    for (const proposal of proposals)
-      if (!latest.has(proposal.conversationId.toString()))
-        latest.set(proposal.conversationId.toString(), proposal);
+    for (const proposal of proposals) {
+      const conversationId = proposal.conversationId.toString();
+      const conversation = conversationsById.get(conversationId);
+      if (!latest.has(conversationId) && conversation && ProposalRoutingService.isCurrentForConversation(proposal, conversation))
+        latest.set(conversationId, proposal);
+    }
     const latestQualification = new Map<string, any>();
     for (const entry of qualificationHistory)
       if (!latestQualification.has(entry.leadId.toString()))
@@ -104,6 +108,7 @@ router.get('/conversations', async (req: AuthRequest, res, next) => {
       data: conversations.map(item => ({
         ...item,
         proposedResponse: latest.get(item._id.toString()),
+        latestInboundContext: ProposalRoutingService.currentInboundContext(item),
         latestQualification: item.leadId?._id
           ? latestQualification.get(item.leadId._id.toString())
           : undefined,
@@ -136,6 +141,14 @@ router.patch(
         status: { $in: ['proposed', 'failed'] },
       });
       if (candidate) {
+        const currentConversation: any = await Conversation.findOne({ _id: candidate.conversationId, userId: req.userId }).lean();
+        if (!currentConversation || !ProposalRoutingService.isCurrentForConversation(candidate, currentConversation)) {
+          await AssistedProposal.updateOne(
+            { _id: candidate._id, status: { $in: ['proposed', 'failed'] } },
+            { $set: { status: 'cancelled', invalidatedAt: new Date(), invalidationReason: 'superseded_by_new_inbound_event', errorMessage: 'Propuesta invalidada por un mensaje entrante posterior' } }
+          );
+          return res.status(409).json({ success: false, message: 'La propuesta corresponde a un mensaje anterior y fue invalidada', code: 'PROPOSAL_SUPERSEDED_BY_INBOUND' });
+        }
         const validation = await ReactivationService.validateProposal(candidate);
         if (!validation.valid) {
           await ReactivationService.invalidateProposal(
@@ -341,9 +354,12 @@ router.post(
         leadId: proposal.leadId._id.toString(),
         conversationId: proposal.conversationId.toString(),
         sourceEventId: messagingSourceEventId,
+        correlationId: proposal.correlationId || `proposal:${proposal._id}`,
         text: proposal.text,
         recipient,
       });
+      const outbound: any = await OutboundMessage.findOne({ userId: req.userId, sourceEventId: messagingSourceEventId }).select('_id').lean();
+      if (outbound?._id) await AssistedProposal.updateOne({ _id: proposal._id }, { $set: { outboundMessageId: outbound._id } });
       if (deliveryStatus === 'unknown') {
         await AssistedProposal.updateOne(
           { _id: proposal._id },

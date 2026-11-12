@@ -18,7 +18,7 @@ import { ConversationMemoryService } from './ConversationMemoryService';
 import { ConversationalSafetyService } from './ConversationalSafetyService';
 
 type AssistedPlatform = 'whatsapp' | 'instagram' | 'facebook';
-type Context = { userId: string; leadId: string; conversationId: string; sourceEventId: string; text: string; isNewLead: boolean; platform: AssistedPlatform; recipient: MessagingRecipient };
+type Context = { userId: string; leadId: string; conversationId: string; sourceEventId: string; correlationId?: string; eventType?: string; text: string; isNewLead: boolean; platform: AssistedPlatform; recipient: MessagingRecipient };
 
 export class AssistedResponseService {
   static recipientRecord(recipient: MessagingRecipient): { type: string; externalId: string } {
@@ -77,10 +77,10 @@ export class AssistedResponseService {
     const schedulingMeeting: any = meetingOutcome.reply ? await Meeting.findOne({ userId: context.userId, conversationId: context.conversationId }).sort({ createdAt: -1 }) : null;
     const conversationState: any = schedulingMeeting ? await Conversation.findOne({ _id: context.conversationId, userId: context.userId }).select('lastMessage') : null;
     const proposal = await AssistedProposal.findOneAndUpdate({ userId: context.userId, sourceEventId: context.sourceEventId }, { $setOnInsert: {
-      userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId,
+      userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, correlationId: context.correlationId,
       platform: context.platform, recipient: this.recipientRecord(context.recipient), text: safety.text, originalText: safety.text, purpose: schedulingMeeting ? 'meeting_scheduling' : 'conversation_response', status: 'proposed',
       expiresAt: schedulingMeeting ? (schedulingMeeting.optionsExpiresAt || new Date(Date.now() + 86400000)) : undefined,
-      contextSnapshot: schedulingMeeting ? { leadStatus: applied.current.status, channel: context.platform, conversationLastMessageAt: conversationState?.lastMessage, meetingId: schedulingMeeting._id.toString(), meetingStatus: schedulingMeeting.status, meetingScheduledFor: schedulingMeeting.scheduledFor || schedulingMeeting.scheduledAt } : undefined,
+      contextSnapshot: { leadStatus: applied.current.status, channel: context.platform, conversationLastMessageAt: conversationState?.lastMessage, lastLeadMessageId: context.sourceEventId, inboundEventType: context.eventType, recipientType: context.recipient.type, meetingId: schedulingMeeting?._id.toString(), meetingStatus: schedulingMeeting?.status, meetingScheduledFor: schedulingMeeting?.scheduledFor || schedulingMeeting?.scheduledAt },
     } }, { upsert: true, new: true });
     await Conversation.updateOne({ _id: context.conversationId, userId: context.userId }, { $set: { 'aiAnalysis.intent': qualification.intent, 'aiAnalysis.recommendedResponse': proposal.text } });
     if (handoffReason) {

@@ -296,6 +296,44 @@ describe('Phase 4 Meta consolidation', () => {
     expect(await OutboundMessage.countDocuments({})).toBe(0);
   });
 
+  test('invalidates a stale Facebook comment proposal when the existing conversation receives a Messenger DM', async () => {
+    const comment = await MetaIngestionService.acceptPayload(
+      ownerA.toString(),
+      facebookComment('comment-before-dm', 'INFO', 'same-facebook-user')
+    );
+    await MetaIngestionService.processAccepted(ownerA.toString(), comment[0]);
+
+    const dmPayload = {
+      object: 'page',
+      entry: [{
+        id: 'page-1',
+        messaging: [{
+          sender: { id: 'same-facebook-user' }, recipient: { id: 'page-1' }, timestamp: Date.now(),
+          message: { mid: 'm_current_dm', text: 'Hola, quiero saber cÃ³mo funciona' },
+        }],
+      }],
+    };
+    const dm = await MetaIngestionService.acceptPayload(ownerA.toString(), dmPayload);
+    await MetaIngestionService.processAccepted(ownerA.toString(), dm[0]);
+
+    const proposals: any[] = await AssistedProposal.find({ userId: ownerA }).sort({ createdAt: 1 }).lean();
+    expect(proposals).toHaveLength(2);
+    expect(proposals[0]).toMatchObject({
+      recipient: { type: 'facebook_comment' },
+      status: 'cancelled',
+      invalidationReason: 'superseded_by_new_inbound_event',
+    });
+    expect(proposals[1]).toMatchObject({
+      sourceEventId: 'meta:facebook:m_current_dm',
+      recipient: { type: 'facebook_user' },
+      status: 'proposed',
+      contextSnapshot: { lastLeadMessageId: 'meta:facebook:m_current_dm', inboundEventType: 'direct_message', recipientType: 'facebook_user' },
+    });
+    const conversation: any = await Conversation.findOne({ userId: ownerA }).lean();
+    expect(conversation.messages.at(-1)).toMatchObject({ eventType: 'direct_message', source: 'facebook_direct_message' });
+    expect(await MetaIngestionService.acceptPayload(ownerA.toString(), dmPayload)).toHaveLength(0);
+  });
+
   test('routes a new Facebook event directly through ALMA when automatic mode is enabled', async () => {
     process.env.FACEBOOK_AUTO_SEND_ENABLED = 'true';
     const processMessage = jest.spyOn(AlmaService, 'processMessage').mockResolvedValue('Respuesta');

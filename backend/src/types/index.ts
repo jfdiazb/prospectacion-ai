@@ -94,6 +94,8 @@ export interface IMessage {
   direction?: 'inbound' | 'outbound';
   status?: 'received' | 'proposed' | 'pending' | 'sent' | 'simulated' | 'failed';
   externalMessageId?: string;
+  eventType?: string;
+  source?: string;
   relatedMessageId?: string;
   processingError?: string;
 }

@@ -5,6 +5,7 @@ const schema = new Schema({
   leadId: { type: Schema.Types.ObjectId, ref: 'Lead', required: true },
   conversationId: { type: Schema.Types.ObjectId, ref: 'Conversation', required: true },
   sourceEventId: { type: String, required: true },
+  correlationId: String,
   platform: { type: String, enum: ['whatsapp', 'instagram', 'facebook'], default: 'whatsapp', required: true },
   recipient: {
     type: { type: String, enum: ['whatsapp_user', 'instagram_user', 'instagram_comment', 'facebook_user', 'facebook_comment'] },
@@ -18,6 +19,8 @@ const schema = new Schema({
     channel: String,
     conversationLastMessageAt: Date,
     lastLeadMessageId: String,
+    inboundEventType: String,
+    recipientType: String,
     qualificationEvaluatedAt: Date,
     meetingId: String,
     meetingStatus: String,

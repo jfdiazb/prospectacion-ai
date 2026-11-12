@@ -11,6 +11,7 @@ import { MetaLaunchAdapter } from './MetaLaunchAdapter';
 import { metaEventFingerprint, metaWebhookCorrelationId, observeMeta } from './MetaObservability';
 import { AlmaService } from './AlmaService';
 import OutboundMessage from '../models/OutboundMessage';
+import AssistedProposal from '../models/AssistedProposal';
 
 type AcceptedMetaEvent = {
   id: string;
@@ -210,6 +211,8 @@ export class MetaIngestionService {
           direction: 'inbound',
           status: 'received',
           externalMessageId: event.externalEventId,
+          eventType: event.eventType,
+          source: event.source,
         });
         await InboundEvent.updateOne(
           { _id: id, userId },
@@ -238,11 +241,29 @@ export class MetaIngestionService {
         conversationId: currentConversationId,
         sourceEventId: event.externalEventId,
         correlationId,
+        eventType: event.eventType,
         text: event.content,
         isNewLead,
         platform: event.platform,
         recipient: event.recipient,
       };
+      await AssistedProposal.updateMany(
+        {
+          userId,
+          conversationId: currentConversationId,
+          status: { $in: ['proposed', 'failed'] },
+          sourceEventId: { $ne: event.externalEventId },
+          purpose: { $in: ['conversation_response', 'automation', 'follow_up', 'reactivation'] },
+        },
+        {
+          $set: {
+            status: 'cancelled',
+            invalidatedAt: new Date(),
+            invalidationReason: 'superseded_by_new_inbound_event',
+            errorMessage: 'Propuesta invalidada por un mensaje entrante posterior',
+          },
+        }
+      );
       const automaticSend =
         (event.platform === 'facebook' && process.env.FACEBOOK_AUTO_SEND_ENABLED === 'true') ||
         (event.platform === 'instagram' && process.env.META_AUTO_SEND_ENABLED === 'true');
