@@ -7,12 +7,20 @@ import type { IScraperResult } from '@types';
 import { useScraperMode } from '@context/ScraperModeContext';
 
 export const ScraperPage = () => {
-  const { confirmMode } = useScraperMode();
+  const { mode, confirmMode } = useScraperMode();
   const [hashtag, setHashtag] = useState('ventas');
   const [result, setResult] = useState<IScraperResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const isLiveResult = result?.mode === 'live';
+  const effectiveMode = result?.mode === 'live' || result?.mode === 'demo'
+    ? result.mode
+    : mode;
+  const isLiveResult = effectiveMode === 'live';
+  const isDemoResult = effectiveMode === 'demo';
+  const livePostsWithAvailableEngagement = result?.topPosts.filter(
+    post => typeof post.views === 'number' && post.views > 0,
+  ) ?? [];
+  const averageEngagementAvailable = !isLiveResult || livePostsWithAvailableEngagement.length > 0;
 
   const handleScrape = async () => {
     try {
@@ -50,8 +58,10 @@ export const ScraperPage = () => {
               }`}
             >
               {isLiveResult
-                ? 'Lectura oficial: esta muestra proviene de YouTube Data API v3.'
-                : 'Modo demostración: los resultados visibles son simulados y no provienen de redes sociales reales.'}
+                ? 'Fuente real habilitada: las consultas provienen de YouTube Data API v3.'
+                : isDemoResult
+                  ? 'Modo demostración: los resultados visibles son simulados y no provienen de redes sociales reales.'
+                  : 'Estado no verificado: ALMA todavía no pudo confirmar la fuente de datos.'}
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Análisis rápido de hashtag</h2>
@@ -99,7 +109,9 @@ export const ScraperPage = () => {
                   </div>
                   <div className="flex flex-wrap gap-2 text-sm text-dark-300">
                     <Badge variant="secondary">Posts: {result.totalPosts}</Badge>
-                    <Badge variant="primary">Engagement: {result.avgEngagement}%</Badge>
+                    <Badge variant="primary">
+                      Engagement: {averageEngagementAvailable ? `${result.avgEngagement}%` : 'No disponible'}
+                    </Badge>
                   </div>
                 </div>
                 <div className="grid gap-3">
@@ -108,7 +120,11 @@ export const ScraperPage = () => {
                       <div className="space-y-2">
                         <p className="text-sm text-dark-300">{post.text}</p>
                         <div className="flex items-center gap-2 text-xs text-white/70">
-                          <span>Engagement {post.engagement}%</span>
+                          <span>
+                            Engagement {isLiveResult && !(typeof post.views === 'number' && post.views > 0)
+                              ? 'No disponible'
+                              : `${post.engagement}%`}
+                          </span>
                           <span>·</span>
                           <span>ID: {post.id}</span>
                         </div>

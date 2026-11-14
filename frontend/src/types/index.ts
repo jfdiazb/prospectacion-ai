@@ -116,6 +116,9 @@ export interface IScraperResult {
     id: string;
     text: string;
     engagement: number;
+    views?: number;
+    likes?: number;
+    comments?: number;
   }[];
   mode?: 'demo' | 'mock' | 'live';
   platform?: string;
