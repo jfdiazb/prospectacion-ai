@@ -21,6 +21,10 @@ type MetaObservation = {
   normalizedCount?: number;
   acceptedCount?: number;
   hasSignature?: boolean;
+  entryCount?: number;
+  messagingCount?: number;
+  changeFields?: string[];
+  changeValueKinds?: string[];
 };
 
 const fingerprint = (value: string | Buffer): string =>

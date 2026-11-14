@@ -31,7 +31,28 @@ export class MetaIngestionService {
     const commercialContext: any = await CommercialContextService.getActive(userId);
     const normalized = MetaWebhookNormalizer.normalizePayload(payload);
     const detectedPlatform = (payload as any)?.object === 'instagram' ? 'instagram' : (payload as any)?.object === 'page' ? 'facebook' : 'unknown';
-    observeMeta({ correlationId, stage: 'normalization', code: normalized.length ? 'normalized' : 'normalized_zero', platform: detectedPlatform, normalizedCount: normalized.length });
+    const entries = Array.isArray((payload as any)?.entry) ? (payload as any).entry : [];
+    const changes = entries.flatMap((entry: any) => Array.isArray(entry?.changes) ? entry.changes : []);
+    observeMeta({
+      correlationId,
+      stage: 'normalization',
+      code: normalized.length ? 'normalized' : 'normalized_zero',
+      platform: detectedPlatform,
+      normalizedCount: normalized.length,
+      ...(normalized.length ? {} : {
+        entryCount: entries.length,
+        messagingCount: entries.reduce(
+          (total: number, entry: any) => total + (Array.isArray(entry?.messaging) ? entry.messaging.length : 0),
+          0
+        ),
+        changeFields: [...new Set<string>(changes.map((change: any) => String(change?.field ?? 'unknown')))].slice(0, 10),
+        changeValueKinds: [...new Set<string>(changes.flatMap((change: any): string[] => {
+          const value = change?.value;
+          if (!value || typeof value !== 'object' || Array.isArray(value)) return [typeof value];
+          return Object.keys(value).sort().slice(0, 20);
+        }))].slice(0, 20),
+      }),
+    });
     for (const event of normalized) {
       const eventFingerprint = metaEventFingerprint(correlationId, event.externalEventId);
       const configuredMaxAge = Number(process.env.META_INBOUND_MAX_AGE_MS || 600000);

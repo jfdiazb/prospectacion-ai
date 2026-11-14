@@ -535,6 +535,43 @@ describe('Phase 4 Meta consolidation', () => {
     expect(await OutboundMessage.countDocuments({})).toBe(0);
   });
 
+  test('reports only structural metadata when a signed Instagram webhook has no supported message', async () => {
+    const info = jest.spyOn(console, 'info').mockImplementation();
+    const privateId = 'private-message-id';
+    const privateSender = 'private-sender-id';
+
+    expect(await MetaIngestionService.acceptPayload(ownerA.toString(), {
+      object: 'instagram',
+      entry: [{
+        id: 'configured-account',
+        changes: [{
+          field: 'messages',
+          value: {
+            sender: { id: privateSender },
+            recipient: { id: 'configured-account' },
+            timestamp: Date.now(),
+            read: { mid: privateId },
+          },
+        }],
+      }],
+    }, 'meta_req_structural_zero')).toHaveLength(0);
+
+    const observation = info.mock.calls
+      .filter(([message]) => message === 'Meta webhook observability')
+      .map(([, item]) => item as any)
+      .find(item => item.code === 'normalized_zero');
+    expect(observation).toMatchObject({
+      correlationId: 'meta_req_structural_zero',
+      platform: 'instagram',
+      entryCount: 1,
+      messagingCount: 0,
+      changeFields: ['messages'],
+      changeValueKinds: ['read', 'recipient', 'sender', 'timestamp'],
+    });
+    expect(JSON.stringify(observation)).not.toContain(privateId);
+    expect(JSON.stringify(observation)).not.toContain(privateSender);
+  });
+
   test('records the real failed Instagram outbound status instead of auto_sent', async () => {
     process.env.META_AUTO_SEND_ENABLED = 'true';
     const send = jest.spyOn(MessagingService, 'send').mockImplementation(async context => {

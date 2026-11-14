@@ -36,7 +36,7 @@ export interface YouTubeMonitor {
   activeThreadCount: number; monitoredThreadCount: number; uncoveredThreadCount: number; coverageCycleCount?: number; maxCoverageDelayMinutes?: number;
   lastReplySummary?: { activeThreads?: number; polledThreads?: number; coverageCycleCount?: number; urgentThreads?: number; threadFailures?: number; replies?: number; processed?: number; own_channel?: number; not_eligible?: number; duplicate?: number };
   lastProcessedCommentAt?: string;
-  delivery: { sent: number; failed: number; pending: number; simulated: number };
+  delivery: { generated: number; queued: number; sent: number; confirmed: number; failed: number; unknown: number; simulated: number };
   quota: { estimatedUnitsToday: number; dailyLimit: number; estimatedPercent: number; note: string };
   unanswered: { count: number; oldestAt?: string };
   errors: { oauth: number; quota: number; network: number; api: number };
