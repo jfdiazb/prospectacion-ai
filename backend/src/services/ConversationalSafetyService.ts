@@ -1,5 +1,6 @@
 import Meeting from '../models/Meeting';
 import type { MeetingReadiness } from './MeetingReadinessService';
+import { CommercialConversationPolicy, type AuthorizedCommercialKnowledge } from './CommercialConversationPolicy';
 
 type MeetingSnapshot = {
   status?: string;
@@ -71,7 +72,8 @@ export class ConversationalSafetyService {
     commercialInformationAuthorized?: boolean;
     asksCommercialDetails?: boolean;
     firstContactDiscovery?: boolean;
-    commercialContext?: { brandName?: string; businessType?: string; commercialLines?: string[] } | null;
+    requestedText?: string;
+    commercialContext?: AuthorizedCommercialKnowledge | null;
   }): SafetyResult {
     const text = input.text.trim();
     const normalized = normalize(text);
@@ -83,6 +85,9 @@ export class ConversationalSafetyService {
     if (this.detectPlaceholders(text)) violations.push('unresolved_placeholder');
     if (this.detectInternalContent(text)) violations.push('internal_content_exposure');
     if (this.detectUnsupportedExecutionClaim(text)) violations.push('unsupported_execution_claim');
+    if (input.requestedText && CommercialConversationPolicy.isEmptyCommercialEvasion(input.requestedText, text)) {
+      violations.push('empty_commercial_evasion');
+    }
     if (input.firstContactDiscovery && this.containsPrematureFirstContactContent(text)) {
       violations.push('premature_first_contact_commercial_framing');
     }
@@ -102,7 +107,7 @@ export class ConversationalSafetyService {
       violations.push('premature_meeting_cta');
     }
     if (!violations.length) return { text, allowed: true, violations, fallbackUsed: false };
-    return { text: this.safeFallback(input.readiness, meeting, input.firstContactDiscovery, input.asksCommercialDetails, input.commercialContext), allowed: false, violations, fallbackUsed: true };
+    return { text: this.safeFallback(input.readiness, meeting, input.firstContactDiscovery, input.asksCommercialDetails, input.commercialContext, input.requestedText), allowed: false, violations, fallbackUsed: true };
   }
 
   static async validateForConversation(input: {
@@ -113,7 +118,8 @@ export class ConversationalSafetyService {
     commercialInformationAuthorized?: boolean;
     asksCommercialDetails?: boolean;
     firstContactDiscovery?: boolean;
-    commercialContext?: { brandName?: string; businessType?: string; commercialLines?: string[] } | null;
+    requestedText?: string;
+    commercialContext?: AuthorizedCommercialKnowledge | null;
   }): Promise<SafetyResult> {
     const meeting: any = await Meeting.findOne({ userId: input.userId, conversationId: input.conversationId })
       .sort({ createdAt: -1 }).select('status provider joinUrl bookingUrl scheduledAt scheduledFor requestedDate requestedTime modality').lean();
@@ -130,7 +136,7 @@ export class ConversationalSafetyService {
     return /\b(?:negocio|productos?|marca|amway|nutrilite|compr(?:a|ar|as)|inscripcion|registr(?:o|arte|arse)|precios?|reunion|cita|calendly|zoom|ingresos?|ganancias?)\b|https?:\/\//i.test(value);
   }
 
-  private static safeFallback(readiness: MeetingReadiness, meeting?: MeetingSnapshot | null, firstContactDiscovery = false, asksCommercialDetails = false, commercial?: { brandName?: string; businessType?: string; commercialLines?: string[] } | null): string {
+  private static safeFallback(readiness: MeetingReadiness, meeting?: MeetingSnapshot | null, firstContactDiscovery = false, asksCommercialDetails = false, commercial?: AuthorizedCommercialKnowledge | null, requestedText = ''): string {
     if (firstContactDiscovery) {
       return '¡Hola! Gracias por escribir. Para orientarte mejor, ¿qué te llamó la atención o qué te gustaría encontrar en este momento?';
     }
@@ -145,6 +151,8 @@ export class ConversationalSafetyService {
       if (meeting.joinUrl) return `Tu reunión está confirmada. Puedes consultar el enlace de acceso aquí: ${meeting.joinUrl}`;
       return 'Tu reunión está confirmada, pero el enlace de acceso todavía no está disponible. Te lo compartiremos cuando el sistema lo registre.';
     }
+    const commercialReply = CommercialConversationPolicy.responseFor(requestedText, commercial);
+    if (commercialReply) return commercialReply;
     if (asksCommercialDetails && commercial?.brandName && commercial.businessType) {
       const lines = (commercial.commercialLines ?? []).filter(Boolean).slice(0, 3);
       const scope = lines.length ? ` Incluye ${lines.join(', ')}.` : '';

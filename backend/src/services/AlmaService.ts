@@ -136,9 +136,7 @@ export class AlmaService {
     const postMeetingContinuation = meetingAlreadyAccepted
       ? 'Gracias. Si necesitas aclarar algo más sobre el proyecto, con gusto te ayudo.'
       : null;
-    const authorizedInfoBrief = CommercialConversationPolicy.requiresAuthorizedBrief(context.text)
-      ? CommercialConversationPolicy.authorizedBrief(commercialContext)
-      : null;
+    const authorizedInfoBrief = CommercialConversationPolicy.responseFor(context.text, commercialContext);
     const aiProvider = context.automation || shouldOfferMeeting || authorizedInfoBrief || postMeetingContinuation ? null : getAIProvider();
     const aiResult = context.automation || shouldOfferMeeting || authorizedInfoBrief || postMeetingContinuation ? null : await aiProvider!.generateReply({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, incomingText: context.text, isNewLead: context.isNewLead, firstContactDiscovery, intent, normalizedIntent: qualification.normalizedIntent, platform: context.platform, history, askedTopics: aiMemory.askedTopics, memory: commercialMemory,
       commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines, categories: commercialContext.categories, productFamilies: commercialContext.productFamilies, allowedInformation: commercialContext.allowedInformation, informationPendingConfirmation: commercialContext.informationPendingConfirmation, communicationRules: commercialContext.communicationRules, restrictions: commercialContext.restrictions, disclaimers: commercialContext.disclaimers } : undefined });
@@ -152,7 +150,8 @@ export class AlmaService {
       userId: context.userId, conversationId: context.conversationId, text: deduplication.text,
       readiness: meetingReadiness, asksCommercialDetails, commercialInformationAuthorized,
       firstContactDiscovery: firstContactDiscovery && !authorizedInfoBrief,
-      commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines } : undefined,
+      requestedText: context.text,
+      commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines, productFamilies: commercialContext.productFamilies, allowedInformation: commercialContext.allowedInformation, informationPendingConfirmation: commercialContext.informationPendingConfirmation } : undefined,
     });
     const response = safety.text;
     if (!meetingOutcome.reply && !await ConversationService.reserveAIResponse(context.conversationId, context.userId, response)) {

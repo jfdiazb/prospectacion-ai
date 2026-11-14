@@ -30,3 +30,25 @@ tests:
       - { type: not-contains, value: freelancing }
       - { type: not-contains, value: precio }
       - { type: not-contains, value: reunión }
+  - description: exact YouTube INFO incident receives authorized facts
+    vars: { mode: commercial, text: 'Hola quiero info' }
+    assert:
+      - { type: contains, value: '"requiresAuthorizedBrief":true' }
+      - { type: contains, value: Amway }
+      - { type: not-contains, value: 'Si necesitas aclarar' }
+      - { type: not-contains, value: 'con gusto te ayudo' }
+  - description: investment without authorized amount is explicit and safe
+    vars: { mode: commercial, text: '¿Cuál es la inversión?' }
+    assert:
+      - { type: contains, value: 'No tengo una cifra de inversión autorizada' }
+      - { type: not-contains, value: agendar }
+      - { type: not-contains, value: reunión }
+  - description: empty commercial evasion blocked before send
+    vars:
+      mode: safety
+      text: 'Gracias. Si necesitas aclarar algo más sobre el proyecto, con gusto te ayudo.'
+      requestedText: 'Hola quiero info'
+      withCommercialContext: true
+    assert:
+      - { type: contains, value: empty_commercial_evasion }
+      - { type: contains, value: Amway }

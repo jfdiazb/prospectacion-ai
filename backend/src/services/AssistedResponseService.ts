@@ -16,6 +16,7 @@ import { MeetingReadinessService } from './MeetingReadinessService';
 import { LaunchAttributionService } from './LaunchAttributionService';
 import { ConversationMemoryService } from './ConversationMemoryService';
 import { ConversationalSafetyService } from './ConversationalSafetyService';
+import { CommercialConversationPolicy } from './CommercialConversationPolicy';
 
 type AssistedPlatform = 'whatsapp' | 'instagram' | 'facebook';
 type Context = { userId: string; leadId: string; conversationId: string; sourceEventId: string; correlationId?: string; eventType?: string; text: string; isNewLead: boolean; platform: AssistedPlatform; recipient: MessagingRecipient };
@@ -51,8 +52,9 @@ export class AssistedResponseService {
       ? MeetingReadinessService.meetingOfferFor(meetingReadiness, recent, leadTexts)
       : undefined;
     const shouldOfferMeeting = Boolean(qualifiedMeetingOffer);
-    const ai = shouldOfferMeeting ? null : getAIProvider();
-    const generated = shouldOfferMeeting ? null : await ai!.generateReply({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, incomingText: context.text, isNewLead: context.isNewLead, intent: qualification.intent, normalizedIntent: qualification.normalizedIntent, platform: context.platform, history: history.slice(0, -1), askedTopics: memory.askedTopics, memory: commercialMemory,
+    const authorizedInfoBrief = CommercialConversationPolicy.responseFor(context.text, commercialContext);
+    const ai = shouldOfferMeeting || authorizedInfoBrief ? null : getAIProvider();
+    const generated = shouldOfferMeeting || authorizedInfoBrief ? null : await ai!.generateReply({ userId: context.userId, leadId: context.leadId, conversationId: context.conversationId, sourceEventId: context.sourceEventId, incomingText: context.text, isNewLead: context.isNewLead, intent: qualification.intent, normalizedIntent: qualification.normalizedIntent, platform: context.platform, history: history.slice(0, -1), askedTopics: memory.askedTopics, memory: commercialMemory,
       commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines, allowedInformation: commercialContext.allowedInformation, informationPendingConfirmation: commercialContext.informationPendingConfirmation, communicationRules: commercialContext.communicationRules, restrictions: commercialContext.restrictions, disclaimers: commercialContext.disclaimers } : undefined });
     const meetingOutcome = await MeetingOrchestratorService.process({
       userId: context.userId, leadId: context.leadId, conversationId: context.conversationId,
@@ -65,13 +67,16 @@ export class AssistedResponseService {
       ? { text: meetingOutcome.reply, usedFallback: false }
       : shouldOfferMeeting
         ? { text: qualifiedMeetingOffer!, usedFallback: false }
+        : authorizedInfoBrief
+          ? { text: authorizedInfoBrief, usedFallback: false }
         : AlmaService.avoidRepeatedResponse(generated!.text, history.slice(0, -1), memory, context.text);
     const asksCommercialDetails = /empresa|marca|producto|precio|plan|modelo|amway|nutrilite|de que se trata|c[oó]mo funciona/i.test(context.text);
     const safety = await ConversationalSafetyService.validateForConversation({
       userId: context.userId, conversationId: context.conversationId, text: deduplicated.text,
       readiness: meetingReadiness, asksCommercialDetails,
+      requestedText: context.text,
       commercialInformationAuthorized: Boolean(commercialContext?.allowedInformation?.length),
-      commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines } : undefined,
+      commercialContext: commercialContext ? { brandName: commercialContext.brandName, businessType: commercialContext.businessType, commercialLines: commercialContext.commercialLines, productFamilies: commercialContext.productFamilies, allowedInformation: commercialContext.allowedInformation, informationPendingConfirmation: commercialContext.informationPendingConfirmation } : undefined,
     });
     if (!await ConversationService.reserveAIResponse(context.conversationId, context.userId, safety.text)) return null;
     const schedulingMeeting: any = meetingOutcome.reply ? await Meeting.findOne({ userId: context.userId, conversationId: context.conversationId }).sort({ createdAt: -1 }) : null;

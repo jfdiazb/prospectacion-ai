@@ -377,7 +377,7 @@ describe('Phase 4 Meta consolidation', () => {
     expect(await Conversation.countDocuments({ userId: ownerB })).toBe(1);
   });
 
-  test('preserves the inbound message and marks processing failure when Gemini fails', async () => {
+  test('preserves the inbound message and marks processing failure when the AI provider fails', async () => {
     jest
       .spyOn(aiIntegrations, 'getAIProvider')
       .mockReturnValue({
@@ -386,7 +386,7 @@ describe('Phase 4 Meta consolidation', () => {
       });
     const accepted = await MetaIngestionService.acceptPayload(
       ownerA.toString(),
-      facebookComment('fb-failure')
+      facebookComment('fb-failure', 'Necesito ingresos adicionales')
     );
     await MetaIngestionService.processAccepted(ownerA.toString(), accepted[0]);
     expect(await InboundEvent.findById(accepted[0].id)).toMatchObject({

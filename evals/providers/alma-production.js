@@ -45,7 +45,7 @@ class AlmaProductionProvider {
     } else if (vars.mode === 'commercial') {
       result = {
         requiresAuthorizedBrief: CommercialConversationPolicy.requiresAuthorizedBrief(String(vars.text || '')),
-        response: CommercialConversationPolicy.authorizedBrief({
+        response: CommercialConversationPolicy.responseFor(String(vars.text || ''), {
           brandName: 'Amway',
           businessType: 'venta directa y oportunidad de negocio independiente',
           commercialLines: ['oportunidad de negocio', 'consumo de productos'],
@@ -62,6 +62,11 @@ class AlmaProductionProvider {
           : null,
         commercialInformationAuthorized: bool(vars.commercialInformationAuthorized),
         asksCommercialDetails: bool(vars.asksCommercialDetails),
+        requestedText: String(vars.requestedText || ''),
+        commercialContext: bool(vars.withCommercialContext) ? {
+          brandName: 'Amway', businessType: 'venta directa y oportunidad de negocio independiente',
+          commercialLines: ['oportunidad de negocio', 'consumo de productos'],
+        } : null,
       });
     }
     return { output: JSON.stringify(result) };

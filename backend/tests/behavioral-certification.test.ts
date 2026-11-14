@@ -33,6 +33,29 @@ describe('Behavioral/commercial production certification', () => {
     expect(result.text).not.toMatch(/\[[^\]]+\]|agendar|reunión/i);
   });
 
+  test('blocks the exact empty YouTube reply before publication', () => {
+    const result = ConversationalSafetyService.validate({
+      text: 'Gracias. Si necesitas aclarar algo más sobre el proyecto, con gusto te ayudo.',
+      requestedText: 'Hola quiero info', readiness: discovery,
+      commercialInformationAuthorized: true,
+      commercialContext: { brandName: 'Amway', businessType: 'venta directa y oportunidad de negocio independiente', commercialLines: ['oportunidad de negocio', 'consumo de productos'] },
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.violations).toContain('empty_commercial_evasion');
+    expect(result.text).toMatch(/Amway.*venta directa/i);
+  });
+
+  test('blocks a template marker and never publishes it for an INFO request', () => {
+    const result = ConversationalSafetyService.validate({
+      text: 'El proyecto consiste en [breve descripción del objetivo y funcionamiento principal].',
+      requestedText: 'INFO', readiness: discovery,
+      commercialContext: { brandName: 'Amway', businessType: 'venta directa', commercialLines: ['productos'] },
+    });
+    expect(result.violations).toContain('unresolved_placeholder');
+    expect(result.text).not.toMatch(/\[[^\]]+\]/);
+    expect(result.text).toMatch(/Amway/);
+  });
+
   test.each(['Ya te envié el correo con la información', 'El email fue enviado y confirmado'])('blocks unsupported execution claim: %s', text => {
     expect(ConversationalSafetyService.validate({ text, readiness: discovery }).violations).toContain('unsupported_execution_claim');
   });

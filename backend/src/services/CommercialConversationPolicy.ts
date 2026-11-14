@@ -5,6 +5,7 @@ export type AuthorizedCommercialKnowledge = {
   categories?: string[];
   productFamilies?: string[];
   allowedInformation?: string[];
+  informationPendingConfirmation?: string[];
 };
 
 const normalize = (value: string): string => value
@@ -13,7 +14,11 @@ const normalize = (value: string): string => value
 export class CommercialConversationPolicy {
   static isGenericInfo(text: string): boolean {
     const value = normalize(text).replace(/[^a-z0-9]+/g, ' ').trim();
-    return /^(?:info|informacion|quiero informacion|me interesa)$/.test(value);
+    return /^(?:(?:hola|buenas?)\s+)?(?:info|quiero info|informacion|quiero informacion|me interesa)$/.test(value);
+  }
+
+  static isInvestmentQuestion(text: string): boolean {
+    return /\b(?:cuanto (?:cuesta|vale)|cual es (?:el|la) (?:precio|inversion)|precio|inversion inicial|costo inicial|coste inicial)\b/.test(normalize(text));
   }
 
   static requiresGrounding(text: string, normalizedIntent?: string): boolean {
@@ -25,6 +30,7 @@ export class CommercialConversationPolicy {
   static requiresAuthorizedBrief(text: string): boolean {
     const value = normalize(text).replace(/[^a-z0-9]+/g, ' ').trim();
     return this.isGenericInfo(text)
+      || this.isInvestmentQuestion(text)
       || /\b(?:explica(?:me)?|cuentame|informacion)\b.{0,45}\b(?:proyecto|oferta|oportunidad|negocio|modelo)\b|\b(?:de que se trata|como funciona)\b/.test(value);
   }
 
@@ -39,6 +45,22 @@ export class CommercialConversationPolicy {
     const scope = lines.length ? ` Incluye ${lines.join(', ')}` : '';
     const familyText = family ? `, con ${family} dentro de la configuración autorizada` : '';
     return `¡Gracias por tu interés! Se trata de ${brand}, un modelo de ${businessType}.${scope}${familyText}. ¿Qué te gustaría conocer o qué buscas lograr?`;
+  }
+
+  static responseFor(text: string, knowledge?: AuthorizedCommercialKnowledge | null): string | null {
+    if (!this.requiresAuthorizedBrief(text)) return null;
+    if (!this.isInvestmentQuestion(text)) return this.authorizedBrief(knowledge);
+    const facts = (knowledge?.allowedInformation ?? []).map(String).map(value => value.trim()).filter(value =>
+      Boolean(value) && /\b(?:precio|inversion|costo|coste|requisito)\b/.test(normalize(value)));
+    if (facts.length) return `Sobre la inversión, la información autorizada es: ${facts.slice(0, 2).join(' ')}`;
+    return 'No tengo una cifra de inversión autorizada y no sería correcto inventarla. Puedo explicarte el modelo y lo que sí está confirmado en la información comercial disponible.';
+  }
+
+  static isEmptyCommercialEvasion(request: string, response: string): boolean {
+    if (!this.requiresAuthorizedBrief(request)) return false;
+    const value = normalize(response).replace(/[^a-z0-9]+/g, ' ').trim();
+    return /^(?:gracias )?(?:si necesitas aclarar algo mas sobre el proyecto )?(?:con gusto te ayudo|estoy para ayudarte|puedo ayudarte)(?: en lo que necesites)?$/.test(value)
+      || /^(?:gracias )?(?:quieres|deseas) que te (?:explique|cuente|mande|envie)$/.test(value);
   }
 
   static containsOutsideOffer(text: string): boolean {
